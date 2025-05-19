@@ -1,6 +1,6 @@
+<!-- Banner Image -->
 <p align="center">
-  <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/banner.png?raw=true"
+  <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/banner.png?raw=true" 
        alt="Smart Student Handbook Banner"
-       style="max-width: 100%; width: 1000px; height: auto; border-radius: 10px;" />
+       style="width: 100%; max-width: 1200px; height: auto;" />
 </p>
-
