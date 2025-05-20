@@ -45,7 +45,7 @@ An AI-powered note-taking platform designed to help students take better notes, 
 
 ---
 
-### 👥 Team Members
+### Team Members
 
 <details>
 <summary><b>Reinhard Pretorius</b> – AI Developer</summary>
@@ -79,13 +79,13 @@ LinkedIn: [Mpumelelo Njamela](https://www.linkedin.com/in/mpumelelo-njamela-4280
 
 ---
 
-### ## 📘 Smart Student Handbook – Team F5
+### Smart Student Handbook – Team F5
 
 An AI-powered note-taking platform designed to help students take better notes, organize them by module and year, and collaborate with others. The system supports Markdown, WYSIWYG editing, and Firebase authentication to make studying more efficient.
 
 ---
 
-### 📂 Links
+### Links
 
 - 📄 [Functional Requirements (SRS)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
 - 📌 [GitHub Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
@@ -94,7 +94,7 @@ An AI-powered note-taking platform designed to help students take better notes, 
 
 ---
 
-### 👥 Team Members
+###  Team Members
 
 <details>
 <summary><b>Reinhard Pretorius</b> – AI Developer</summary>
@@ -139,9 +139,9 @@ We follow GitFlow:
 
 ###  GitHub Organization
 
-- ✅ Mono-repo structure
-- ✅ [Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
-- ✅ Issue tracking via GitHub Issues
+-  Mono-repo structure
+-  [Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
+-  Issue tracking via GitHub Issues
 
 ---
  Branching Strategy
@@ -155,9 +155,9 @@ We follow GitFlow:
 
 ### 🔧 GitHub Organization
 
-- ✅ Mono-repo structure
-- ✅ [Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
-- ✅ Issue tracking via GitHub Issues
+-  Mono-repo structure
+-  [Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
+-  Issue tracking via GitHub Issues
 
 ---
 
