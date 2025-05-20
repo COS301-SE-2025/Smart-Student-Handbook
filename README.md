@@ -47,14 +47,18 @@ Built to boost academic productivity and make studying simpler and smarter.
 
 ---
 
-## 👥 Team Members
+## Team Members
 
 <details>
 <summary><b>Reinhard Pretorius</b> – AI Developer</summary>
 <br>
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/rein.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<b>GitHub:</b> <a href="https://github.com/WizardOfGreen"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
-<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/reinhard-pretorius-664121356/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<a href="https://github.com/WizardOfGreen">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
+</a>
+<a href="https://www.linkedin.com/in/reinhard-pretorius-664121356/">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
+</a>
 <br clear="all" />
 </details>
 
@@ -62,8 +66,12 @@ Built to boost academic productivity and make studying simpler and smarter.
 <summary><b>Tanaka Ndhlovu</b> – Web Developer</summary>
 <br>
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/tanaka.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<b>GitHub:</b> <a href="https://github.com/NdhlovuTanaka"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
-<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/tanaka-ndhlovu/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<a href="https://github.com/NdhlovuTanaka">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
+</a>
+<a href="https://www.linkedin.com/in/tanaka-ndhlovu/">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
+</a>
 <br clear="all" />
 </details>
 
@@ -71,8 +79,12 @@ Built to boost academic productivity and make studying simpler and smarter.
 <summary><b>Takudzwa Magunda</b> – Integration & Service Engineer</summary>
 <br>
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/taku.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<b>GitHub:</b> <a href="https://github.com/MagundaTakudzwa"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
-<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/takudzwa-magunda/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<a href="https://github.com/MagundaTakudzwa">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
+</a>
+<a href="https://www.linkedin.com/in/takudzwa-magunda/">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
+</a>
 <br clear="all" />
 </details>
 
@@ -80,8 +92,12 @@ Built to boost academic productivity and make studying simpler and smarter.
 <summary><b>Oscar Motsepe</b> – Front-End Developer</summary>
 <br>
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/junior.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<b>GitHub:</b> <a href="https://github.com/ojmotsepe"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
-<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/junior-motsepe-746618356/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<a href="https://github.com/ojmotsepe">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
+</a>
+<a href="https://www.linkedin.com/in/junior-motsepe-746618356/">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
+</a>
 <br clear="all" />
 </details>
 
@@ -89,8 +105,12 @@ Built to boost academic productivity and make studying simpler and smarter.
 <summary><b>Mpumelelo Njamela</b> – Testing Engineer</summary>
 <br>
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/mpume.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<b>GitHub:</b> <a href="https://github.com/mpume44"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
-<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/mpumelelo-njamela-428090332/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<a href="https://github.com/mpume44">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
+</a>
+<a href="https://www.linkedin.com/in/mpumelelo-njamela-428090332/">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
+</a>
 <br clear="all" />
 </details>
 
