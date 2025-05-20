@@ -47,7 +47,7 @@ Built to boost academic productivity and make studying simpler and smarter.
 
 ---
 
-## Team Members
+## 👥 Team Members
 
 <details>
 <summary><b>Reinhard Pretorius</b> – AI Developer</summary>
