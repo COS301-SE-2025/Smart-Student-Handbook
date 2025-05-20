@@ -30,9 +30,9 @@
 
 ## Smart Student Handbook – Team F5
 
-An AI-powered note-taking platform designed to help students take better notes, organize them by module and year, and collaborate with others. The system supports Markdown, WYSIWYG editing, and Firebase authentication to make studying more efficient.
-
----
+The Smart Student Handbook is a digital platform that helps students take, organize, and revise notes effectively.
+It offers smart features like AI-powered suggestions, structured categorization, and real-time collaboration.
+Built to boost academic productivity and make studying simpler and smarter.
 
 
 
