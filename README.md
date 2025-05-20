@@ -26,7 +26,34 @@
 
 </p>
 
----
+<p align="center">
+
+  <!-- Code coverage (example placeholder - replace if using Codecov/SonarCloud later) -->
+  <img src="https://img.shields.io/badge/codecov-coming%20soon-ff69b4?style=for-the-badge" />
+
+  <!-- Linting badge placeholder -->
+  <img src="https://img.shields.io/badge/Linting-pending-lightgrey?style=for-the-badge&logo=github" />
+
+  <!-- Build badge placeholder -->
+  <img src="https://img.shields.io/badge/Build-pending-lightgrey?style=for-the-badge&logo=githubactions" />
+
+  <!-- Last commit -->
+  <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/commits/main/">
+    <img src="https://img.shields.io/github/last-commit/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge" />
+  </a>
+
+  <!-- Issues: Open -->
+  <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues">
+    <img src="https://img.shields.io/github/issues/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge&label=open%20issues" />
+  </a>
+
+  <!-- Issues: Closed -->
+  <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues?q=is%3Aissue+state%3Aclosed">
+    <img src="https://img.shields.io/github/issues-closed/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge&label=closed%20issues" />
+  </a>
+
+</p>
+
 
 ## Smart Student Handbook – Team F5
 
