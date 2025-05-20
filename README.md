@@ -102,7 +102,7 @@ Built to boost academic productivity and make studying simpler and smarter.
     <td style="vertical-align: top; width: auto; border: 0; padding: 10px;">
       <h2><b style="font-size: 18px;">Takudzwa Magunda</b></h2>
       <b style="font-size: 16px;">Integration & Service Engineer</b><br>
-      I’m a third-year Computer Science student who naturally gravitates toward the “connect-the-dots” layer of software.  
+      I’m a third-year Computer Science student who naturally gravitates toward the "connect-the-dots" layer of systems.  
       I’ve built projects in Java, C++, and Node.js.I thrive working on the service-and-integration layer: figuring out how APIs, databases and front ends all talk to each other.
       <br><br>
     </td>
@@ -146,9 +146,9 @@ Built to boost academic productivity and make studying simpler and smarter.
     <td style="vertical-align: top; width: auto; border: 0; padding: 10px;">
       <h2><b style="font-size: 18px;">Mpumelelo Njamela</b></h2>
       <b style="font-size: 16px;">Testing Engineer</b><br>
-      I’m a third-year Computer Science student with a solid foundation in software principles, algorithms, and system design.  
+      I’m a third-year Computer Science student with a solid foundation in software principles, algorithms and system design.  
       I’ve worked in Java, Python, and C++, and I’ve applied these skills to real-world analytics challenges — like building sports prediction models.  
-      I love testing, debugging, and refining systems, and I bring a data-driven mindset to make sure our system is accurate, robust and reliable.
+      I love testing, debugging, and refining systems and I bring a data-driven mindset to make sure our system is accurate, robust and reliable.
       <br><br>
     </td>
   </tr>
