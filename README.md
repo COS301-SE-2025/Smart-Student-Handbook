@@ -28,8 +28,6 @@
 </p>
 
 
----
-
 ## 📊 Project Dashboard
 
 <p align="left">
@@ -41,14 +39,14 @@
   <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues?q=is%3Aissue+state%3Aclosed"><img src="https://img.shields.io/github/issues-closed/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge&color=brightgreen" /></a>
 </p>
 
-## Smart Student Handbook – Team F5
+
+## General Overview
+
+Smart Student Handbook – Team F5
 
 The Smart Student Handbook is a digital platform that helps students take, organize, and revise notes effectively.
 It offers smart features like AI-powered suggestions, structured categorization, and real-time collaboration.
 Built to boost academic productivity and make studying simpler and smarter.
-
-
-
 
 ### Project Links
 
@@ -174,17 +172,19 @@ Built to boost academic productivity and make studying simpler and smarter.
 
 ### Branching Strategy
 
-We follow GitFlow:
+We follow a customized GitFlow:
 
 - `main`: Stable production code  
 - `dev`: Integrates all new features  
-- `feature`: Individual feature development  
+- `frontend`: All UI/React development  
+- `api`: Backend and API development  
+- `ai-models`: AI/ML model work 
 ---
 
-###  GitHub Organization
+###  GitHub Organization and Management
 
-- Mono-repo structure  
+- Mono-repo structure (frontend, backend, and AI all in one repo)
 - [GitHub Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)  
-- Issue tracking via [GitHub Issues](https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues)
+
 
 ---
