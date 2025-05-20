@@ -35,22 +35,14 @@ An AI-powered note-taking platform designed to help students take better notes, 
 ---
 
 
-### 📂 Project Links
 
-<p align="center">
-  <a href="https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit" target="_blank">
-    <img src="https://img.shields.io/badge/SRS-Functional%20Requirements-blue?style=for-the-badge&logo=googledocs&logoColor=white" alt="SRS Document Badge" />
-  </a>
-  <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects" target="_blank">
-    <img src="https://img.shields.io/badge/GitHub-Project%20Board-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Project Board Badge" />
-  </a>
-  <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues" target="_blank">
-    <img src="https://img.shields.io/badge/GitHub-Issues-orange?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Issues Badge" />
-  </a>
-  <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/pulse" target="_blank">
-    <img src="https://img.shields.io/badge/GitHub-Activity%20Pulse-9cf?style=for-the-badge&logo=github&logoColor=white" alt="Pulse Activity Badge" />
-  </a>
-</p>
+
+### Project Links
+
+ 📝 [Functional Requirements (SRS)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
+ 🗂️ [GitHub Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
+ ❗ [GitHub Issues](https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues)
+ 📈 [Pulse (Activity)](https://github.com/COS301-SE-2025/Smart-Student-Handbook/pulse)
 
 
 ---
