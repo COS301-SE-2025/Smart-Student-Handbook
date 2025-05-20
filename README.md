@@ -47,7 +47,7 @@ Built to boost academic productivity and make studying simpler and smarter.
 
 ---
 
-## 👥 Team Members
+## Team Members
 
 <details>
 <summary><b>Reinhard Pretorius</b> – AI Developer</summary>
@@ -55,7 +55,7 @@ Built to boost academic productivity and make studying simpler and smarter.
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/rein.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
 <a href="https://github.com/WizardOfGreen">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
-</a>
+</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <a href="https://www.linkedin.com/in/reinhard-pretorius-664121356/">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
 </a>
@@ -68,7 +68,7 @@ Built to boost academic productivity and make studying simpler and smarter.
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/tanaka.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
 <a href="https://github.com/NdhlovuTanaka">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
-</a>
+</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <a href="https://www.linkedin.com/in/tanaka-ndhlovu/">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
 </a>
@@ -81,7 +81,7 @@ Built to boost academic productivity and make studying simpler and smarter.
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/taku.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
 <a href="https://github.com/MagundaTakudzwa">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
-</a>
+</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <a href="https://www.linkedin.com/in/takudzwa-magunda/">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
 </a>
@@ -94,7 +94,7 @@ Built to boost academic productivity and make studying simpler and smarter.
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/junior.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
 <a href="https://github.com/ojmotsepe">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
-</a>
+</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <a href="https://www.linkedin.com/in/junior-motsepe-746618356/">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
 </a>
@@ -107,13 +107,12 @@ Built to boost academic productivity and make studying simpler and smarter.
 <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/mpume.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
 <a href="https://github.com/mpume44">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="28" />
-</a>
+</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <a href="https://www.linkedin.com/in/mpumelelo-njamela-428090332/">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="28" />
 </a>
 <br clear="all" />
 </details>
-
 
 ### Branching Strategy
 
