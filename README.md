@@ -18,9 +18,6 @@
   <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />&nbsp;
   <img src="https://img.shields.io/badge/shadcn/ui-111827?style=for-the-badge" />
 
-  <br><br>
-
-  <!-- Row 2 -->
   <img src="https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=white" />&nbsp;
   <img src="https://img.shields.io/badge/Zod-F77F00?style=for-the-badge" />&nbsp;
   <img src="https://img.shields.io/badge/Markdown-000000?style=for-the-badge&logo=markdown&logoColor=white" />&nbsp;
