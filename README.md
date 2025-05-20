@@ -47,87 +47,53 @@ Built to boost academic productivity and make studying simpler and smarter.
 
 ---
 
-### 👥 Team Members
+## 👥 Team Members
 
 <details>
 <summary><b>Reinhard Pretorius</b> – AI Developer</summary>
 <br>
-<p align="center">
-  <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/rein.jpg?raw=true" width="200"/>
-</p>
-<p align="center">
-  <a href="https://github.com/WizardOfGreen">
-    <img src="https://img.shields.io/badge/GitHub-Profile-181717?style=for-the-badge&logo=github&logoColor=white" />
-  </a>
-  <a href="https://www.linkedin.com/in/reinhard-pretorius-664121356/">
-    <img src="https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" />
-  </a>
-</p>
+<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/rein.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
+<b>GitHub:</b> <a href="https://github.com/WizardOfGreen"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
+<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/reinhard-pretorius-664121356/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<br clear="all" />
 </details>
 
 <details>
 <summary><b>Tanaka Ndhlovu</b> – Web Developer</summary>
 <br>
-<p align="center">
-  <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/tanaka.jpg?raw=true" width="200"/>
-</p>
-<p align="center">
-  <a href="https://github.com/NdhlovuTanaka">
-    <img src="https://img.shields.io/badge/GitHub-Profile-181717?style=for-the-badge&logo=github&logoColor=white" />
-  </a>
-  <a href="https://www.linkedin.com/in/tanaka-ndhlovu/">
-    <img src="https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" />
-  </a>
-</p>
+<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/tanaka.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
+<b>GitHub:</b> <a href="https://github.com/NdhlovuTanaka"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
+<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/tanaka-ndhlovu/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<br clear="all" />
 </details>
 
 <details>
 <summary><b>Takudzwa Magunda</b> – Integration & Service Engineer</summary>
 <br>
-<p align="center">
-  <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/taku.jpg?raw=true" width="200"/>
-</p>
-<p align="center">
-  <a href="https://github.com/MagundaTakudzwa">
-    <img src="https://img.shields.io/badge/GitHub-Profile-181717?style=for-the-badge&logo=github&logoColor=white" />
-  </a>
-  <a href="https://www.linkedin.com/in/takudzwa-magunda/">
-    <img src="https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" />
-  </a>
-</p>
+<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/taku.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
+<b>GitHub:</b> <a href="https://github.com/MagundaTakudzwa"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
+<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/takudzwa-magunda/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<br clear="all" />
 </details>
 
 <details>
 <summary><b>Oscar Motsepe</b> – Front-End Developer</summary>
 <br>
-<p align="center">
-  <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/junior.jpg?raw=true" width="200"/>
-</p>
-<p align="center">
-  <a href="https://github.com/ojmotsepe">
-    <img src="https://img.shields.io/badge/GitHub-Profile-181717?style=for-the-badge&logo=github&logoColor=white" />
-  </a>
-  <a href="https://www.linkedin.com/in/junior-motsepe-746618356/">
-    <img src="https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" />
-  </a>
-</p>
+<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/junior.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
+<b>GitHub:</b> <a href="https://github.com/ojmotsepe"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
+<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/junior-motsepe-746618356/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<br clear="all" />
 </details>
 
 <details>
 <summary><b>Mpumelelo Njamela</b> – Testing Engineer</summary>
 <br>
-<p align="center">
-  <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/mpume.jpg?raw=true" width="200"/>
-</p>
-<p align="center">
-  <a href="https://github.com/mpume44">
-    <img src="https://img.shields.io/badge/GitHub-Profile-181717?style=for-the-badge&logo=github&logoColor=white" />
-  </a>
-  <a href="https://www.linkedin.com/in/mpumelelo-njamela-428090332/">
-    <img src="https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" />
-  </a>
-</p>
+<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/mpume.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
+<b>GitHub:</b> <a href="https://github.com/mpume44"><img src="https://img.shields.io/badge/-GitHub-181717?style=flat&logo=github&logoColor=white" /></a>  
+<b>LinkedIn:</b> <a href="https://www.linkedin.com/in/mpumelelo-njamela-428090332/"><img src="https://img.shields.io/badge/-LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" /></a>
+<br clear="all" />
 </details>
+
 
 ### Branching Strategy
 
