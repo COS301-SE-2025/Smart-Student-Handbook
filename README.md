@@ -30,7 +30,7 @@
 </p>
 
 
-## 📘 Smart Student Handbook – Team F5
+## Smart Student Handbook – Team F5
 
 An AI-powered note-taking platform designed to help students take better notes, organize them by module and year, and collaborate with others. The system supports Markdown, WYSIWYG editing, and Firebase authentication to make studying more efficient.
 
@@ -79,12 +79,77 @@ LinkedIn: [Mpumelelo Njamela](https://www.linkedin.com/in/mpumelelo-njamela-4280
 
 ---
 
-### 🌿 Branching Strategy
+### ## 📘 Smart Student Handbook – Team F5
+
+An AI-powered note-taking platform designed to help students take better notes, organize them by module and year, and collaborate with others. The system supports Markdown, WYSIWYG editing, and Firebase authentication to make studying more efficient.
+
+---
+
+### 📂 Links
+
+- 📄 [Functional Requirements (SRS)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
+- 📌 [GitHub Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
+- 🐛 [Issues](https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues)
+- 📊 [Pulse](https://github.com/COS301-SE-2025/Smart-Student-Handbook/pulse)
+
+---
+
+### 👥 Team Members
+
+<details>
+<summary><b>Reinhard Pretorius</b> – AI Developer</summary>
+GitHub: [WizardOfGreen](https://github.com/WizardOfGreen)  
+LinkedIn: [Reinhard Pretorius](https://www.linkedin.com/in/reinhard-pretorius-664121356/)
+</details>
+
+<details>
+<summary><b>Tanaka Ndhlovu</b> – Web Developer</summary>
+GitHub: [NdhlovuTanaka](https://github.com/NdhlovuTanaka)  
+LinkedIn: [Tanaka Ndhlovu](https://www.linkedin.com/in/tanaka-ndhlovu/)
+</details>
+
+<details>
+<summary><b>Takudzwa Magunda</b> – Integration & Service Engineer</summary>
+GitHub: [MagundaTakudzwa](https://github.com/MagundaTakudzwa)  
+LinkedIn: [Takudzwa Magunda](https://www.linkedin.com/in/takudzwa-magunda/)
+</details>
+
+<details>
+<summary><b>Oscar Motsepe</b> – Front-End Developer</summary>
+GitHub: [ojmotsepe](https://github.com/ojmotsepe)  
+LinkedIn: [Junior Motsepe](https://www.linkedin.com/in/junior-motsepe-746618356?trk=contact-info)
+</details>
+
+<details>
+<summary><b>Mpumelelo Njamela</b> – Testing Engineer</summary>
+GitHub: [mpume44](https://github.com/mpume44)  
+LinkedIn: [Mpumelelo Njamela](https://www.linkedin.com/in/mpumelelo-njamela-428090332)
+</details>
+
+---
+
+###  Branching Strategy
 
 We follow GitFlow:
 - `main`: Stable production code
 - `develop`: Integrates all new features
 - `feature/*`: Individual feature development
+
+---
+
+###  GitHub Organization
+
+- ✅ Mono-repo structure
+- ✅ [Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
+- ✅ Issue tracking via GitHub Issues
+
+---
+ Branching Strategy
+
+We follow GitFlow:
+- `main`: Stable production code
+- `develop`: Integrates all new features
+
 
 ---
 
