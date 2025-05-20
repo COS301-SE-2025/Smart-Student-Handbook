@@ -39,10 +39,10 @@ An AI-powered note-taking platform designed to help students take better notes, 
 
 ### Project Links
 
- 📝 [Functional Requirements (SRS)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
- 🗂️ [GitHub Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
- ❗ [GitHub Issues](https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues)
- 📈 [Pulse (Activity)](https://github.com/COS301-SE-2025/Smart-Student-Handbook/pulse)
+ -📝 [Functional Requirements (SRS)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
+ -🗂️ [GitHub Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
+ -❗ [GitHub Issues](https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues)
+ -📈 [Pulse (Activity)](https://github.com/COS301-SE-2025/Smart-Student-Handbook/pulse)
 
 
 ---
