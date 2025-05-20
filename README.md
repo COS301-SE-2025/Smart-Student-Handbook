@@ -86,13 +86,8 @@ LinkedIn: [Mpumelelo Njamela](https://www.linkedin.com/in/mpumelelo-njamela-4280
 We follow GitFlow:
 
 - `main`: Stable production code  
-- `develop`: Integrates all new features  
-- `feature/*`: Individual feature development  
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Branching-GitFlow-blueviolet?style=for-the-badge" />
-</p>
-
+- `dev`: Integrates all new features  
+- `feature`: Individual feature development  
 ---
 
 ###  GitHub Organization
