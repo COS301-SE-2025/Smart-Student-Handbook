@@ -7,38 +7,39 @@
 
 ## 🧰 Tech Stack
 
-<img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white" />
-<img src="https://img.shields.io/badge/Express.js-404D59?style=for-the-badge" />
-<img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white" />
-<img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
-<img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
-<img src="https://img.shields.io/badge/shadcn/ui-111827?style=for-the-badge" />
-<img src="https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=white" />
-<img src="https://img.shields.io/badge/Zod-F77F00?style=for-the-badge" />
-<img src="https://img.shields.io/badge/Markdown-000000?style=for-the-badge&logo=markdown&logoColor=white" />
-<img src="https://img.shields.io/badge/WYSIWYG%20Editor-6B46C1?style=for-the-badge" />
-<img src="https://img.shields.io/badge/GitHub%20Projects-181717?style=for-the-badge&logo=github&logoColor=white" />
-<img src="https://img.shields.io/badge/Draw.io-F08705?style=for-the-badge&logo=diagrams.net&logoColor=white" />
-<img src="https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" />
-<img src="https://img.shields.io/badge/Typescript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+<p align="left">
+  <!-- Row 1: 7 badges -->
+  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/Express.js-404D59?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
+  <img src="https://img.shields.io/badge/shadcn/ui-111827?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=white" />
+  <br>
+  <!-- Row 2: 7 badges -->
+  <img src="https://img.shields.io/badge/Zod-F77F00?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Markdown-000000?style=for-the-badge&logo=markdown&logoColor=white" />
+  <img src="https://img.shields.io/badge/WYSIWYG%20Editor-6B46C1?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/GitHub%20Projects-181717?style=for-the-badge&logo=github&logoColor=white" />
+  <img src="https://img.shields.io/badge/Draw.io-F08705?style=for-the-badge&logo=diagrams.net&logoColor=white" />
+  <img src="https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" />
+  <img src="https://img.shields.io/badge/Typescript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+</p>
 
 
 ---
 
 ## 📊 Project Dashboard
 
-<img src="https://img.shields.io/badge/Codecov-Coming%20Soon-ff69b4?style=for-the-badge&logo=codecov&logoColor=white" />
-<img src="https://img.shields.io/badge/Linting-Pending-lightgrey?style=for-the-badge&logo=github" />
-<img src="https://img.shields.io/badge/Build-Pending-lightgrey?style=for-the-badge&logo=githubactions" />
-<a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/commits/main/">
-  <img src="https://img.shields.io/github/last-commit/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge&color=yellow" />
-</a>
-<a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues">
-  <img src="https://img.shields.io/github/issues/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge&color=brightgreen" />
-</a>
-<a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues?q=is%3Aissue+is%3Aclosed">
-  <img src="https://img.shields.io/github/issues-closed/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge&color=brightgreen" />
-</a>
+<p align="left">
+  <img src="https://img.shields.io/badge/Codecov-Coming%20Soon-ff69b4?style=for-the-badge&logo=codecov&logoColor=white" />
+  <img src="https://img.shields.io/badge/Linting-Pending-lightgrey?style=for-the-badge&logo=github" />
+  <img src="https://img.shields.io/badge/Build-Pending-lightgrey?style=for-the-badge&logo=githubactions" />
+  <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/commits/main/"><img src="https://img.shields.io/github/last-commit/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge&color=yellow" /></a>
+  <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues"><img src="https://img.shields.io/github/issues/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge&color=brightgreen" /></a>
+  <a href="https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues?q=is%3Aissue+state%3Aclosed"><img src="https://img.shields.io/github/issues-closed/COS301-SE-2025/Smart-Student-Handbook?style=for-the-badge&color=brightgreen" /></a>
+</p>
 
 ## Smart Student Handbook – Team F5
 
