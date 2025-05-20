@@ -47,72 +47,117 @@ Built to boost academic productivity and make studying simpler and smarter.
 
 ---
 
-## 👥 Team Members
+## Team Members
 
 <details>
-<summary><b>Reinhard Pretorius</b> – AI Developer</summary>
-<br>
-<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/rein.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<a href="https://github.com/WizardOfGreen">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="40" />
-</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<a href="https://www.linkedin.com/in/reinhard-pretorius-664121356/">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="40" />
-</a>
-<br clear="all" />
+<summary>Reinhard Pretorius</summary>
+<table style="border-width: 1px; width: 100%; font-family: Arial, sans-serif; border-collapse: collapse;">
+  <tr>
+    <td style="vertical-align: top; width:auto; border: 0; padding: 10px;">
+      <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/rein.jpg?raw=true" width="800" height="auto" style="display: block; margin: 0 auto;">
+    </td>
+    <td style="vertical-align: top; width: auto; border: 0; padding: 10px;">
+      <h2><b style="font-size: 18px;">Reinhard Pretorius</b></h2>
+      <b style="font-size: 16px;">AI Developer</b><br>
+      I’m a third-year Computer Science student with a strong passion for Artificial Intelligence and Machine Learning.  
+      I bring both technical expertise and visionary ambition to the team. I’m particularly interested in using AI to drive innovation in the medical field.  
+      My long-term goal is to build intelligent systems that support cutting-edge medical equipment and procedures. In this project, I contribute AI knowledge and advanced data pipelines to expand the system’s intelligence.
+      <br><br>
+    </td>
+  </tr>
+</table>
+
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/WizardOfGreen)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/reinhard-pretorius-664121356/)
 </details>
 
 <details>
-<summary><b>Tanaka Ndhlovu</b> – Web Developer</summary>
-<br>
-<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/tanaka.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<a href="https://github.com/NdhlovuTanaka">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="40" />
-</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<a href="https://www.linkedin.com/in/tanaka-ndhlovu/">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="40" />
-</a>
-<br clear="all" />
+<summary>Tanaka Ndhlovu</summary>
+<table style="border-width: 1px; width: 100%; font-family: Arial, sans-serif; border-collapse: collapse;">
+  <tr>
+    <td style="vertical-align: top; width:auto; border: 0; padding: 10px;">
+      <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/tanaka.jpg?raw=true" width="800" height="auto" style="display: block; margin: 0 auto;">
+    </td>
+    <td style="vertical-align: top; width: auto; border: 0; padding: 10px;">
+      <h2><b style="font-size: 18px;">Tanaka Ndhlovu</b></h2>
+      <b style="font-size: 16px;">Web Developer</b><br>
+      I’m a third-year Information and Knowledge Systems student with a strong focus on developing websites, web apps, and mobile apps.  
+      I’ve built projects with Angular, React.js, Vue.js, and React Native — and I code in C++, C#, Java, and XML.  
+      <br><br>
+    </td>
+  </tr>
+</table>
+
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/NdhlovuTanaka)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/tanaka-ndhlovu/)
 </details>
 
 <details>
-<summary><b>Takudzwa Magunda</b> – Integration & Service Engineer</summary>
-<br>
-<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/taku.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<a href="https://github.com/MagundaTakudzwa">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="40" />
-</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<a href="https://www.linkedin.com/in/takudzwa-magunda/">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="40" />
-</a>
-<br clear="all" />
+<summary>Takudzwa Magunda</summary>
+<table style="border-width: 1px; width: 100%; font-family: Arial, sans-serif; border-collapse: collapse;">
+  <tr>
+    <td style="vertical-align: top; width:auto; border: 0; padding: 10px;">
+      <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/taku.jpg?raw=true" width="800" height="auto" style="display: block; margin: 0 auto;">
+    </td>
+    <td style="vertical-align: top; width: auto; border: 0; padding: 10px;">
+      <h2><b style="font-size: 18px;">Takudzwa Magunda</b></h2>
+      <b style="font-size: 16px;">Integration & Service Engineer</b><br>
+      I’m a third-year Computer Science student who naturally gravitates toward the “connect-the-dots” layer of software.  
+      I’ve built projects in Java, C++, and Node.js.I thrive working on the service-and-integration layer: figuring out how APIs, databases and front ends all talk to each other.
+      <br><br>
+    </td>
+  </tr>
+</table>
+
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/MagundaTakudzwa)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/takudzwa-magunda/)
 </details>
 
 <details>
-<summary><b>Oscar Motsepe</b> – Front-End Developer</summary>
-<br>
-<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/junior.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<a href="https://github.com/ojmotsepe">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="40" />
-</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<a href="https://www.linkedin.com/in/junior-motsepe-746618356/">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="40" />
-</a>
-<br clear="all" />
+<summary>Oscar Motsepe</summary>
+<table style="border-width: 1px; width: 100%; font-family: Arial, sans-serif; border-collapse: collapse;">
+  <tr>
+    <td style="vertical-align: top; width:auto; border: 0; padding: 10px;">
+      <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/junior.jpg?raw=true" width="800" height="auto" style="display: block; margin: 0 auto;">
+    </td>
+    <td style="vertical-align: top; width: auto; border: 0; padding: 10px;">
+      <h2><b style="font-size: 18px;">Oscar Motsepe</b></h2>
+      <b style="font-size: 16px;">Front-End Developer</b><br>
+      I’m a creative developer who’s passionate about building modern, responsive and user-friendly applications.  
+      My skills include HTML5, React, and UI/UX design and I work extensively in Figma for prototyping.  
+      I also enjoy aesthetic refinement — whether that’s styling components or post-processing images in Adobe Lightroom.  
+      I bring a visual edge to our team and work to make interfaces both beautiful and intuitive.
+      <br><br>
+    </td>
+  </tr>
+</table>
+
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/ojmotsepe)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/junior-motsepe-746618356/)
 </details>
 
 <details>
-<summary><b>Mpumelelo Njamela</b> – Testing Engineer</summary>
-<br>
-<img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/mpume.jpg?raw=true" width="140" align="left" style="margin-right: 20px; border-radius: 10px;" />
-<a href="https://github.com/mpume44">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" width="40" />
-</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<a href="https://www.linkedin.com/in/mpumelelo-njamela-428090332/">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linkedin/linkedin-original.svg" width="40" />
-</a>
-<br clear="all" />
+<summary>Mpumelelo Njamela</summary>
+<table style="border-width: 1px; width: 100%; font-family: Arial, sans-serif; border-collapse: collapse;">
+  <tr>
+    <td style="vertical-align: top; width:auto; border: 0; padding: 10px;">
+      <img src="https://github.com/COS301-SE-2025/Smart-Student-Handbook/blob/main/assets/mpume.jpg?raw=true" width="800" height="auto" style="display: block; margin: 0 auto;">
+    </td>
+    <td style="vertical-align: top; width: auto; border: 0; padding: 10px;">
+      <h2><b style="font-size: 18px;">Mpumelelo Njamela</b></h2>
+      <b style="font-size: 16px;">Testing Engineer</b><br>
+      I’m a third-year Computer Science student with a solid foundation in software principles, algorithms, and system design.  
+      I’ve worked in Java, Python, and C++, and I’ve applied these skills to real-world analytics challenges — like building sports prediction models.  
+      I love testing, debugging, and refining systems, and I bring a data-driven mindset to make sure our system is accurate, robust and reliable.
+      <br><br>
+    </td>
+  </tr>
+</table>
+
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/mpume44)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/mpumelelo-njamela-428090332/)
 </details>
+
 
 ### Branching Strategy
 
