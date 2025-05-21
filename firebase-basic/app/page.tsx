@@ -12,6 +12,10 @@ export default function Home() {
           <Button variant="outline">Go to Login</Button>
         </Link>
 
+        <Link href="/signup">
+          <Button variant="outline">Register</Button>
+        </Link>
+
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
       </footer>
