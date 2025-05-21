@@ -1,0 +1,25 @@
+Firebase SDK;
+    1) To use Firebase on your app , install the SDK with this command : npm install firebase
+
+How to set up FireBase on your App :
+    1) Create a firebase.js file at {appname}\lib
+        Next.js uses this dir for the firebase exports and imports. I also used it for the Login and Dashboard
+    2) Export anything you need from Firebase.
+        This allows the app to use whatever Firebase can provide be it auth , db etc . 
+        Contact me (Reinhard) if I need to add anything to the Firebase
+    3) Firebase Config.
+        Use the firebaseconfig for your Apps aswell , this connects to the Firebase Web App I made .
+        Dont change any of it , if you do you wont be able to connect to Firebase.
+
+Readme to describe how to Login && Use data of the Firebase
+    1) Login as a already registered user : Use these credentials for now
+        1.1) cybran101@gmail.com
+        1.2) 87654321
+    2) Dashboard 
+        After login , it takes you to the dashboard . Here , simple data will be shown from the Firestore Database 
+        These data has the tag of users.note and users.title
+    3) User specific Database
+        Each user has their own "Collection" of data they can have , as of now it is a manual procedure to create their own database.
+        The Firestore database structure looks like this : users - {userid} - {users.title} , {users.note}.
+        The userID is generate by Firebase itself , it is unique to each user and used for authentication.
+    
