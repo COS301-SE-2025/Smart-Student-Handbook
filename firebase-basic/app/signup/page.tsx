@@ -17,15 +17,23 @@ export default function SignupPage() {
     e.preventDefault();
     setError('');
 
+    const trimmedEmail = email.trim();
+
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
       const user = userCredential.user;
 
       await setDoc(doc(db, 'users', user.uid), {
         name,
         role: 'User',
         email: user.email,
-        createdAt: new Date()
+        createdAt: new Date(),
       });
 
       router.push('/dashboard');
@@ -34,6 +42,7 @@ export default function SignupPage() {
       setError(err.message);
     }
   };
+
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-6 bg-gray-100">
