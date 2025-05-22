@@ -4,16 +4,21 @@ import viteLogo from '/vite.svg'
 import './App.css'
 import './index.css'
 
+import { Toaster } from "sonner"
+
 function App() {
   const [count, setCount] = useState(0)
 
   return (
+    <div className="min-h-screen overflow-auto bg-white">
+      {/* Toaster is okay here, only once in your app */}
+      <Toaster richColors position="top-right" />
 
-    
-    <>
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-      <h1 className="text-3xl font-bold text-blue-600">Hello, Tailwind!</h1>
-    </div>
+      {/* Demo content only (no Login here) */}
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <h1 className="text-3xl font-bold text-blue-600">Hello, Tailwind!</h1>
+      </div>
+
       <div>
         <a href="https://vite.dev" target="_blank">
           <img src={viteLogo} className="logo" alt="Vite logo" />
@@ -22,7 +27,9 @@ function App() {
           <img src={reactLogo} className="logo react" alt="React logo" />
         </a>
       </div>
+
       <h1>Vite + React</h1>
+
       <div className="card">
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
@@ -31,10 +38,11 @@ function App() {
           Edit <code>src/App.jsx</code> and save to test HMR
         </p>
       </div>
+
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
       </p>
-    </>
+    </div>
   )
 }
 
