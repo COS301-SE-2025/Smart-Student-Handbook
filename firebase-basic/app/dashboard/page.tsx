@@ -25,26 +25,6 @@ export default function DashboardPage() {
   const [userData, setUserData] = useState<{ note?: string; title?: string } | null>(null);
   const router = useRouter();
 
-  const handleAddNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      await addDoc(collection(db, 'datanotes'), {
-        uid: user.uid,
-        noteData: {
-          title: 'Untitled Note',
-          note: 'This is a default note',
-        },
-        createdAt: new Date(),
-      });
-      alert('Note added!');
-    } catch (err) {
-      console.error('Error adding note:', err);
-    }
-  }
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -87,7 +67,7 @@ export default function DashboardPage() {
           <CarouselNext />
         </Carousel>
 
-        <form onSubmit={handleAddNote}>
+        <form>
           <div>
             {/* Add fields here later if you want user input */}
           </div>
