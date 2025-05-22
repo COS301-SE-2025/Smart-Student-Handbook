@@ -9,7 +9,7 @@ import { Input } from "../components/ui/input"
 import { Button } from "../components/ui/button"
 import { Card } from "../components/ui/card"
 
-import { toast } from "sonner" 
+import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 
 const formSchema = z.object({
@@ -19,7 +19,7 @@ const formSchema = z.object({
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate() 
+  const navigate = useNavigate()
 
   const {
     register,
@@ -32,7 +32,10 @@ export default function Login() {
   const onSubmit = async (data) => {
     setIsLoading(true)
     try {
-      await new Promise((res) => setTimeout(res, 1500)) // Simulate login
+      await new Promise((res) => setTimeout(res, 1500)) // simulate login delay
+
+      // Save user to localStorage
+      localStorage.setItem("user", JSON.stringify({ email: data.email }))
 
       toast.success("Login successful", {
         description: `Welcome, ${data.email}`,
@@ -52,9 +55,11 @@ export default function Login() {
   }
 
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-100 p-4">
-      <Card className="w-full max-w-sm p-6 shadow-xl rounded-2xl">
-        <h1 className="text-2xl font-bold text-center mb-4">Login</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6">
+      <Card className="w-full max-w-md bg-white p-8 rounded-2xl shadow-2xl">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">
+          Login
+        </h1>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
@@ -70,15 +75,11 @@ export default function Login() {
               <p className="text-red-500 text-sm">{errors.password.message}</p>
             )}
           </div>
-          <div className="flex justify-between text-sm">
-            <a href="#" className="text-blue-500 hover:underline">
-              Forgot password?
-            </a>
-            <a href="#" className="text-blue-500 hover:underline">
-              Sign up
-            </a>
+          <div className="flex justify-between text-sm text-blue-600">
+            <a href="#" className="hover:underline">Forgot password?</a>
+            <a href="#" className="hover:underline">Sign up</a>
           </div>
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full mt-4" disabled={isLoading}>
             {isLoading ? (
               <div className="flex items-center justify-center">
                 <Loader2 className="animate-spin h-4 w-4 mr-2" />
