@@ -5,6 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { ModeToggle } from "@/components/mode-toggle"
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/ui/app-sidebar"
@@ -53,7 +54,10 @@ export default function DashboardPage() {
       <AppSidebar />
       <SidebarTrigger />
 
-      <main className="flex flex-col items-center justify-center min-h-screen p-4">
+      <main className="relative flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="absolute top-4 right-4">
+        <ModeToggle />
+        </div>
         <Carousel>
           <CarouselContent>
             <CarouselItem>
