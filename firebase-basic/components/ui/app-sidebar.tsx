@@ -10,6 +10,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Switch } from "@/components/ui/switch"
+
+
 
 // Menu items.
 const items = [
@@ -35,7 +39,7 @@ const items = [
   },
   {
     title: "Settings",
-    url: "#",
+    url: "/profile",
     icon: Settings,
   },
 ]
@@ -43,6 +47,11 @@ const items = [
 export function AppSidebar() {
   return (
     <Sidebar>
+      <Avatar>
+        <AvatarImage src="https://github.com/shadcn.png"/>
+        <AvatarFallback>CN</AvatarFallback>
+      </Avatar>
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Application</SidebarGroupLabel>
@@ -59,6 +68,8 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
+            <Switch/>
+
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

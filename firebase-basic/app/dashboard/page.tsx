@@ -69,7 +69,6 @@ export default function DashboardPage() {
 
         <form>
           <div>
-            {/* Add fields here later if you want user input */}
           </div>
           <Button type="submit">Click Me</Button>
         </form>
