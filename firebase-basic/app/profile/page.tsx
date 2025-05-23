@@ -173,7 +173,6 @@ export default function ProfilePage() {
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
-
                         </CardFooter>
                     </Card>
 
@@ -189,6 +188,9 @@ export default function ProfilePage() {
                                 <Badge variant="outline">Slacker</Badge>
                                 <Badge variant="outline">Lazy</Badge>
                                 <Badge variant="outline">Fast Coder</Badge>
+                                <Badge variant="outline">Researcher</Badge>
+                                <Badge variant="outline">GitHub Enthusiast</Badge>
+
 
                             </div>
                         </CardContent>
