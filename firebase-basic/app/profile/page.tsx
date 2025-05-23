@@ -203,7 +203,7 @@ export default function ProfilePage() {
                         </CardHeader>
                         <CardContent>
                             <div>
-                                <div className="flex items-center justify-between p-2 border rounded-lg shadow-sm bg-white m-1">
+                                <div className="flex items-center justify-between p-2 border rounded-lg shadow-sm bg-white m-1 dark:bg-gray-900 dark:text-white">
                                     <div className="flex items-center space-x-3">
                                         <Button variant="link" className="text-base">
                                             <UserIcon className="w-4 h-4 mr-1" /> Friend1
@@ -240,7 +240,7 @@ export default function ProfilePage() {
 
                                 </div>
 
-                                <div className="flex items-center justify-between p-2 border rounded-lg shadow-sm bg-white m-1">
+                                <div className="flex items-center justify-between p-2 border rounded-lg shadow-sm bg-white m-1 dark:bg-gray-900 dark:text-white">
                                     <div className="flex items-center space-x-3">
                                         <Button variant="link" className="text-base">
                                             <UserIcon className="w-4 h-4 mr-1" /> Friend2

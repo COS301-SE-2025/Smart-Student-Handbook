@@ -80,8 +80,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
-            <Switch />
-
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
