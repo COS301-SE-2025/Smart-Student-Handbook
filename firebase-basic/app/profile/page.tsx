@@ -42,16 +42,17 @@ import {
 
 } from "@/components/ui/dropdown-menu"
 import React from 'react';
-
+import { ProfileAreaChart } from "@/components/ui/area-chart"
 export default function ProfilePage() {
     return (
 
         <SidebarProvider>
             <AppSidebar />
             <SidebarTrigger />
-            <main className="flex gap-4 p-4">
-                <div className="p-4 w-2/3">
-                    <Tabs defaultValue="account" className="w-[400px]">
+            <div className="flex flex-col flex-1">
+           <main className="mx-auto w-full max-w-5xl flex gap-6 p-6 items-start">
+                <div className="flex-1"> 
+                    <Tabs defaultValue="account" className="w-full max-w-xl">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="account">Account</TabsTrigger>
                             <TabsTrigger value="password">Password</TabsTrigger>
@@ -120,7 +121,7 @@ export default function ProfilePage() {
                         </TabsContent>
                     </Tabs>
                 </div>
-                <div className="p-4 w-1/3">
+                <div className="p-4">
                     <Card className="w-[350px] m-1">
                         <CardHeader>
                             <CardTitle>Organizations</CardTitle>
@@ -280,9 +281,17 @@ export default function ProfilePage() {
 
                         </CardContent>
                     </Card>
-                </div>
+                  </div>
             </main>
+          
 
+           {/* Chart area – now its own full-width row */}
+            <div className="w-full flex justify-center mt-10">
+                <div className="w-full max-w-4xl">
+                    <ProfileAreaChart />
+                </div>
+            </div>
+            </div>
         </SidebarProvider >
 
     );

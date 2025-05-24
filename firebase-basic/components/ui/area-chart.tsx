@@ -43,9 +43,9 @@ export function ProfileAreaChart() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Area Chart - Linear</CardTitle>
+        <CardTitle>Study Hours</CardTitle>
         <CardDescription>
-          Showing total visitors for the last 6 months
+          Showing total study and note taking hours
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -87,7 +87,7 @@ export function ProfileAreaChart() {
               Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
             </div>
             <div className="flex items-center gap-2 leading-none text-muted-foreground">
-              January - June 2024
+              January - May 2025
             </div>
           </div>
         </div>
