@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, fs , db } from '@/lib/firebase';
+import { auth, fs, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/carousel"
 import { Label } from '@radix-ui/react-label';
 import { Button } from '@/components/ui/button';
+import { addFriend } from "@/utils/SaveFriends";
 
 export default function DashboardPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -48,6 +49,14 @@ export default function DashboardPage() {
 
   if (!userEmail) return <p>Loading...</p>;
 
+    const handleAdd = async () => {
+      const friendID = prompt("Enter friend's User ID:");
+      if (friendID) {
+        await addFriend(friendID.trim());
+      }
+    };
+
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -70,6 +79,12 @@ export default function DashboardPage() {
         <div>
           <Button onClick={sendTestNote}>
             Send Test Note to Firebase
+          </Button>
+        </div>
+
+        <div>
+          <Button onClick={handleAdd}>
+            Add Friend
           </Button>
         </div>
 
