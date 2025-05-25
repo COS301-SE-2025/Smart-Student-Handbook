@@ -1,13 +1,13 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-
+import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: "AIzaSyABkJJG7rmzW2-MZB7R9Nc3pWYisyRqTjQ",
   authDomain: "studenthandbook-a215a.firebaseapp.com",
+  databaseURL: "https://studenthandbook-a215a-default-rtdb.europe-west1.firebasedatabase.app", // ✅ Corrected URL
   projectId: "studenthandbook-a215a",
   storageBucket: "studenthandbook-a215a.firebasestorage.app",
   messagingSenderId: "115322354821",
@@ -18,6 +18,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
-const db = getFirestore(app);
+const fs = getFirestore(app);
+const db = getDatabase(app);
 
-export { auth , db };
+export { auth , fs , db };
