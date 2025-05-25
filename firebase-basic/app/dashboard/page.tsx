@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth, fs , db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/ui/app-sidebar"
-import { addDoc, collection } from 'firebase/firestore';
+import { sendTestNote } from "@/utils/TestFirebaseButton";
 
 import {
   Carousel,
@@ -30,7 +30,7 @@ export default function DashboardPage() {
       if (user) {
         setUserEmail(user.email);
 
-        const userDocRef = doc(db, 'users', user.uid);
+        const userDocRef = doc(fs, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
 
         if (userSnap.exists()) {
@@ -67,13 +67,11 @@ export default function DashboardPage() {
           <CarouselNext />
         </Carousel>
 
-        <form>
-          <div>
-          </div>
-          <Button type="submit">Click Me</Button>
-        </form>
-
-
+        <div>
+          <Button onClick={sendTestNote}>
+            Send Test Note to Firebase
+          </Button>
+        </div>
 
       </main>
     </SidebarProvider>
