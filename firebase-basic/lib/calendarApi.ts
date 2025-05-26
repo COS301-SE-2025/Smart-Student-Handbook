@@ -1,6 +1,11 @@
 // lib/calendarApi.ts
 
+import { getAuth } from "firebase/auth";
+
+
 const USER_ID = "dev1"; // Replace with real user auth/userId when ready
+const auth = getAuth() ; 
+const user = auth.currentUser ;
 
 export const calendarApi = {
   // LECTURES

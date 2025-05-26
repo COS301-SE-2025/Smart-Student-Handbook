@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { auth, fs, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
@@ -31,14 +30,6 @@ export default function DashboardPage() {
       if (user) {
         setUserEmail(user.email);
 
-        const userDocRef = doc(fs, 'users', user.uid);
-        const userSnap = await getDoc(userDocRef);
-
-        if (userSnap.exists()) {
-          setUserData(userSnap.data());
-        } else {
-          console.warn('No such user document!');
-        }
       } else {
         router.push('/login');
       }
