@@ -1,29 +1,41 @@
+// app/api/semesters/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/fire";
+import { adminDb } from "@/lib/firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 
-// GET /api/semesters?userId=...
+// --- AUTH ---
+async function verifyUser(req: NextRequest) {
+  const header = req.headers.get("Authorization");
+  if (!header || !header.startsWith("Bearer ")) return null;
+  const idToken = header.split(" ")[1];
+  try {
+    const decoded = await getAuth().verifyIdToken(idToken);
+    return decoded.uid;
+  } catch {
+    return null;
+  }
+}
+
+// --- GET SEMESTERS ---
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId");
-  if (!userId)
-    return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+  const uid = await verifyUser(req);
+  if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const semestersRef = db.ref(`users/${userId}/semesters`);
+  const semestersRef = adminDb.ref(`users/${uid}/semesters`);
   const snapshot = await semestersRef.get();
   const semesters = snapshot.exists() ? Object.values(snapshot.val()) : [];
   return NextResponse.json(semesters);
 }
 
-// POST: Add a new semester
+// --- ADD SEMESTER ---
 export async function POST(req: NextRequest) {
-  const { userId, semester } = await req.json();
-  if (!userId || !semester)
-    return NextResponse.json({ error: "Missing data" }, { status: 400 });
-
-  if (!semester.name || !semester.startDate || !semester.endDate)
+  const uid = await verifyUser(req);
+  if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { semester } = await req.json();
+  if (!semester || !semester.name || !semester.startDate || !semester.endDate)
     return NextResponse.json({ error: "Missing semester fields" }, { status: 400 });
 
-  const semestersRef = db.ref(`users/${userId}/semesters`);
+  const semestersRef = adminDb.ref(`users/${uid}/semesters`);
   const newSemesterRef = semestersRef.push();
   const newSem = { ...semester, id: newSemesterRef.key, isActive: false };
   await newSemesterRef.set(newSem);
@@ -31,13 +43,15 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(newSem, { status: 201 });
 }
 
-// PATCH: Set semester active
+// --- PATCH: Set semester active ---
 export async function PATCH(req: NextRequest) {
-  const { userId, semesterId } = await req.json();
-  if (!userId || !semesterId)
-    return NextResponse.json({ error: "Missing data" }, { status: 400 });
+  const uid = await verifyUser(req);
+  if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { semesterId } = await req.json();
+  if (!semesterId)
+    return NextResponse.json({ error: "Missing semesterId" }, { status: 400 });
 
-  const semestersRef = db.ref(`users/${userId}/semesters`);
+  const semestersRef = adminDb.ref(`users/${uid}/semesters`);
   const snapshot = await semestersRef.get();
   if (!snapshot.exists()) return NextResponse.json({ error: "No semesters" }, { status: 404 });
 
@@ -50,13 +64,15 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ success: true });
 }
 
-// DELETE: Remove a semester by ID
+// --- DELETE SEMESTER ---
 export async function DELETE(req: NextRequest) {
-  const { userId, semesterId } = await req.json();
-  if (!userId || !semesterId)
-    return NextResponse.json({ error: "Missing userId or semesterId" }, { status: 400 });
+  const uid = await verifyUser(req);
+  if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { semesterId } = await req.json();
+  if (!semesterId)
+    return NextResponse.json({ error: "Missing semesterId" }, { status: 400 });
 
-  const semRef = db.ref(`users/${userId}/semesters/${semesterId}`);
+  const semRef = adminDb.ref(`users/${uid}/semesters/${semesterId}`);
   await semRef.remove();
   return NextResponse.json({ success: true });
 }

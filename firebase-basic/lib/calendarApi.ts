@@ -1,58 +1,79 @@
-// lib/calendarApi.ts
+import { auth } from "./firebase";
 
-import { getAuth } from "firebase/auth";
-
-
-const USER_ID = "dev1"; // Replace with real user auth/userId when ready
-const auth = getAuth() ; 
-const user = auth.currentUser ;
+// Helper to get current user token
+async function getIdToken() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in");
+  return await user.getIdToken();
+}
 
 export const calendarApi = {
-  // LECTURES
   async getLectures(semesterId: string) {
-    const res = await fetch(`/api/lectures?userId=${USER_ID}&semesterId=${semesterId}`);
+    const token = await getIdToken();
+    const res = await fetch(`/api/lectures?semesterId=${semesterId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!res.ok) throw new Error("Failed to fetch lectures");
     return await res.json();
   },
   async addLecture(lecture: any, semesterId: string) {
+    const token = await getIdToken();
     const res = await fetch("/api/lectures", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: USER_ID, semesterId, lecture }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ semesterId, lecture }),
     });
     if (!res.ok) throw new Error("Failed to add lecture");
     return await res.json();
   },
   async deleteLecture(lectureId: string) {
+    const token = await getIdToken();
     const res = await fetch("/api/lectures", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: USER_ID, lectureId }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ lectureId }),
     });
     if (!res.ok) throw new Error("Failed to delete lecture");
     return await res.json();
   },
 
-  // EVENTS
+  // Events
   async getEvents(semesterId: string) {
-    const res = await fetch(`/api/events?userId=${USER_ID}&semesterId=${semesterId}`);
+    const token = await getIdToken();
+    const res = await fetch(`/api/events?semesterId=${semesterId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!res.ok) throw new Error("Failed to fetch events");
     return await res.json();
   },
   async addEvent(event: any, semesterId: string) {
+    const token = await getIdToken();
     const res = await fetch("/api/events", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: USER_ID, semesterId, event }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ semesterId, event }),
     });
     if (!res.ok) throw new Error("Failed to add event");
     return await res.json();
   },
   async deleteEvent(eventId: string) {
+    const token = await getIdToken();
     const res = await fetch("/api/events", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: USER_ID, eventId }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ eventId }),
     });
     if (!res.ok) throw new Error("Failed to delete event");
     return await res.json();
