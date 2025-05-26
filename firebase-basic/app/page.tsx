@@ -1,9 +1,48 @@
+"use client";
+
 import Image from "next/image";
 import Link from 'next/link';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+
+const teamMembers = [
+  {
+    name: 'Reinhard Pretorius',
+    role: 'AI Developer',
+    image: '/images/Reinhard.jpg',
+    description: `A third-year Computer Science student with a passion for AI and ML. Expertise in intelligent systems and data pipelines.`
+  },
+  {
+    name: 'Tanaka Ndhlovu',
+    role: 'Web Developer',
+    image: '/images/Tanaka.jpg',
+    description: `Third-year Information and Knowledge Systems student skilled in React, Vue, Angular, and UI/UX design for cross-platform apps.`
+  },
+  {
+    name: 'Takudzwa Magunda',
+    role: 'Integration & Service Engineer',
+    image: '/images/Takudzwa.jpg',
+    description: `Experienced in Java, Python, Node.js, and TypeScript. Specializes in API integration and cloud service orchestration.`
+  },
+  {
+    name: 'Mpumelelo Njamela',
+    role: 'Testing Engineer',
+    image: '/images/Mpumelelo.jpg',
+    description: `Strong foundation in algorithms, data structures, and systems architecture. Applies predictive sports analytics and ML techniques.`
+  },
+  {
+    name: 'Oscar Motsepe',
+    role: 'Front-End Developer',
+    image: '/images/Oscar.jpg',
+    description: `Creative developer proficient in HTML5, React, and Figma. Focused on modern responsive UI and interactive visualizations.`
+  }
+];
+
 
 export default function Home() {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
   return (
     <div className="flex flex-col items-center min-h-screen p-8 gap-8 bg-gray-50">
       {/* Header Section */}
@@ -30,49 +69,42 @@ export default function Home() {
         <CardHeader>
           <CardTitle>Project Overview</CardTitle>
         </CardHeader>
-        <CardContent>
+        <div className="p-4">
           <p>
             Team F5 presents the Smart Student Handbook, an AI-powered, cloud-based platform
             for structured note organization by Degree, Module, and Year. Enjoy rich text
             editing, multimedia integration, and intelligent flashcard generation.
           </p>
-        </CardContent>
+        </div>
       </Card>
 
-      {/* Team Section */}
-      <section className="w-full max-w-4xl space-y-4">
-        <h2 className="text-2xl font-semibold text-center">Meet the Team</h2>
+      {/* Team Section with Clickable Cards */}
+      <section className="w-full max-w-4xl">
+        <h2 className="text-2xl font-semibold text-center mb-4">Meet the Team</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Reinhard Pretorius</CardTitle>
-              <CardDescription>AI Developer</CardDescription>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Tanaka Ndhlovu</CardTitle>
-              <CardDescription>Web Developer</CardDescription>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Takudzwa Magunda</CardTitle>
-              <CardDescription>Integration & Service Engineer</CardDescription>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Mpumelelo Njamela</CardTitle>
-              <CardDescription>Testing Engineer</CardDescription>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Oscar Motsepe</CardTitle>
-              <CardDescription>Front-End Developer</CardDescription>
-            </CardHeader>
-          </Card>
+          {teamMembers.map((member) => {
+            const isOpen = expanded === member.name;
+            return (
+              <Card
+                key={member.name}
+                onClick={() => setExpanded(isOpen ? null : member.name)}
+                className="cursor-pointer transition-shadow hover:shadow-lg"
+              >
+                <CardHeader>
+                  <CardTitle>{member.name}</CardTitle>
+                  <CardDescription>{member.role}</CardDescription>
+                </CardHeader>
+                {isOpen && (
+                  <div className="p-4 flex flex-col items-center">
+                    <div className="w-24 h-24 relative mb-4">
+                    <Image src={member.image} alt={member.name} fill className="rounded-full object-contain bg-white"/>
+                    </div>
+                    <p className="text-center">{member.description}</p>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       </section>
 
