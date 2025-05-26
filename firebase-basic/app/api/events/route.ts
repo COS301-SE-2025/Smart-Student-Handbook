@@ -1,31 +1,41 @@
+// app/api/events/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/fire";
+import { adminDb } from "@/lib/firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 
-// GET /api/events?userId=...&semesterId=...
+// --- AUTH ---
+async function verifyUser(req: NextRequest) {
+  const header = req.headers.get("Authorization");
+  if (!header || !header.startsWith("Bearer ")) return null;
+  const idToken = header.split(" ")[1];
+  try {
+    const decoded = await getAuth().verifyIdToken(idToken);
+    return decoded.uid;
+  } catch {
+    return null;
+  }
+}
+
+// --- GET EVENTS ---
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId");
-  // const semesterId = searchParams.get("semesterId");
-  if (!userId)
-    return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+  const uid = await verifyUser(req);
+  if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const eventsRef = db.ref(`users/${userId}/events`);
+  const eventsRef = adminDb.ref(`users/${uid}/events`);
   const snapshot = await eventsRef.get();
   const events = snapshot.exists() ? Object.values(snapshot.val()) : [];
-  // Only events within the semester dates (optionally filter)
   return NextResponse.json(events);
 }
 
-// POST: Add a new event
+// --- ADD EVENT ---
 export async function POST(req: NextRequest) {
-  const { userId, event } = await req.json();
-  if (!userId || !event)
-    return NextResponse.json({ error: "Missing data" }, { status: 400 });
-
-  if (!event.title || !event.type || !event.date)
+  const uid = await verifyUser(req);
+  if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { event } = await req.json();
+  if (!event || !event.title || !event.type || !event.date)
     return NextResponse.json({ error: "Missing event fields" }, { status: 400 });
 
-  const eventsRef = db.ref(`users/${userId}/events`);
+  const eventsRef = adminDb.ref(`users/${uid}/events`);
   const newEventRef = eventsRef.push();
   const newEvent = { ...event, id: newEventRef.key };
   await newEventRef.set(newEvent);
@@ -33,13 +43,15 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(newEvent, { status: 201 });
 }
 
-// DELETE: Remove an event by ID
+// --- DELETE EVENT ---
 export async function DELETE(req: NextRequest) {
-  const { userId, eventId } = await req.json();
-  if (!userId || !eventId)
-    return NextResponse.json({ error: "Missing userId or eventId" }, { status: 400 });
+  const uid = await verifyUser(req);
+  if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { eventId } = await req.json();
+  if (!eventId)
+    return NextResponse.json({ error: "Missing eventId" }, { status: 400 });
 
-  const eventRef = db.ref(`users/${userId}/events/${eventId}`);
+  const eventRef = adminDb.ref(`users/${uid}/events/${eventId}`);
   await eventRef.remove();
   return NextResponse.json({ success: true });
 }
