@@ -34,12 +34,12 @@ const items = [
   },
   {
     title: "Notes",
-    url: "#",
+    url: "/notes",
     icon: Inbox,
   },
   {
     title: "Calendar",
-    url: "#",
+    url: "/calendar",
     icon: Calendar,
   },
   {

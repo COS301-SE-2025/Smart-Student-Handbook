@@ -7,7 +7,7 @@ import { getDatabase } from "firebase/database";
 const firebaseConfig = {
   apiKey: "AIzaSyABkJJG7rmzW2-MZB7R9Nc3pWYisyRqTjQ",
   authDomain: "studenthandbook-a215a.firebaseapp.com",
-  databaseURL: "https://studenthandbook-a215a-default-rtdb.europe-west1.firebasedatabase.app", // ✅ Corrected URL
+  databaseURL: "https://studenthandbook-a215a-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "studenthandbook-a215a",
   storageBucket: "studenthandbook-a215a.firebasestorage.app",
   messagingSenderId: "115322354821",

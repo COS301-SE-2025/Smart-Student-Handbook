@@ -135,7 +135,7 @@ export default function ProfilePage() {
             });
         });
 
-        return () => unsubscribe(); // Cleanup
+        return () => unsubscribe();
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
