@@ -10,7 +10,6 @@ export const saveUserSettings = async (
     occupation: string;
     hobbies: string[];
     description: string;
-    organizations: string[];
   }
 ) => {
   if (!userID) {

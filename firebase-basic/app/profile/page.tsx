@@ -52,7 +52,7 @@ export default function ProfilePage() {
         occupation: "",
         hobbies: "",
         description: "",
-        organizations: ""
+
     });
 
     useEffect(() => {
@@ -129,7 +129,7 @@ export default function ProfilePage() {
                         occupation: data.occupation || "",
                         hobbies: Array.isArray(data.hobbies) ? data.hobbies.join(", ") : data.hobbies || "",
                         description: data.description || "",
-                        organizations: Array.isArray(data.organizations) ? data.organizations.join(", ") : data.organizations || ""
+                        
                     });
                 }
             });
@@ -158,7 +158,7 @@ export default function ProfilePage() {
         const formattedData = {
             ...formData,
             hobbies: formData.hobbies.split(",").map((h: string) => h.trim()),
-            organizations: formData.organizations.split(",").map((o: string) => o.trim())
+    
         };
 
         await saveUserSettings(userID, formattedData);
@@ -190,7 +190,7 @@ export default function ProfilePage() {
                                                 { id: "degree", label: "Degree" },
                                                 { id: "occupation", label: "Occupation" },
                                                 { id: "hobbies", label: "Hobbies (comma-separated)" },
-                                                { id: "organizations", label: "Organizations (comma-separated)" }
+                                            
                                             ].map(({ id, label }) => (
                                                 <div className="flex flex-col space-y-1.5" key={id}>
                                                     <Label htmlFor={id}>{label}</Label>
@@ -233,60 +233,7 @@ export default function ProfilePage() {
                         </Tabs>
                     </div>
                     <div className="p-4">
-                        <Card className="w-[350px] m-1">
-                            <CardHeader>
-                                <CardTitle>Organizations</CardTitle>
-                                <CardDescription>List of all the organizations</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <form>
-                                    <div className="flex gap-4">
-                                        <Avatar>
-                                            <AvatarImage src="https://www.up.ac.za/themes/up2.0/images/vertical-logo-bg.png" />
-                                            <AvatarFallback>UNI</AvatarFallback>
-                                        </Avatar>
-
-                                        <Avatar>
-                                            <AvatarImage src="https://github.com/shadcn.png" />
-                                            <AvatarFallback>CN</AvatarFallback>
-                                        </Avatar>
-                                    </div>
-                                </form>
-                            </CardContent>
-                            <CardFooter className="flex justify-between">
-                                <Button variant="outline">Remove</Button>
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline">Edit Organization</Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-[425px]">
-                                        <DialogHeader>
-                                            <DialogTitle>Edit Organization</DialogTitle>
-                                            <DialogDescription>
-                                                Add an Organization
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <div className="grid gap-4 py-4">
-                                            <div className="grid grid-cols-4 items-center gap-4">
-                                                <Label htmlFor="name" className="text-right">
-                                                    Name
-                                                </Label>
-                                                <Input id="name" className="col-span-3" />
-                                            </div>
-                                            <div className="grid grid-cols-4 items-center gap-4">
-                                                <Label htmlFor="username" className="text-right">
-                                                    URL
-                                                </Label>
-                                                <Input id="url" className="col-span-3" />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button type="submit">Save changes</Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            </CardFooter>
-                        </Card>
+                        
 
                         <Card className="w-[350px] m-1">
                             <CardHeader>
