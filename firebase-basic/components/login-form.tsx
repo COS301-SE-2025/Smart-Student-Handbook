@@ -21,6 +21,8 @@ export function LoginForm({
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState("")
   const [isLoading, setIsLoading] = React.useState(false)
+  const [showPassword, setShowPassword] = React.useState(false);
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,13 +72,24 @@ export function LoginForm({
                     Forgot your password?
                   </a>
                 </div>
+                <div className="relative">
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="pr-10"
                 />
+                <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-2 flex items-center text-muted-foreground text-xs hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+              </div>
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
