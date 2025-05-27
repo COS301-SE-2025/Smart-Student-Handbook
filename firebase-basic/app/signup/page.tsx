@@ -2,8 +2,12 @@ import { SignupForm } from "@/components/signup-form"
 
 export default function SignupPage() {
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-6 bg-gray-100">
-      <SignupForm />
-    </main>
+    <div className="min-h-screen w-full bg-cover bg-center flex items-center justify-center"
+     style={{ backgroundImage: "url('/background.jpg')" }}
+    >
+      <div className="w-full max-w-sm md:max-w-3xl">
+        <SignupForm />
+      </div>
+    </div>
   )
 }
