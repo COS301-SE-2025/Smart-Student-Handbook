@@ -200,66 +200,69 @@ export default function NotePage() {
             if (node.type === "folder") {
                 const isSelected = selectedFolderId === node.id;
                 return (
+                    <SidebarProvider>
                         <main className="">
 
-                        <div key={node.id} style={{ marginLeft: depth * 12 }}>
-                            {/* Folder row: flex horizontal */}
-                            <div className="flex items-center py-0.5">
-                                <Button
-                                    variant="ghost"
-                                    className="flex-grow justify-start text-sm py-0.5"
-                                    onClick={() => {
-                                        toggleExpand(node);
-                                        setSelectedFolderId(node.id);
-                                        setSelectedNote(null);
-                                    }}
-                                >
-                                    {node.expanded ? (
-                                        <ChevronDown className="mr-2" />
-                                    ) : (
-                                        <ChevronRight className="mr-2" />
-                                    )}
-                                    <FolderIcon className="mr-2" size={16} />
-                                    {isSelected ? (
-                                        <input
-                                            type="text"
-                                            value={node.name}
-                                            onChange={(e) => handleFolderNameChange(node.id, e.target.value)}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="bg-transparent border-b border-muted focus:outline-none focus:border-primary w-full max-w-xs"
-                                        />
-                                    ) : (
-                                        node.name
-                                    )}
-                                </Button>
+                            <div key={node.id} style={{ marginLeft: depth * 12 }}>
+                                {/* Folder row: flex horizontal */}
+                                <div className="flex items-center py-0.5">
+                                    <Button
+                                        variant="ghost"
+                                        className="flex-grow justify-start text-sm py-0.5"
+                                        onClick={() => {
+                                            toggleExpand(node);
+                                            setSelectedFolderId(node.id);
+                                            setSelectedNote(null);
+                                        }}
+                                    >
+                                        {node.expanded ? (
+                                            <ChevronDown className="mr-2" />
+                                        ) : (
+                                            <ChevronRight className="mr-2" />
+                                        )}
+                                        <FolderIcon className="mr-2" size={16} />
+                                        {isSelected ? (
+                                            <input
+                                                type="text"
+                                                value={node.name}
+                                                onChange={(e) => handleFolderNameChange(node.id, e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="bg-transparent border-b border-muted focus:outline-none focus:border-primary w-full max-w-xs"
+                                            />
+                                        ) : (
+                                            node.name
+                                        )}
+                                    </Button>
 
-                                {/* Delete button */}
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="ml-1 text-red-600 hover:text-red-800 p-1"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (window.confirm(`Delete folder "${node.name}" and all its contents?`)) {
-                                            setTree((prev) => {
-                                                const newTree = removeNodeById(prev, node.id);
-                                                if (selectedFolderId === node.id) setSelectedFolderId(null);
-                                                if (selectedNote?.id === node.id) setSelectedNote(null);
-                                                return newTree;
-                                            });
-                                        }
-                                    }}
-                                    aria-label={`Delete folder ${node.name}`}
-                                >
-                                    <Trash2 size={12} />
-                                </Button>
+                                    {/* Delete button */}
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="ml-1 text-red-600 hover:text-red-800 p-1"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (window.confirm(`Delete folder "${node.name}" and all its contents?`)) {
+                                                setTree((prev) => {
+                                                    const newTree = removeNodeById(prev, node.id);
+                                                    if (selectedFolderId === node.id) setSelectedFolderId(null);
+                                                    if (selectedNote?.id === node.id) setSelectedNote(null);
+                                                    return newTree;
+                                                });
+                                            }
+                                        }}
+                                        aria-label={`Delete folder ${node.name}`}
+                                    >
+                                        <Trash2 size={12} />
+                                    </Button>
+                                </div>
+
+                                {/* Children rendered BELOW the folder row, vertically stacked */}
+                                {node.expanded && <div>{renderTree(node.children, depth + 1)}</div>}
                             </div>
 
-                            {/* Children rendered BELOW the folder row, vertically stacked */}
-                            {node.expanded && <div>{renderTree(node.children, depth + 1)}</div>}
-                        </div>
-
                         </main>
+
+                    </SidebarProvider>
 
                 );
 
