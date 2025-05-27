@@ -59,11 +59,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <Avatar>
-        <AvatarImage src="https://github.com/shadcn.png" />
-        <AvatarFallback>CN</AvatarFallback>
-      </Avatar>
-
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Application</SidebarGroupLabel>
