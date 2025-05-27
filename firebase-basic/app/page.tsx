@@ -1,11 +1,14 @@
 "use client"
 
+import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { BookOpen, Users, Zap, Cloud } from "lucide-react"
+import { Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 const teamMembers = [
   {
@@ -69,6 +72,8 @@ const features = [
 ]
 
 export default function Home() {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = React.useState(false)
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
       {/* Banner Image */}
@@ -101,16 +106,28 @@ export default function Home() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link href="/login">
-                <Button size="lg" className="bg-white text-amber-700 hover:bg-amber-50 px-8 py-3 text-lg font-semibold">
-                  Login
+        
+                <Button size="lg" className="bg-white text-amber-700 hover:bg-amber-50 px-8 py-3 text-lg font-semibold"
+                onClick={() => {
+                  setIsLoading(true)
+                  router.push("/login")
+                }}
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Login"}
                 </Button>
-              </Link>
-              <Link href="/signup">
-                <Button size="lg" className="bg-white text-amber-700 hover:bg-amber-50 px-8 py-3 text-lg font-semibold">
-                  Sign Up
+              
+              
+                <Button 
+                size="lg" 
+                className="bg-white text-amber-700 hover:bg-amber-50 px-8 py-3 text-lg font-semibold"
+                onClick={() => {
+                  setIsLoading(true)
+                  router.push("/signup")
+                }}
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign Up"}
                 </Button>
-              </Link>
+              
             </div>
           </div>
         </div>
