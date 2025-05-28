@@ -35,7 +35,7 @@
 
   .tiptap ul,
   .tiptap ol {
-    list-style-position: inside;
+    list-style-position: outside;
     text-align: center; 
   }
 

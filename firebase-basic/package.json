@@ -39,7 +39,9 @@
     "react-dom": "^19.0.0",
     "recharts": "^2.15.3",
     "shadcn": "^2.5.0",
-    "tailwind-merge": "^3.3.0"
+    "sonner": "^2.0.3",
+    "tailwind-merge": "^3.3.0",
+    "toast": "^0.5.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -9,7 +9,7 @@ export function Header() {
       {/* Left side: Logo + Search */}
       <div className="flex items-center gap-4">
         <Avatar className="h-8 w-8">
-          <AvatarImage src="/smart-student.png" alt="Smart Student" />
+          <AvatarImage src="/.png" alt="Smart Student" />
           <AvatarFallback>SS</AvatarFallback>
         </Avatar>
 

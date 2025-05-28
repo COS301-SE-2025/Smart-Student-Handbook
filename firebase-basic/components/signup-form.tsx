@@ -4,7 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { createUserWithEmailAndPassword } from "firebase/auth"
 import { doc, setDoc } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
+import { auth, fs } from "@/lib/firebase"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -35,7 +35,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<"div">)
       const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password)
       const user = userCredential.user
 
-      await setDoc(doc(db, "users", user.uid), {
+      await setDoc(doc(fs, "users", user.uid), {
         name,
         role: "User",
         email: user.email,
