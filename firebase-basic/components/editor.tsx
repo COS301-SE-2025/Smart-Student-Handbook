@@ -47,7 +47,7 @@ const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
                 {["format", "list", "align"].map((tab) => (
                     <button
                         key={tab}
-                        className={`px-3 py-1 rounded ${activeTab === tab ? "bg-blue-500 text-white" : "bg-gray-100"
+                        className={`px-3 py-1 rounded ${activeTab === tab ? "bg-black text-white" : "bg-gray-100"
                             }`}
                         onClick={() => setActiveTab(tab as "format" | "list" | "align")}
                     >
@@ -62,7 +62,7 @@ const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
                         <button
                             onClick={() => editor.chain().focus().toggleBold().run()}
                             className={`px-2 py-1 rounded ${editor.isActive("bold")
-                                ? "bg-blue-500 text-white"
+                                ? "bg-black text-white"
                                 : "bg-white hover:bg-gray-200"
                                 }`}
                         >
@@ -71,7 +71,7 @@ const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
                         <button
                             onClick={() => editor.chain().focus().toggleItalic().run()}
                             className={`px-2 py-1 rounded ${editor.isActive("italic")
-                                ? "bg-blue-500 text-white"
+                                ? "bg-black text-white"
                                 : "bg-white hover:bg-gray-200"
                                 }`}
                         >
@@ -80,7 +80,7 @@ const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
                         <button
                             onClick={() => editor.chain().focus().toggleUnderline().run()}
                             className={`px-2 py-1 rounded ${editor.isActive("underline")
-                                ? "bg-blue-500 text-white"
+                                ? "bg-black text-white"
                                 : "bg-white hover:bg-gray-200"
                                 }`}
                         >
@@ -91,7 +91,7 @@ const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
                             onClick={() => editor.chain().focus().toggleHighlight().run()}
                             className={`px-2 py-1 rounded 
                                 ${editor.isActive("highlight")
-                                    ? "bg-blue-500 text-white"
+                                    ? "bg-black text-white"
                                     : "bg-white hover:bg-gray-200"
                                 }`
                             }
@@ -105,13 +105,13 @@ const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
                     <>
                         <button
                             onClick={() => editor.chain().focus().toggleBulletList().run()}
-                            className={`px-2 py-1 rounded ${editor.isActive('bulletList') ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                            className={`px-2 py-1 rounded ${editor.isActive('bulletList') ? 'bg-black text-white' : 'bg-white hover:bg-gray-200'}`}
                         >
                             Bullet List
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                            className={`px-2 py-1 rounded ${editor.isActive('orderedList') ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                            className={`px-2 py-1 rounded ${editor.isActive('orderedList') ? 'bg-black text-white' : 'bg-white hover:bg-gray-200'}`}
                         >
                             Numbered List
                         </button>
@@ -122,19 +122,19 @@ const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
                     <>
                         <button
                             onClick={() => editor.chain().focus().setTextAlign("left").run()}
-                            className={`px-2 py-1 rounded ${editor.isActive({ textAlign: "left" }) ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                            className={`px-2 py-1 rounded ${editor.isActive({ textAlign: "left" }) ? 'bg-black text-white' : 'bg-white hover:bg-gray-200'}`}
                         >
                             Left
                         </button>
                         <button
                             onClick={() => editor.chain().focus().setTextAlign("center").run()}
-                            className={`px-2 py-1 rounded ${editor.isActive({ textAlign: "center" }) ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                            className={`px-2 py-1 rounded ${editor.isActive({ textAlign: "center" }) ? 'bg-black text-white' : 'bg-white hover:bg-gray-200'}`}
                         >
                             Center
                         </button>
                         <button
                             onClick={() => editor.chain().focus().setTextAlign("right").run()}
-                            className={`px-2 py-1 rounded ${editor.isActive({ textAlign: "right" }) ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                            className={`px-2 py-1 rounded ${editor.isActive({ textAlign: "right" }) ? 'bg-black text-white' : 'bg-white hover:bg-gray-200'}`}
                         >
                             Right
                         </button>
