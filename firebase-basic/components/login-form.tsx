@@ -11,6 +11,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
+import { Apple, Facebook, Github } from "lucide-react"
+
 
 export function LoginForm({
   className,
@@ -107,9 +109,18 @@ export function LoginForm({
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                <Button variant="outline" className="w-full">Apple</Button>
-                <Button variant="outline" className="w-full">Google</Button>
-                <Button variant="outline" className="w-full">Meta</Button>
+                <Button variant="outline" className="w-full gap-2">
+                  <Apple className="w-4 h-4" />
+                  <span className="sr-only">Login with Apple</span>
+                </Button>
+                <Button variant="outline" className="w-full gap-2">
+                  <Github className="w-4 h-4" />
+                  <span className="sr-only">Login with Google</span>
+                </Button>
+                <Button variant="outline" className="w-full gap-2">
+                  <Facebook className="w-4 h-4" />
+                  <span className="sr-only">Login with Meta</span>
+                </Button>
               </div>
 
               <div className="text-center text-sm">

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import {
     ChevronDown,
@@ -363,8 +364,11 @@ export default function NotePage() {
             >
 
                 <div className="flex gap-2 p-2">
-                    <Link href="/dashboard" className="btn btn-primary">
-                        Back
+                    <Link href="/dashboard">
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                        <ArrowLeft size={16} />
+                        
+                    </Button>
                     </Link>
 
                     <Button onClick={addFolder} size="sm">
