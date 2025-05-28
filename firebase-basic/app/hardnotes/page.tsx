@@ -14,7 +14,17 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 
 import dynamic from "next/dynamic";
+import "react-quill/dist/quill.snow.css";
+
+const Quill = dynamic(() => import("react-quill"), { ssr: false });
+
+import QuillEditor from "@/components/quilleditor";
 const Editor = dynamic(() => import("@/components/editor"), { ssr: false });
+
+type EditorProps = {
+    content: string;
+    onContentChange: (content: string) => void;
+};
 
 type Note = {
     id: string;
@@ -35,7 +45,7 @@ type FileNode = Note | Folder;
 
 const generateId = () => Math.random().toString(36).slice(2, 9);
 
-export default function NotePage() {
+export default function NotePage({ content, onContentChange }: EditorProps) {
     const [tree, setTree] = useState<FileNode[]>([
         {
             id: "folder1",
@@ -84,7 +94,6 @@ export default function NotePage() {
         localStorage.setItem("noteTree", JSON.stringify(tree));
     }, [tree]);
 
-    // Load selection from localStorage on mount
     useEffect(() => {
         const savedSelectedFolderId = localStorage.getItem("selectedFolderId");
         const savedSelectedNote = localStorage.getItem("selectedNote");
@@ -357,15 +366,11 @@ export default function NotePage() {
                             placeholder="Note Title"
                             className="text-2xl font-bold mb-4 border-b border-muted focus:outline-none focus:border-primary"
                         />
-                        <div className="editor-content border p-4 rounded bg-white shadow-sm h-[400px] overflow-y-auto">
-                            <Editor
-                                content={selectedNote.content}
-                                onContentChange={(newContent) =>
-                                    handleNoteChange(selectedNote.id, "content", newContent)
-                                }
-                            />
-                        </div>  
-
+                        <QuillEditor
+                            key={selectedNote.id}
+                            value={selectedNote.content}
+                            onChange={(newContent) => handleNoteChange(selectedNote.id, "content", newContent)}
+                        />
                     </>
                 ) : (
                     <p className="text-muted-foreground">Select a note to view or edit</p>
