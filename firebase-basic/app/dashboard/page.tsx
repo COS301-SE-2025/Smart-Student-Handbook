@@ -10,7 +10,6 @@ import Link from 'next/link';
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/ui/app-sidebar";
 import { Header } from '@/components/ui/header';
-import { addFriend } from "@/utils/SaveFriends";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
