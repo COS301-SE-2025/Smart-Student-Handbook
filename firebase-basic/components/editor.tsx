@@ -3,7 +3,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 interface EditorProps {
     content: string;
@@ -11,6 +11,8 @@ interface EditorProps {
 }
 
 const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
+    const [activeTab, setActiveTab] = useState<"format" | "list" | "align">("format");
+
     const editor = useEditor({
         extensions: [
             StarterKit,
@@ -26,10 +28,9 @@ const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
         },
         editorProps: {
             attributes: {
-                class: "outline-none list-disc list-decimal list-inside",
+                className: "outline-none",
             },
         },
-
     });
 
     useEffect(() => {
@@ -41,25 +42,110 @@ const Editor: React.FC<EditorProps> = ({ content, onContentChange }) => {
     if (!editor) return null;
 
     return (
-        <div className="space-y-2">
-            {/* Toolbar */}
-            <div className="flex flex-wrap gap-1 bg-gray-100 p-2 rounded">
-                <button onClick={() => editor.chain().focus().toggleBold().run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">Bold</button>
-                <button onClick={() => editor.chain().focus().toggleItalic().run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">Italic</button>
-                <button onClick={() => editor.chain().focus().toggleUnderline().run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">Underline</button>
-                <button onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">H1</button>
-                <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">H2</button>
-                <button onClick={() => editor.chain().focus().toggleBulletList().run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">Bullet List</button>
-                <button onClick={() => editor.chain().focus().toggleOrderedList().run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">Numbered List</button>
-                <button onClick={() => editor.chain().focus().toggleHighlight().run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">Highlight</button>
-                <button onClick={() => editor.chain().focus().setTextAlign("left").run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">Left</button>
-                <button onClick={() => editor.chain().focus().setTextAlign("center").run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">Center</button>
-                <button onClick={() => editor.chain().focus().setTextAlign("right").run()} className="px-2 py-1 bg-white rounded hover:bg-gray-200">Right</button>
+        <div>
+            <div className="toolbar mb-2">
+                {["format", "list", "align"].map((tab) => (
+                    <button
+                        key={tab}
+                        className={`px-3 py-1 rounded ${activeTab === tab ? "bg-blue-500 text-white" : "bg-gray-100"
+                            }`}
+                        onClick={() => setActiveTab(tab as "format" | "list" | "align")}
+                    >
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                ))}
             </div>
-            <div className="border p-4 rounded bg-white shadow-sm min-h-[200px]">
+
+            <div className="flex flex-wrap gap-1 bg-gray-100 p-2 rounded">
+                {activeTab === "format" && (
+                    <>
+                        <button
+                            onClick={() => editor.chain().focus().toggleBold().run()}
+                            className={`px-2 py-1 rounded ${editor.isActive("bold")
+                                ? "bg-blue-500 text-white"
+                                : "bg-white hover:bg-gray-200"
+                                }`}
+                        >
+                            Bold
+                        </button>
+                        <button
+                            onClick={() => editor.chain().focus().toggleItalic().run()}
+                            className={`px-2 py-1 rounded ${editor.isActive("italic")
+                                ? "bg-blue-500 text-white"
+                                : "bg-white hover:bg-gray-200"
+                                }`}
+                        >
+                            Italic
+                        </button>
+                        <button
+                            onClick={() => editor.chain().focus().toggleUnderline().run()}
+                            className={`px-2 py-1 rounded ${editor.isActive("underline")
+                                ? "bg-blue-500 text-white"
+                                : "bg-white hover:bg-gray-200"
+                                }`}
+                        >
+                            Underline
+                        </button>
+
+                        <button
+                            onClick={() => editor.chain().focus().toggleHighlight().run()}
+                            className={`px-2 py-1 rounded 
+                                ${editor.isActive("highlight")
+                                    ? "bg-blue-500 text-white"
+                                    : "bg-white hover:bg-gray-200"
+                                }`
+                            }
+                        >
+                            Highlight
+                        </button>
+                    </>
+                )}
+
+                {activeTab === "list" && (
+                    <>
+                        <button
+                            onClick={() => editor.chain().focus().toggleBulletList().run()}
+                            className={`px-2 py-1 rounded ${editor.isActive('bulletList') ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                        >
+                            Bullet List
+                        </button>
+                        <button
+                            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                            className={`px-2 py-1 rounded ${editor.isActive('orderedList') ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                        >
+                            Numbered List
+                        </button>
+                    </>
+                )}
+
+                {activeTab === "align" && (
+                    <>
+                        <button
+                            onClick={() => editor.chain().focus().setTextAlign("left").run()}
+                            className={`px-2 py-1 rounded ${editor.isActive({ textAlign: "left" }) ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                        >
+                            Left
+                        </button>
+                        <button
+                            onClick={() => editor.chain().focus().setTextAlign("center").run()}
+                            className={`px-2 py-1 rounded ${editor.isActive({ textAlign: "center" }) ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                        >
+                            Center
+                        </button>
+                        <button
+                            onClick={() => editor.chain().focus().setTextAlign("right").run()}
+                            className={`px-2 py-1 rounded ${editor.isActive({ textAlign: "right" }) ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-200'}`}
+                        >
+                            Right
+                        </button>
+                    </>
+                )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
                 <EditorContent editor={editor} />
             </div>
-        </div>
+        </div >
     );
 };
 

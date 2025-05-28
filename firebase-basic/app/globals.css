@@ -15,6 +15,30 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
+  .editor-content ul {
+    list-style-type: disc !important;
+    padding-left: 1.25rem;
+    margin-left: 0;
+  }
+
+  .editor-content ol {
+    list-style-type: decimal !important;
+    padding-left: 1.25rem;
+    margin-left: 0;
+  }
+
+  .editor-content li {
+    display: list-item;
+    margin: 0.25rem 0;
+
+  }
+
+  .tiptap ul,
+  .tiptap ol {
+    list-style-position: inside;
+    text-align: center; 
+  }
+
   .dark {
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -140,6 +164,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -198,5 +223,5 @@
     --chart-3: 216 92% 60%;
     --chart-4: 210 98% 78%;
     --chart-5: 212 97% 87%;
-    }
+  }
 }

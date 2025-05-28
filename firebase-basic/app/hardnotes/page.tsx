@@ -331,7 +331,7 @@ export default function NotePage() {
         <div className="flex h-screen p-6 gap-6">
             <div
                 className="w-64 border-r border-muted overflow-y-auto"
-                style={{ maxHeight: 'calc(100vh - 96px)' }} // Give room for header/buttons if any
+                style={{ maxHeight: 'calc(100vh - 96px)' }}
             >
 
                 <div className="flex gap-2 p-2">
@@ -357,11 +357,14 @@ export default function NotePage() {
                             placeholder="Note Title"
                             className="text-2xl font-bold mb-4 border-b border-muted focus:outline-none focus:border-primary"
                         />
-                        <div className="prose border p-4 rounded bg-white shadow-sm min-h-[200px]">
+                        <div className="editor-content border p-4 rounded bg-white shadow-sm h-[400px] overflow-y-auto">
                             <Editor
                                 content={selectedNote.content}
-                                onContentChange={(newContent) => handleNoteChange(selectedNote.id, "content", newContent)} />
-                        </div>
+                                onContentChange={(newContent) =>
+                                    handleNoteChange(selectedNote.id, "content", newContent)
+                                }
+                            />
+                        </div>  
 
                     </>
                 ) : (
