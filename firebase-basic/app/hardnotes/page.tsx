@@ -1,7 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button";
+import { FullScreenLoader } from "@/components/ui/fullscreen-loader"
+import { useRouter } from "next/navigation";
+
 import {
     ChevronDown,
     ChevronRight,
@@ -9,18 +13,10 @@ import {
     FolderIcon,
     Trash2,
 } from "lucide-react";
-
-import dynamic from "next/dynamic";
 import "react-quill/dist/quill.snow.css";
 
 import QuillEditor from "@/components/quilleditor";
-import { useRouter } from "next/router";
 
-type EditorProps = {
-    content: string;
-    onContentChange: (content: string) => void;
-};
-import Link from "next/link";
 const toolbarOptions = [
     ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
     ['blockquote', 'code-block'],
@@ -65,32 +61,72 @@ type FileNode = Note | Folder;
 const generateId = () => Math.random().toString(36).slice(2, 9);
 
 export default function NotePage() {
+    const router = useRouter()
+    const [loading, setLoading] = useState(false)
+
+    const handleBack = () => {
+        setLoading(true)
+        setTimeout(() => {
+            router.push("/dashboard")
+        }, 300) // Allow time for animation
+    }
+
     const [tree, setTree] = useState<FileNode[]>([
         {
-            id: "folder1",
-            name: "Folder 1",
+            id: "root",
+            name: "RootFolder",
             type: "folder",
             expanded: true,
             children: [
                 {
-                    id: "folder2",
-                    name: "Folder 2",
+                    id: "COS301",
+                    name: "COS301",
                     type: "folder",
                     expanded: false,
-                    children: [],
-                }, {
-                    id: "note1",
-                    name: "Note 1",
-                    content: "Content for Note 1",
-                    type: "note",
+                    children: [
+                        {
+                            id: "note1",
+                            name: "COS301 Computer Science Fundamentals",
+                            content: "COS301 Computer Science Fundamentals Notes",
+                            type: "note",
+                        },
+                        {
+                            id: "note2",
+                            name: "COS301 Software Engineering Principles",
+                            content: "COS301 Software Engineering Principles Notes",
+                            type: "note",
+                        }
+                    ],
+                },
+                {
+                    id: "COS701",
+                    name: "COS701",
+                    type: "folder",
+                    expanded: false,
+                    children: [
+                        {
+                            id: "note3",
+                            name: "COS701 AI & Machine Learning Concepts",
+                            content: "COS701 AI & Machine Learning Concepts Notes",
+                            type: "note",
+                        }
+                    ],
+                },
+                {
+                    id: "COS221",
+                    name: "COS221",
+                    type: "folder",
+                    expanded: false,
+                    children: [
+                        {
+                            id: "note4",
+                            name: "COS221 Database System Architecture",
+                            content: "COS221 Database System Architecture Notes",
+                            type: "note",
+                        }
+                    ],
                 },
             ],
-        },
-        {
-            id: "note2",
-            name: "Note 2",
-            content: "Content for Note 2",
-            type: "note",
         },
     ]);
 
@@ -361,11 +397,14 @@ export default function NotePage() {
                 className="w-64 border-r border-muted overflow-y-auto"
                 style={{ maxHeight: 'calc(100vh - 96px)' }}
             >
-
+                {loading && <FullScreenLoader />}
                 <div className="flex gap-2 p-2">
-                    <Link href="/dashboard" className="btn btn-primary">
-                        Back
-                    </Link>
+
+                    <Button onClick={handleBack} variant="outline" size="sm" className="flex items-center gap-2">
+                        <ArrowLeft size={16} />
+
+                    </Button>
+
 
                     <Button onClick={addFolder} size="sm">
                         Add Folder

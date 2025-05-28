@@ -1,4 +1,9 @@
+'use client'
+
 import { Calendar, Home, Inbox, Search, Settings } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { FullScreenLoader } from "@/components/ui/fullscreen-loader"
 
 import {
   Sidebar,
@@ -50,20 +55,36 @@ const items = [
 export function AppSidebar() {
   const { setTheme } = useTheme()
 
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+
+  const handleNavigate = (url: string) => {
+    setLoading(true)
+    setTimeout(() => {
+      router.push(url)
+    }, 300) // give time for animation if needed
+  }
+
   return (
+    <>
+      {loading && <FullScreenLoader />}
+
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Application</SidebarGroupLabel>
+          <SidebarGroupLabel>Smart Student Handbook</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.url}>
+                    <button
+                        onClick={() => handleNavigate(item.url)}
+                        className="flex items-center gap-2 w-full text-left"
+                      >
                       <item.icon />
                       <span>{item.title}</span>
-                    </a>
+                    </button>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -71,6 +92,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="icon">
@@ -92,5 +114,6 @@ export function AppSidebar() {
         </DropdownMenuContent>
       </DropdownMenu>
     </Sidebar>
+    </>
   )
 }
