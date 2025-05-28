@@ -3,6 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button";
+import { FullScreenLoader } from "@/components/ui/fullscreen-loader"
+import { useRouter } from "next/navigation";
+
 import {
     ChevronDown,
     ChevronRight,
@@ -15,7 +18,7 @@ import dynamic from "next/dynamic";
 import "react-quill/dist/quill.snow.css";
 
 import QuillEditor from "@/components/quilleditor";
-import { useRouter } from "next/router";
+
 
 type EditorProps = {
     content: string;
@@ -66,6 +69,16 @@ type FileNode = Note | Folder;
 const generateId = () => Math.random().toString(36).slice(2, 9);
 
 export default function NotePage() {
+    const router = useRouter()
+    const [loading, setLoading] = useState(false)
+
+    const handleBack = () => {
+    setLoading(true)
+    setTimeout(() => {
+        router.push("/dashboard")
+    }, 300) // Allow time for animation
+    }
+
     const [tree, setTree] = useState<FileNode[]>([
         {
             id: "folder1",
@@ -362,14 +375,14 @@ export default function NotePage() {
                 className="w-64 border-r border-muted overflow-y-auto"
                 style={{ maxHeight: 'calc(100vh - 96px)' }}
             >
-
+                {loading && <FullScreenLoader />}
                 <div className="flex gap-2 p-2">
-                    <Link href="/dashboard">
-                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    
+                    <Button onClick={handleBack} variant="outline" size="sm" className="flex items-center gap-2">
                         <ArrowLeft size={16} />
                         
                     </Button>
-                    </Link>
+                    
 
                     <Button onClick={addFolder} size="sm">
                         Add Folder
