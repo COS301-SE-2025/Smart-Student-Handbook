@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 
 import { Calendar, Heart, Share2, Star, FileText, Plus } from 'lucide-react';
 
-// Dummy data for My Notebooks
 const notebooks = [
   {
     title: "COS301 Computer Science Fundamentals",
@@ -52,7 +51,6 @@ const notebooks = [
 const friends = [
   { name: "Ndhlovu Tanaka", role: "Student" },
   { name: "Takudzwa Magunda", role: "Lecturer" },
-  { name: "Reinhard Pretorious", role: "Tutor" },
 ];
 
 const upcomingEvents = [

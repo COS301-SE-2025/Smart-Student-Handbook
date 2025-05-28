@@ -1,6 +1,5 @@
 'use client';
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { saveUserSettings } from "@/utils/SaveUserSettings";
 import { Badge } from "@/components/ui/badge"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
@@ -42,6 +41,7 @@ import { ProfileAreaChart } from "@/components/ui/area-chart"
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { get, onValue, ref } from "firebase/database";
+import { toast } from "sonner";
 
 export default function ProfilePage() {
     const [friends, setFriends] = useState<{ id: string; name: string }[]>([]);
@@ -129,7 +129,7 @@ export default function ProfilePage() {
                         occupation: data.occupation || "",
                         hobbies: Array.isArray(data.hobbies) ? data.hobbies.join(", ") : data.hobbies || "",
                         description: data.description || "",
-                        
+
                     });
                 }
             });
@@ -150,7 +150,6 @@ export default function ProfilePage() {
         const auth = getAuth();
         const user = auth.currentUser;
         if (!user) {
-            alert("User not logged in");
             return;
         }
 
@@ -158,11 +157,14 @@ export default function ProfilePage() {
         const formattedData = {
             ...formData,
             hobbies: formData.hobbies.split(",").map((h: string) => h.trim()),
-    
+
         };
 
         await saveUserSettings(userID, formattedData);
-        alert("Profile saved!");
+
+        toast.success("Your settings have been saved.");
+
+
     };
 
     return (
@@ -190,7 +192,7 @@ export default function ProfilePage() {
                                                 { id: "degree", label: "Degree" },
                                                 { id: "occupation", label: "Occupation" },
                                                 { id: "hobbies", label: "Hobbies (comma-separated)" },
-                                            
+
                                             ].map(({ id, label }) => (
                                                 <div className="flex flex-col space-y-1.5" key={id}>
                                                     <Label htmlFor={id}>{label}</Label>
@@ -233,7 +235,7 @@ export default function ProfilePage() {
                         </Tabs>
                     </div>
                     <div className="p-4">
-                        
+
 
                         <Card className="w-[350px] m-1">
                             <CardHeader>
