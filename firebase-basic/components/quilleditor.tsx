@@ -55,7 +55,6 @@ export default function QuillEditor({
   }, []);
 
   return (
-    <div className="editor-content border p-4 rounded bg-white shadow-sm h-[400px]">
       <ReactQuill
         value={value}
         onChange={onChange}
@@ -64,6 +63,5 @@ export default function QuillEditor({
         formats={formats}
         className="h-full [&_.ql-container]:h-full [&_.ql-editor]:h-full [&_.ql-editor]:overflow-y-auto"
       />
-    </div>
   );
 }
