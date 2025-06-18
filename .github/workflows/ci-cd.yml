@@ -1,0 +1,87 @@
+name: CI / CD
+
+on:
+  push:            # every push to main
+    branches: [main]
+  pull_request:    # all PRs targeting main
+    branches: [main]
+
+jobs:
+  # -----------------------------------------------------------------
+  # 1 — Build & Test  (Always runs)
+  # -----------------------------------------------------------------
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ----- Checkout source -----
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ----- Node setup + dependency cache -----
+      - name: Setup Node 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ----- Quality gates -----
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests (Jest)
+        run: npm test -- --passWithNoTests   # placeholder flag keeps CI green
+
+      # ----- Build & static export -----
+      - name: Build site
+        run: |
+          npm run build
+          npm run export               # writes static files into public/
+
+      # ----- Cypress end-to-end tests -----
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
+          build: npm run build
+          start: npx next start -p 3000
+          wait-on: 'http://localhost:3000'
+          wait-on-timeout: 120
+
+# -----------------------------------------------------------------
+# 2 — Deploy to Firebase Hosting  (DISABLED until secrets exist)
+#    • Needs FIREBASE_SERVICE_ACCOUNT  (JSON key)
+#    • Needs FIREBASE_PROJECT_ID      (studenthandbook-a215a)
+# -----------------------------------------------------------------
+#
+# deploy:
+#   needs: build-test
+#   if: github.ref == 'refs/heads/main'   # runs only on main
+#   runs-on: ubuntu-latest
+#
+#   steps:
+#     - name: Checkout
+#       uses: actions/checkout@v4
+#
+#     - name: Setup Node 20 LTS
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: '20'
+#         cache: 'npm'
+#
+#     - name: Install deps (skip postinstall)
+#       run: npm ci --ignore-scripts
+#
+#     # ---- Authenticate to Google Cloud / Firebase ----
+#     - uses: google-github-actions/auth@v2
+#       with:
+#         credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+#
+#     # ---- Deploy the static public/ folder ----
+#     - name: Deploy to Firebase Hosting (live)
+#       uses: google-github-actions/deploy-firebase@v1
+#       with:
+#         project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+#         channel_id: live           # change to 'preview' for preview URLs
