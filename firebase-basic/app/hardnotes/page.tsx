@@ -286,7 +286,6 @@ export default function NotePage() {
       .filter((node): node is FileNode => node !== null);
   };
 
-
   const renderTree = (nodes: FileNode[], depth = 0) =>
     nodes.map((node) => {
       if (node.type === "folder") {
@@ -404,9 +403,7 @@ export default function NotePage() {
 
   return (
     <div className="h-[calc(100vh-3.5rem)] flex bg-background overflow-hidden">
-      {/* Sidebar */}
       <div className="w-80 border-r border-border bg-card/30 flex flex-col">
-        {/* Header */}
         <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
           <div className="flex items-center gap-3 mb-4">
             <Link href="/dashboard">
@@ -429,7 +426,6 @@ export default function NotePage() {
           </div>
         </div>
 
-        {/* File Tree */}
         <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-1">
             {testTree.length > 0 ? (
@@ -445,11 +441,9 @@ export default function NotePage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {selectedNote ? (
           <>
-            {/* Note Header */}
             <div className="p-6 border-b border-border bg-background/80 backdrop-blur-sm">
               <input
                 type="text"
@@ -460,7 +454,6 @@ export default function NotePage() {
               />
             </div>
 
-            {/* Editor Container */}
             <div className="flex-1 overflow-hidden">
               <div className="h-full p-6">
                 <div className="h-full max-w-4xl mx-auto">
