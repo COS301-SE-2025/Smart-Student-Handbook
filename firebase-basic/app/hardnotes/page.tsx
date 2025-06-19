@@ -15,10 +15,13 @@ const user = getAuth().currentUser;
 import { child, get, ref, set } from "firebase/database";
 
 type Note = {
-  id: string
-  name: string
-  content: string
-  type: "note"
+  id: string;
+  name: string;
+  content: string;
+  type: "note";
+  collaborators: {
+    [userId: string]: boolean;
+  };
 }
 
 type Folder = {
@@ -27,6 +30,10 @@ type Folder = {
   type: "folder"
   expanded: boolean
   children: FileNode[]
+    collaborators: {
+    [userId: string]: boolean;
+  };
+
 }
 
 type FileNode = Note | Folder
@@ -60,10 +67,10 @@ export default function NotePage() {
 
 
   useEffect(() => {
-  if (testTree.length > 0) {
-    saveTreeToRealtimeDB(testTree);
-  }
-}, [testTree]);
+    if (testTree.length > 0) {
+      saveTreeToRealtimeDB(testTree);
+    }
+  }, [testTree]);
 
 
   const toggleExpand = (folder: Folder) => {
@@ -85,7 +92,8 @@ export default function NotePage() {
     if (!user) throw new Error("User not logged in");
 
     const path = `users/${user.uid}/notes`;
-    console.log(path);
+
+    console.log("Accessing path: ", `users/${user.uid}/notes`);
 
     const dbRef = ref(db, path);
     const snapshot = await get(dbRef);
@@ -115,6 +123,7 @@ export default function NotePage() {
             name: item.name,
             content: item.content,
             type: "note",
+            collaborators: {},
           };
         } else {
           return {
@@ -123,6 +132,7 @@ export default function NotePage() {
             type: "folder",
             expanded: item.expanded ?? false,
             children: buildTree(items, item.id),
+            collaborators: {},
           };
         }
       });
@@ -215,6 +225,9 @@ export default function NotePage() {
       type: "folder",
       expanded: false,
       children: [],
+      collaborators: {
+        "placeholder": false
+      },
     };
 
     if (selectedFolderId) {
@@ -246,6 +259,9 @@ export default function NotePage() {
       name: "New Note",
       content: "",
       type: "note",
+      collaborators: {
+        "placeholder": false
+      },
     };
 
     if (selectedFolderId) {
