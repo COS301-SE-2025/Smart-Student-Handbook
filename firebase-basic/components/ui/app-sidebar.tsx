@@ -74,7 +74,7 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <a
                         href={item.url}
-                        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                        className={`relative flex items-center gap-3 px-3 py-6.5 rounded-lg transition-all duration-200 group ${
                           isActive
                             ? "bg-blue-50 text-blue-700 border border-blue-100"
                             : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
@@ -88,8 +88,8 @@ export function AppSidebar() {
                             isActive ? "text-blue-600" : "text-gray-500 group-hover:text-gray-700"
                           }`}
                         />
-                        <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-                          <span className={`font-medium text-sm ${isActive ? "text-blue-700" : ""}`}>{item.title}</span>
+                        <div className="flex flex-col space y-4 group-data-[collapsible=icon]:hidden">
+                          <span className={`font-medium text-base ${isActive ? "text-blue-700" : ""}`}>{item.title}</span>
                           <span
                             className={`text-xs transition-colors ${
                               isActive ? "text-blue-500" : "text-gray-500 group-hover:text-gray-600"
