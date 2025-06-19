@@ -7,11 +7,21 @@ import Link from "next/link"
 import QuillEditor from "@/components/quilleditor"
 import "react-quill/dist/quill.snow.css"
 
+import { db } from "../../lib/firebase";
+import { getAuth } from "firebase/auth";
+
+const user = getAuth().currentUser;
+
+import { child, get, ref, set } from "firebase/database";
+
 type Note = {
-  id: string
-  name: string
-  content: string
-  type: "note"
+  id: string;
+  name: string;
+  content: string;
+  type: "note";
+  collaborators: {
+    [userId: string]: boolean;
+  };
 }
 
 type Folder = {
@@ -20,6 +30,10 @@ type Folder = {
   type: "folder"
   expanded: boolean
   children: FileNode[]
+    collaborators: {
+    [userId: string]: boolean;
+  };
+
 }
 
 type FileNode = Note | Folder
@@ -27,78 +41,37 @@ type FileNode = Note | Folder
 const generateId = () => Math.random().toString(36).slice(2, 9)
 
 export default function NotePage() {
-  const [tree, setTree] = useState<FileNode[]>([
-    {
-      id: "folder1",
-      name: "Folder 1",
-      type: "folder",
-      expanded: true,
-      children: [
-        {
-          id: "folder2",
-          name: "Folder 2",
-          type: "folder",
-          expanded: false,
-          children: [],
-        },
-        {
-          id: "note1",
-          name: "Note 1",
-          content: "Content for Note 1",
-          type: "note",
-        },
-      ],
-    },
-    {
-      id: "note2",
-      name: "Note 2",
-      content: "Content for Note 2",
-      type: "note",
-    },
-  ])
 
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>("folder1")
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null)
+  const [testTree, setTree] = useState<FileNode[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
   useEffect(() => {
-    const savedTree = localStorage.getItem("noteTree")
-    if (savedTree) {
+    async function fetchTree() {
       try {
-        setTree(JSON.parse(savedTree))
-      } catch {}
+        console.log("Fetching tree for user...");
+        const loadedTree = await loadTreeFromRealtimeDB();
+        console.log("Tree loaded:", loadedTree);
+        setTree(loadedTree);
+      } catch (err) {
+        console.error("Error loading tree:", err);
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [])
+
+    fetchTree();
+  }, []);
+
 
   useEffect(() => {
-    localStorage.setItem("noteTree", JSON.stringify(tree))
-  }, [tree])
-
-  useEffect(() => {
-    const savedSelectedFolderId = localStorage.getItem("selectedFolderId")
-    const savedSelectedNote = localStorage.getItem("selectedNote")
-    if (savedSelectedFolderId) setSelectedFolderId(savedSelectedFolderId)
-    if (savedSelectedNote) {
-      try {
-        setSelectedNote(JSON.parse(savedSelectedNote))
-      } catch {}
+    if (testTree.length > 0) {
+      saveTreeToRealtimeDB(testTree);
     }
-  }, [])
+  }, [testTree]);
 
-  useEffect(() => {
-    if (selectedFolderId) {
-      localStorage.setItem("selectedFolderId", selectedFolderId)
-    } else {
-      localStorage.removeItem("selectedFolderId")
-    }
-  }, [selectedFolderId])
-
-  useEffect(() => {
-    if (selectedNote) {
-      localStorage.setItem("selectedNote", JSON.stringify(selectedNote))
-    } else {
-      localStorage.removeItem("selectedNote")
-    }
-  }, [selectedNote])
 
   const toggleExpand = (folder: Folder) => {
     const toggle = (nodes: FileNode[]): FileNode[] =>
@@ -114,42 +87,136 @@ export default function NotePage() {
     setTree((prev) => toggle(prev))
   }
 
-  const handleFolderNameChange = (id: string, newName: string) => {
-    const updateName = (nodes: FileNode[]): FileNode[] =>
-      nodes.map((node) => {
-        if (node.type === "folder") {
-          if (node.id === id) {
-            return { ...node, name: newName }
-          }
-          return { ...node, children: updateName(node.children) }
-        }
-        return node
-      })
-    setTree((prev) => updateName(prev))
+  async function loadTreeFromRealtimeDB(): Promise<FileNode[]> {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error("User not logged in");
+
+    const path = `users/${user.uid}/notes`;
+
+    console.log("Accessing path: ", `users/${user.uid}/notes`);
+
+    const dbRef = ref(db, path);
+    const snapshot = await get(dbRef);
+
+    if (!snapshot.exists()) {
+      console.warn("No data exists for this user.");
+      return [];
+    }
+
+    const data = snapshot.val();
+    const items = Object.values(data);
+
+    console.log("Items : ", items);
+
+    return buildTree(items);
   }
 
-  const handleNoteChange = (id: string, field: "content" | "name", value: string) => {
-    const updateNote = (nodes: FileNode[]): FileNode[] =>
-      nodes.map((node) => {
-        if (node.type === "note" && node.id === id) {
-          return { ...node, [field]: value }
-        } else if (node.type === "folder") {
-          return { ...node, children: updateNote(node.children) }
-        }
-        return node
+  function buildTree(items: any[], parentId: string | null = null): FileNode[] {
+    return items
+      .filter((item) => {
+        return (item.parentId ?? null) === parentId;
       })
+      .map((item) => {
+        if (item.type === "note") {
+          return {
+            id: item.id,
+            name: item.name,
+            content: item.content,
+            type: "note",
+            collaborators: {},
+          };
+        } else {
+          return {
+            id: item.id,
+            name: item.name,
+            type: "folder",
+            expanded: item.expanded ?? false,
+            children: buildTree(items, item.id),
+            collaborators: {},
+          };
+        }
+      });
+  }
 
-    setTree((prev) => updateNote(prev))
 
-    if (selectedNote && selectedNote.id === id) {
-      setSelectedNote({ ...selectedNote, [field]: value })
+  function flattenTree(nodes: FileNode[], parentId: string | null = null): Record<string, any> {
+    const result: Record<string, any> = {};
+    nodes.forEach((node) => {
+      if (node.type === "note") {
+        result[node.id] = {
+          ...node,
+          parentId,
+        };
+      } else {
+        const { children, ...folderData } = node;
+        result[node.id] = {
+          ...folderData,
+          parentId,
+        };
+        Object.assign(result, flattenTree(children, node.id));
+      }
+    });
+
+    return result;
+  }
+
+  async function saveTreeToRealtimeDB(tree: FileNode[]) {
+    const user = getAuth().currentUser;
+    if (!user) {
+      throw new Error("User not logged in");
     }
+
+    const userPath = `users/${user.uid}/notes`;
+    const flatTree = flattenTree(tree);
+
+    await set(ref(db, userPath), flatTree);
+
   }
 
   const handleSelectNote = (note: Note) => {
     setSelectedNote(note)
     setSelectedFolderId(null)
   }
+
+  const handleFolderNameChange = (id: string, newName: string) => {
+    const updateName = (nodes: FileNode[]): FileNode[] =>
+      nodes.map((node) => {
+        if (node.type === "folder") {
+          if (node.id === id) {
+            return { ...node, name: newName };
+          }
+          return { ...node, children: updateName(node.children) };
+        }
+        return node;
+      });
+
+    setTree((prev) => {
+      const updatedTree = updateName(prev);
+      return updatedTree;
+    });
+  };
+
+  const handleNoteChange = (id: string, field: "content" | "name", value: string) => {
+    const updateNote = (nodes: FileNode[]): FileNode[] =>
+      nodes.map((node) => {
+        if (node.type === "note" && node.id === id) {
+          return { ...node, [field]: value };
+        } else if (node.type === "folder") {
+          return { ...node, children: updateNote(node.children) };
+        }
+        return node;
+      });
+
+    setTree((prev) => {
+      const updatedTree = updateNote(prev);
+      return updatedTree;
+    });
+
+    if (selectedNote && selectedNote.id === id) {
+      setSelectedNote({ ...selectedNote, [field]: value });
+    }
+  };
+
 
   const addFolder = () => {
     const newFolder: Folder = {
@@ -158,24 +225,33 @@ export default function NotePage() {
       type: "folder",
       expanded: false,
       children: [],
-    }
+      collaborators: {
+        "placeholder": false
+      },
+    };
 
     if (selectedFolderId) {
       const addToFolder = (nodes: FileNode[]): FileNode[] =>
         nodes.map((node) => {
           if (node.type === "folder") {
             if (node.id === selectedFolderId) {
-              return { ...node, children: [...node.children, newFolder] }
+              return { ...node, children: [...node.children, newFolder] };
             }
-            return { ...node, children: addToFolder(node.children) }
+            return { ...node, children: addToFolder(node.children) };
           }
-          return node
-        })
-      setTree((prev) => addToFolder(prev))
+          return node;
+        });
+      setTree((prev) => {
+        const updatedTree = addToFolder(prev);
+        return updatedTree;
+      });
     } else {
-      setTree((prev) => [...prev, newFolder])
+      setTree((prev) => {
+        const updatedTree = [...prev, newFolder];
+        return updatedTree;
+      });
     }
-  }
+  };
 
   const addNote = () => {
     const newNote: Note = {
@@ -183,29 +259,48 @@ export default function NotePage() {
       name: "New Note",
       content: "",
       type: "note",
-    }
+      collaborators: {
+        "placeholder": false
+      },
+    };
 
     if (selectedFolderId) {
       const addToFolder = (nodes: FileNode[]): FileNode[] =>
         nodes.map((node) => {
           if (node.type === "folder") {
             if (node.id === selectedFolderId) {
-              return { ...node, children: [...node.children, newNote] }
+              return { ...node, children: [...node.children, newNote] };
             }
-            return { ...node, children: addToFolder(node.children) }
+            return { ...node, children: addToFolder(node.children) };
           }
-          return node
-        })
-      setTree((prev) => addToFolder(prev))
+          return node;
+        });
+      setTree((prev) => {
+        const updatedTree = addToFolder(prev);
+        return updatedTree;
+      });
     } else {
-      setTree((prev) => [...prev, newNote])
+      setTree((prev) => {
+        const updatedTree = [...prev, newNote];
+        return updatedTree;
+      });
     }
-  }
+  };
 
-  const removeNodeById = (nodes: FileNode[], id: string): FileNode[] =>
-    nodes
-      .filter((node) => node.id !== id)
-      .map((node) => (node.type === "folder" ? { ...node, children: removeNodeById(node.children, id) } : node))
+  const removeNodeById = (nodes: FileNode[], id: string): FileNode[] => {
+    return nodes
+      .map((node) => {
+        if (node.id === id) return null;
+
+        if (node.type === "folder") {
+          const updatedChildren = removeNodeById(node.children, id);
+          return { ...node, children: updatedChildren };
+        }
+
+        return node;
+      })
+      .filter((node): node is FileNode => node !== null);
+  };
 
   const renderTree = (nodes: FileNode[], depth = 0) =>
     nodes.map((node) => {
@@ -214,9 +309,8 @@ export default function NotePage() {
         return (
           <div key={node.id} className="mb-1">
             <div
-              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${
-                isSelected ? "bg-muted" : ""
-              }`}
+              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${isSelected ? "bg-muted" : ""
+                }`}
               style={{ marginLeft: depth * 20 }}
             >
               <Button
@@ -266,14 +360,15 @@ export default function NotePage() {
                 size="sm"
                 className="p-1 h-auto opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 hover:bg-red-50"
                 onClick={(e) => {
-                  e.stopPropagation()
+                  e.stopPropagation();
                   if (window.confirm(`Delete folder "${node.name}" and all its contents?`)) {
                     setTree((prev) => {
-                      const newTree = removeNodeById(prev, node.id)
-                      if (selectedFolderId === node.id) setSelectedFolderId(null)
-                      if (selectedNote?.id === node.id) setSelectedNote(null)
-                      return newTree
-                    })
+                      const newTree = removeNodeById(prev, node.id);
+
+                      if (selectedFolderId === node.id) setSelectedFolderId(null);
+                      if (selectedNote?.id === node.id) setSelectedNote(null);
+                      return newTree;
+                    });
                   }
                 }}
               >
@@ -289,9 +384,8 @@ export default function NotePage() {
         return (
           <div
             key={node.id}
-            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${
-              isSelected ? "bg-blue-50 border border-blue-200" : ""
-            }`}
+            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${isSelected ? "bg-blue-50 border border-blue-200" : ""
+              }`}
             style={{ marginLeft: (depth + 1) * 20 }}
             onClick={() => handleSelectNote(node)}
           >
@@ -325,9 +419,7 @@ export default function NotePage() {
 
   return (
     <div className="h-[calc(100vh-3.5rem)] flex bg-background overflow-hidden">
-      {/* Sidebar */}
       <div className="w-80 border-r border-border bg-card/30 flex flex-col">
-        {/* Header */}
         <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
           <div className="flex items-center gap-3 mb-4">
             <Link href="/dashboard">
@@ -350,11 +442,10 @@ export default function NotePage() {
           </div>
         </div>
 
-        {/* File Tree */}
         <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-1">
-            {tree.length > 0 ? (
-              renderTree(tree)
+            {testTree.length > 0 ? (
+              renderTree(testTree)
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -366,11 +457,9 @@ export default function NotePage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {selectedNote ? (
           <>
-            {/* Note Header */}
             <div className="p-6 border-b border-border bg-background/80 backdrop-blur-sm">
               <input
                 type="text"
@@ -381,7 +470,6 @@ export default function NotePage() {
               />
             </div>
 
-            {/* Editor Container */}
             <div className="flex-1 overflow-hidden">
               <div className="h-full p-6">
                 <div className="h-full max-w-4xl mx-auto">
