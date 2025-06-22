@@ -90,7 +90,7 @@ export function SmartHeader() {
       case "/profile":
         return { title: "Settings", icon: <Settings className="h-4 w-4" /> }
       default:
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" /> }
+        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4 text-white" /> }
     }
   }
 
@@ -110,14 +110,14 @@ export function SmartHeader() {
   }
 
   return (
-    <header style={{backgroundColor : '#00c4fd'}} className="fixed top-0 left-0 right-0 z-50 h-14 bg-[#07ccec] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+    <header className="bg-blue-500 fixed top-0 left-0 right-0 z-50 h-14 border-b border-border">
       <div className="flex h-full items-center justify-between px-4">
         {/* Left: Sidebar trigger and page title */}
         <div className="flex items-center gap-3">
-          <SidebarTrigger className="h-8 w-8" />
+          <SidebarTrigger className="h-8 w-8 text-white" />
           <div className="flex items-center gap-2">
             <div className="text-muted-foreground">{pageInfo.icon}</div>
-            <h1 className="font-semibold text-foreground">{pageInfo.title}</h1>
+            <h1 className="font-semibold text-foreground text-white">{pageInfo.title}</h1>
           </div>
         </div>
 
