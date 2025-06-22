@@ -1,18 +1,26 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronRight, FileText, FolderIcon, Trash2, Plus, ArrowLeft } from "lucide-react"
-import Link from "next/link"
-import QuillEditor from "@/components/quilleditor"
-import "react-quill/dist/quill.snow.css"
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  FolderIcon,
+  Trash2,
+  Plus,
+  ArrowLeft,
+} from "lucide-react";
+import Link from "next/link";
+import QuillEditor from "@/components/quilleditor";
+import "react-quill/dist/quill.snow.css";
 
 import { db } from "../../lib/firebase";
 import { getAuth } from "firebase/auth";
 
 const user = getAuth().currentUser;
 
-import { child, get, ref, set } from "firebase/database";
+import { child, get, getDatabase, ref, set } from "firebase/database";
 
 type Note = {
   id: string;
@@ -22,28 +30,28 @@ type Note = {
   collaborators: {
     [userId: string]: boolean;
   };
-}
+};
 
 type Folder = {
-  id: string
-  name: string
-  type: "folder"
-  expanded: boolean
-  children: FileNode[]
-    collaborators: {
+  id: string;
+  name: string;
+  type: "folder";
+  expanded: boolean;
+  children: FileNode[];
+  collaborators: {
     [userId: string]: boolean;
   };
+};
 
-}
+type FileNode = Note | Folder;
 
-type FileNode = Note | Folder
-
-const generateId = () => Math.random().toString(36).slice(2, 9)
+const generateId = () => Math.random().toString(36).slice(2, 9);
 
 export default function NotePage() {
-
   const [testTree, setTree] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [sharedTree, setSharedTree] = useState<Folder[]>([]);
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -65,27 +73,128 @@ export default function NotePage() {
     fetchTree();
   }, []);
 
-
   useEffect(() => {
     if (testTree.length > 0) {
       saveTreeToRealtimeDB(testTree);
     }
   }, [testTree]);
 
-
   const toggleExpand = (folder: Folder) => {
     const toggle = (nodes: FileNode[]): FileNode[] =>
       nodes.map((node) => {
         if (node.type === "folder") {
           if (node.id === folder.id) {
-            return { ...node, expanded: !node.expanded }
+            return { ...node, expanded: !node.expanded };
           }
-          return { ...node, children: toggle(node.children) }
+          return { ...node, children: toggle(node.children) };
         }
-        return node
-      })
-    setTree((prev) => toggle(prev))
+        return node;
+      });
+    setTree((prev) => toggle(prev));
+  };
+
+  async function addSharedNoteToCurrentUser({
+    noteId,
+    ownerId,
+  }: {
+    noteId: string;
+    ownerId: string;
+  }) {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error("User not logged in");
+
+    const collaboratorId = user.uid;
+    const db = getDatabase();
+
+    const sharedNoteRef = ref(
+      db,
+      `users/${collaboratorId}/sharedNotes/${noteId}`
+    );
+
+    const data = {
+      owner: ownerId,
+      noteId: noteId,
+    };
+
+    try {
+      await set(sharedNoteRef, data);
+      console.log(
+        `Shared note ${noteId} (owner: ${ownerId}) added to user ${collaboratorId}`
+      );
+    } catch (error) {
+      console.error("Error adding shared note:", error);
+      throw error;
+    }
   }
+
+  async function loadSharedNotesTreeFromRealtimeDB(): Promise<Folder[]> {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error("User not logged in");
+
+    const collaboratorId = user.uid;
+    const db = getDatabase();
+    const sharedNotesRef = ref(db, `users/${collaboratorId}/sharedNotes`);
+    const snapshot = await get(sharedNotesRef);
+
+    if (!snapshot.exists()) {
+      console.log("No shared notes found.");
+      return [];
+    }
+
+    const sharedNotes: Record<string, { owner: string; noteId: string }> =
+      snapshot.val();
+    const sharedItems: any[] = [];
+
+    for (const [noteId, { owner }] of Object.entries(sharedNotes)) {
+      const noteRef = ref(db, `users/${owner}/notes/${noteId}`);
+      try {
+        const noteSnap = await get(noteRef);
+        if (noteSnap.exists()) {
+          const raw = noteSnap.val();
+          sharedItems.push({
+            id: raw.id,
+            name: raw.name ?? "",
+            content: raw.content ?? "",
+            type: "note",
+            collaborators: raw.collaborators ?? {},
+            parentId: "__shared__", // temporary group for building tree
+          });
+        }
+      } catch (err) {
+        console.error(
+          `Failed to fetch shared note ${noteId} from ${owner}:`,
+          err
+        );
+      }
+    }
+
+    const sharedFolder: Folder = {
+      id: "__shared__",
+      name: "Shared With Me",
+      type: "folder",
+      expanded: true,
+      collaborators: {},
+      children: buildTree(sharedItems, "__shared__"),
+    };
+
+    return [sharedFolder];
+  }
+
+  useEffect(() => {
+    const fetchTree = async () => {
+      try {
+        const tree = await loadSharedNotesTreeFromRealtimeDB();
+        console.log("Shared Notes Tree:", tree);
+        setSharedTree(tree);
+      } catch (error) {
+        console.error("Error loading shared tree:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTree();
+  }, []);
 
   async function loadTreeFromRealtimeDB(): Promise<FileNode[]> {
     const user = getAuth().currentUser;
@@ -138,8 +247,10 @@ export default function NotePage() {
       });
   }
 
-
-  function flattenTree(nodes: FileNode[], parentId: string | null = null): Record<string, any> {
+  function flattenTree(
+    nodes: FileNode[],
+    parentId: string | null = null
+  ): Record<string, any> {
     const result: Record<string, any> = {};
     nodes.forEach((node) => {
       if (node.type === "note") {
@@ -170,13 +281,12 @@ export default function NotePage() {
     const flatTree = flattenTree(tree);
 
     await set(ref(db, userPath), flatTree);
-
   }
 
   const handleSelectNote = (note: Note) => {
-    setSelectedNote(note)
-    setSelectedFolderId(null)
-  }
+    setSelectedNote(note);
+    setSelectedFolderId(null);
+  };
 
   const handleFolderNameChange = (id: string, newName: string) => {
     const updateName = (nodes: FileNode[]): FileNode[] =>
@@ -196,7 +306,11 @@ export default function NotePage() {
     });
   };
 
-  const handleNoteChange = (id: string, field: "content" | "name", value: string) => {
+  const handleNoteChange = (
+    id: string,
+    field: "content" | "name",
+    value: string
+  ) => {
     const updateNote = (nodes: FileNode[]): FileNode[] =>
       nodes.map((node) => {
         if (node.type === "note" && node.id === id) {
@@ -217,7 +331,6 @@ export default function NotePage() {
     }
   };
 
-
   const addFolder = () => {
     const newFolder: Folder = {
       id: generateId(),
@@ -226,7 +339,8 @@ export default function NotePage() {
       expanded: false,
       children: [],
       collaborators: {
-        "placeholder": false
+        placeholder: false,
+        DwgkN26pduWlurcPB5w8jBF8LU03: true,
       },
     };
 
@@ -260,7 +374,8 @@ export default function NotePage() {
       content: "",
       type: "note",
       collaborators: {
-        "placeholder": false
+        placeholder: false,
+        DwgkN26pduWlurcPB5w8jBF8LU03: true,
       },
     };
 
@@ -305,12 +420,13 @@ export default function NotePage() {
   const renderTree = (nodes: FileNode[], depth = 0) =>
     nodes.map((node) => {
       if (node.type === "folder") {
-        const isSelected = selectedFolderId === node.id
+        const isSelected = selectedFolderId === node.id;
         return (
           <div key={node.id} className="mb-1">
             <div
-              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${isSelected ? "bg-muted" : ""
-                }`}
+              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${
+                isSelected ? "bg-muted" : ""
+              }`}
               style={{ marginLeft: depth * 20 }}
             >
               <Button
@@ -318,9 +434,9 @@ export default function NotePage() {
                 size="sm"
                 className="p-0 h-auto mr-2 hover:bg-transparent"
                 onClick={() => {
-                  toggleExpand(node)
-                  setSelectedFolderId(node.id)
-                  setSelectedNote(null)
+                  toggleExpand(node);
+                  setSelectedFolderId(node.id);
+                  setSelectedNote(null);
                 }}
               >
                 {node.expanded ? (
@@ -337,7 +453,9 @@ export default function NotePage() {
                   <input
                     type="text"
                     value={node.name}
-                    onChange={(e) => handleFolderNameChange(node.id, e.target.value)}
+                    onChange={(e) =>
+                      handleFolderNameChange(node.id, e.target.value)
+                    }
                     onClick={(e) => e.stopPropagation()}
                     className="bg-transparent border-none focus:outline-none focus:ring-0 w-full font-medium text-sm"
                     autoFocus
@@ -346,8 +464,8 @@ export default function NotePage() {
                   <span
                     className="font-medium text-sm truncate cursor-pointer"
                     onClick={() => {
-                      setSelectedFolderId(node.id)
-                      setSelectedNote(null)
+                      setSelectedFolderId(node.id);
+                      setSelectedNote(null);
                     }}
                   >
                     {node.name}
@@ -361,11 +479,16 @@ export default function NotePage() {
                 className="p-1 h-auto opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 hover:bg-red-50"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (window.confirm(`Delete folder "${node.name}" and all its contents?`)) {
+                  if (
+                    window.confirm(
+                      `Delete folder "${node.name}" and all its contents?`
+                    )
+                  ) {
                     setTree((prev) => {
                       const newTree = removeNodeById(prev, node.id);
 
-                      if (selectedFolderId === node.id) setSelectedFolderId(null);
+                      if (selectedFolderId === node.id)
+                        setSelectedFolderId(null);
                       if (selectedNote?.id === node.id) setSelectedNote(null);
                       return newTree;
                     });
@@ -376,22 +499,29 @@ export default function NotePage() {
               </Button>
             </div>
 
-            {node.expanded && <div className="mt-1">{renderTree(node.children, depth + 1)}</div>}
+            {node.expanded && (
+              <div className="mt-1">{renderTree(node.children, depth + 1)}</div>
+            )}
           </div>
-        )
+        );
       } else {
-        const isSelected = selectedNote?.id === node.id
+        const isSelected = selectedNote?.id === node.id;
         return (
           <div
             key={node.id}
-            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${isSelected ? "bg-blue-50 border border-blue-200" : ""
-              }`}
+            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${
+              isSelected ? "bg-blue-50 border border-blue-200" : ""
+            }`}
             style={{ marginLeft: (depth + 1) * 20 }}
             onClick={() => handleSelectNote(node)}
           >
             <FileText className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
 
-            <span className={`flex-1 text-sm truncate ${isSelected ? "font-medium text-blue-700" : ""}`}>
+            <span
+              className={`flex-1 text-sm truncate ${
+                isSelected ? "font-medium text-blue-700" : ""
+              }`}
+            >
               {node.name}
             </span>
 
@@ -400,22 +530,22 @@ export default function NotePage() {
               size="sm"
               className="p-1 h-auto opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 hover:bg-red-50"
               onClick={(e) => {
-                e.stopPropagation()
+                e.stopPropagation();
                 if (window.confirm(`Delete note "${node.name}"?`)) {
                   setTree((prev) => {
-                    const newTree = removeNodeById(prev, node.id)
-                    if (selectedNote?.id === node.id) setSelectedNote(null)
-                    return newTree
-                  })
+                    const newTree = removeNodeById(prev, node.id);
+                    if (selectedNote?.id === node.id) setSelectedNote(null);
+                    return newTree;
+                  });
                 }
               }}
             >
               <Trash2 className="h-3 w-3" />
             </Button>
           </div>
-        )
+        );
       }
-    })
+    });
 
   return (
     <div className="h-[calc(100vh-3.5rem)] flex bg-background overflow-hidden">
@@ -431,7 +561,12 @@ export default function NotePage() {
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={addFolder} size="sm" variant="outline" className="flex-1 gap-2">
+            <Button
+              onClick={addFolder}
+              size="sm"
+              variant="outline"
+              className="flex-1 gap-2"
+            >
               <Plus className="h-4 w-4" />
               Folder
             </Button>
@@ -464,7 +599,9 @@ export default function NotePage() {
               <input
                 type="text"
                 value={selectedNote.name}
-                onChange={(e) => handleNoteChange(selectedNote.id, "name", e.target.value)}
+                onChange={(e) =>
+                  handleNoteChange(selectedNote.id, "name", e.target.value)
+                }
                 placeholder="Untitled Note"
                 className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 w-full placeholder:text-muted-foreground"
               />
@@ -477,7 +614,9 @@ export default function NotePage() {
                     <QuillEditor
                       key={selectedNote.id}
                       value={selectedNote.content}
-                      onChange={(newContent) => handleNoteChange(selectedNote.id, "content", newContent)}
+                      onChange={(newContent) =>
+                        handleNoteChange(selectedNote.id, "content", newContent)
+                      }
                     />
                   </div>
                 </div>
@@ -488,9 +627,12 @@ export default function NotePage() {
           <div className="flex-1 flex items-center justify-center bg-muted/20">
             <div className="text-center max-w-md">
               <FileText className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-muted-foreground mb-2">Select a note to start writing</h3>
+              <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                Select a note to start writing
+              </h3>
               <p className="text-sm text-muted-foreground mb-6">
-                Choose a note from the sidebar or create a new one to begin taking notes
+                Choose a note from the sidebar or create a new one to begin
+                taking notes
               </p>
               <div className="flex gap-2 justify-center">
                 <Button onClick={addNote} className="gap-2">
@@ -507,5 +649,5 @@ export default function NotePage() {
         )}
       </div>
     </div>
-  )
+  );
 }
