@@ -1,15 +1,13 @@
 "use client"
 
 import type React from "react"
-
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/ui/app-sidebar"
 import { SmartHeader } from "./smart-header"
-import { useEffect, useState } from "react"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth } from "@/lib/firebase"
-
 
 // Pages that should not have the sidebar layout
 const STANDALONE_PAGES = ["/", "/login", "/signup"]
@@ -26,37 +24,17 @@ export function SmartLayout({ children }: SmartLayoutProps) {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
-  // Check if current page should use sidebar layout
   const isStandalonePage = STANDALONE_PAGES.includes(pathname)
   const isProtectedPage = PROTECTED_PAGES.some((page) => pathname.startsWith(page))
 
   useEffect(() => {
-    // In development, use mock authentication
-    if (process.env.NODE_ENV === "development") {
-      setTimeout(() => {
-        // Simulate being logged in for protected pages
-        if (isProtectedPage) {
-            setUser({
-                displayName: "Test User",
-                email: "testuser@example.com"
-            })
-        } else {
-          setUser(null)
-        }
-        setLoading(false)
-      }, 500)
-      return
-    }
-
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user)
       setLoading(false)
     })
-
     return () => unsubscribe()
-  }, [isProtectedPage])
+  }, [])
 
-  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -68,12 +46,10 @@ export function SmartLayout({ children }: SmartLayoutProps) {
     )
   }
 
-  // Standalone pages (home, login, signup) - no sidebar
   if (isStandalonePage) {
     return <>{children}</>
   }
 
-  // Protected pages require authentication
   if (isProtectedPage && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -87,10 +63,6 @@ export function SmartLayout({ children }: SmartLayoutProps) {
                 d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               />
             </svg>
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold mb-2">Sign in required</h2>
-            <p className="text-muted-foreground text-sm">Please sign in to access your student handbook.</p>
           </div>
           <div className="space-y-3">
             <a
@@ -111,7 +83,6 @@ export function SmartLayout({ children }: SmartLayoutProps) {
     )
   }
 
-  // App pages with clean unified layout
   return (
     <SidebarProvider>
       <div className="min-h-screen bg-background">

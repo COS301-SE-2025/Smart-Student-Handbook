@@ -435,7 +435,7 @@ function StudentCalendar() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {loading && <div className="text-blue-700">Loading...</div>}
+        {loading && <div className="text-blue-700">Syncing...</div>}
         {error && <div className="text-red-600">{error}</div>}
 
         {/* header */}
