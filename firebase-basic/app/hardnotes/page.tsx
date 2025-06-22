@@ -20,9 +20,10 @@ import { getAuth } from "firebase/auth";
 
 const user = getAuth().currentUser;
 
-import { child, get, getDatabase, ref, set } from "firebase/database";
+import { child, get, getDatabase, onValue, ref, set } from "firebase/database";
 
 type Note = {
+  ownerId: string;
   id: string;
   name: string;
   content: string;
@@ -50,34 +51,101 @@ const generateId = () => Math.random().toString(36).slice(2, 9);
 export default function NotePage() {
   const [testTree, setTree] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [sharedTree, setSharedTree] = useState<Folder[]>([]);
+  const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
+  // Live sync for current user's notes
   useEffect(() => {
-    async function fetchTree() {
-      try {
-        console.log("Fetching tree for user...");
-        const loadedTree = await loadTreeFromRealtimeDB();
-        console.log("Tree loaded:", loadedTree);
-        setTree(loadedTree);
-      } catch (err) {
-        console.error("Error loading tree:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
+    const user = getAuth().currentUser;
+    if (!user) return;
 
-    fetchTree();
+    const notesRef = ref(db, `users/${user.uid}/notes`);
+
+    const unsubscribe = onValue(notesRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const items = Object.values(data);
+        const tree = buildTree(items);
+        setTree(tree);
+      } else {
+        setTree([]);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
+  // Save updates to the user's tree
   useEffect(() => {
     if (testTree.length > 0) {
       saveTreeToRealtimeDB(testTree);
     }
   }, [testTree]);
+
+  // Live sync for shared notes
+  useEffect(() => {
+    const user = getAuth().currentUser;
+    if (!user) return;
+
+    const sharedNotesRef = ref(db, `users/${user.uid}/sharedNotes`);
+
+    const noteListeners: (() => void)[] = [];
+    const sharedItemsMap = new Map<string, any>();
+
+    const unsubscribe = onValue(sharedNotesRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setSharedTree([]);
+        setLoading(false);
+        return;
+      }
+
+      const sharedNotes: Record<string, { owner: string; noteId: string }> =
+        snapshot.val();
+
+      // Detach all previous listeners
+      noteListeners.forEach((unsub) => unsub());
+      noteListeners.length = 0;
+      sharedItemsMap.clear();
+
+      Object.entries(sharedNotes).forEach(([noteId, { owner }]) => {
+        const path = `users/${owner}/notes/${noteId}` ; 
+        const noteRef = ref(db, path);
+        console.log(path)
+        const noteUnsub = onValue(noteRef, (noteSnap) => {
+          if (noteSnap.exists()) {
+            const raw = noteSnap.val();
+            const item = {
+              id: raw.id,
+              name: raw.name ?? "",
+              content: raw.content ?? "",
+              type: "note",
+              collaborators: raw.collaborators ?? {},
+              parentId: "__shared__",
+              ownerId: owner,
+            };
+
+            sharedItemsMap.set(raw.id, item);
+
+            const sharedItems = Array.from(sharedItemsMap.values());
+            const built = buildTree(sharedItems, "__shared__");
+            setSharedTree(built);
+          }
+        });
+
+        noteListeners.push(noteUnsub);
+      });
+
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
+      noteListeners.forEach((unsub) => unsub());
+    };
+  }, []);
 
   const toggleExpand = (folder: Folder) => {
     const toggle = (nodes: FileNode[]): FileNode[] =>
@@ -157,7 +225,8 @@ export default function NotePage() {
             content: raw.content ?? "",
             type: "note",
             collaborators: raw.collaborators ?? {},
-            parentId: "__shared__", // temporary group for building tree
+            parentId: "__shared__",
+            ownerId: owner, // ✅ Add this line
           });
         }
       } catch (err) {
@@ -165,6 +234,32 @@ export default function NotePage() {
           `Failed to fetch shared note ${noteId} from ${owner}:`,
           err
         );
+      }
+    }
+
+    async function updateSharedNoteContent({
+      ownerId,
+      noteId,
+      field,
+      value,
+    }: {
+      ownerId: string;
+      noteId: string;
+      field: "name" | "content";
+      value: string;
+    }) {
+      const user = getAuth().currentUser;
+      if (!user) throw new Error("User not logged in");
+
+      const db = getDatabase();
+      const noteRef = ref(db, `users/${ownerId}/notes/${noteId}/${field}`);
+
+      try {
+        await set(noteRef, value);
+        console.log(`Updated shared note ${noteId} (${field}) to:`, value);
+      } catch (error) {
+        console.error("Error updating shared note:", error);
+        throw error;
       }
     }
 
@@ -179,22 +274,6 @@ export default function NotePage() {
 
     return [sharedFolder];
   }
-
-  useEffect(() => {
-    const fetchTree = async () => {
-      try {
-        const tree = await loadSharedNotesTreeFromRealtimeDB();
-        console.log("Shared Notes Tree:", tree);
-        setSharedTree(tree);
-      } catch (error) {
-        console.error("Error loading shared tree:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTree();
-  }, []);
 
   async function loadTreeFromRealtimeDB(): Promise<FileNode[]> {
     const user = getAuth().currentUser;
@@ -222,9 +301,7 @@ export default function NotePage() {
 
   function buildTree(items: any[], parentId: string | null = null): FileNode[] {
     return items
-      .filter((item) => {
-        return (item.parentId ?? null) === parentId;
-      })
+      .filter((item) => (item.parentId ?? null) === parentId)
       .map((item) => {
         if (item.type === "note") {
           return {
@@ -232,7 +309,8 @@ export default function NotePage() {
             name: item.name,
             content: item.content,
             type: "note",
-            collaborators: {},
+            collaborators: item.collaborators ?? {},
+            ownerId: item.ownerId ?? "",
           };
         } else {
           return {
@@ -241,7 +319,8 @@ export default function NotePage() {
             type: "folder",
             expanded: item.expanded ?? false,
             children: buildTree(items, item.id),
-            collaborators: {},
+            collaborators: item.collaborators ?? {},
+            ownerId: item.ownerId ?? "",
           };
         }
       });
@@ -328,6 +407,18 @@ export default function NotePage() {
 
     if (selectedNote && selectedNote.id === id) {
       setSelectedNote({ ...selectedNote, [field]: value });
+
+      // 🔥 Sync to Firebase
+      const db = getDatabase();
+      const user = getAuth().currentUser;
+      if (!user) return;
+
+      const ownerId = selectedNote.ownerId || user.uid;
+      const noteRef = ref(db, `users/${ownerId}/notes/${id}/${field}`);
+
+      set(noteRef, value).catch((err) => {
+        console.error("Failed to update note in Firebase:", err);
+      });
     }
   };
 
@@ -368,6 +459,9 @@ export default function NotePage() {
   };
 
   const addNote = () => {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error("User not logged in");
+
     const newNote: Note = {
       id: generateId(),
       name: "New Note",
@@ -377,6 +471,7 @@ export default function NotePage() {
         placeholder: false,
         DwgkN26pduWlurcPB5w8jBF8LU03: true,
       },
+      ownerId: user.uid,
     };
 
     if (selectedFolderId) {
@@ -587,6 +682,15 @@ export default function NotePage() {
                 <p className="text-sm">No notes yet</p>
                 <p className="text-xs">Create your first note or folder</p>
               </div>
+            )}
+
+            {sharedTree.length > 0 && (
+              <>
+                <h4 className="text-sm text-muted-foreground pl-2 mb-1">
+                  Shared
+                </h4>
+                {renderTree(sharedTree)}
+              </>
             )}
           </div>
         </div>
