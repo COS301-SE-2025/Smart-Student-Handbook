@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { auth, fs, db } from '@/lib/firebase';
+import { auth,  db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
