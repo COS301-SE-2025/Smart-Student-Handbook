@@ -56,7 +56,6 @@ export default function NotePage() {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
-  // Live sync for current user's notes
   useEffect(() => {
     const user = getAuth().currentUser;
     if (!user) return;
@@ -78,14 +77,12 @@ export default function NotePage() {
     return () => unsubscribe();
   }, []);
 
-  // Save updates to the user's tree
   useEffect(() => {
     if (testTree.length > 0) {
       saveTreeToRealtimeDB(testTree);
     }
   }, [testTree]);
 
-  // Live sync for shared notes
   useEffect(() => {
     const user = getAuth().currentUser;
     if (!user) return;
@@ -105,15 +102,14 @@ export default function NotePage() {
       const sharedNotes: Record<string, { owner: string; noteId: string }> =
         snapshot.val();
 
-      // Detach all previous listeners
       noteListeners.forEach((unsub) => unsub());
       noteListeners.length = 0;
       sharedItemsMap.clear();
 
       Object.entries(sharedNotes).forEach(([noteId, { owner }]) => {
-        const path = `users/${owner}/notes/${noteId}` ; 
+        const path = `users/${owner}/notes/${noteId}`;
         const noteRef = ref(db, path);
-        console.log(path)
+        console.log(path);
         const noteUnsub = onValue(noteRef, (noteSnap) => {
           if (noteSnap.exists()) {
             const raw = noteSnap.val();
