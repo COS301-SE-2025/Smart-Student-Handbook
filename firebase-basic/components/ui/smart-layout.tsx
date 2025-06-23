@@ -83,19 +83,22 @@ export function SmartLayout({ children }: SmartLayoutProps) {
     )
   }
 
-  return (
-    <SidebarProvider>
-      <div className="min-h-screen bg-background">
+return (
+  <SidebarProvider>
+    <div className="flex h-screen w-screen bg-background overflow-hidden">
+      <AppSidebar />
+
+      {/* Right side: header + scrollable content */}
+      <div className="flex flex-col flex-1 relative">
         <SmartHeader />
-        <div className="flex pt-14">
-          <AppSidebar />
-          <main className="flex-1 min-w-0">
-            <div className="h-[calc(100vh-3.5rem)] overflow-auto">
-              <div className="p-6">{children}</div>
-            </div>
-          </main>
+
+        {/* Main scrollable content with padding to avoid overlapping header */}
+        <div className="absolute top-14 bottom-0 left-0 right-0 overflow-y-auto px-6 pb-6">
+          {children}
         </div>
       </div>
-    </SidebarProvider>
-  )
+    </div>
+  </SidebarProvider>
+)
+
 }

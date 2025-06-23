@@ -125,9 +125,9 @@ function CustomCalendarGrid({
 
   const getDateClasses = (date: Date, isCurrentMonth: boolean) => {
     const baseClasses =
-      "h-12 w-full flex items-center justify-center text-sm font-medium rounded-md cursor-pointer transition-colors border border-transparent hover:border-gray-200 hover:bg-gray-50"
+      "h-12 w-full flex items-center justify-center text-sm font-medium rounded-md cursor-pointer transition-colors border border-transparent hover:border-gray-200 hover:bg-gray-muted"
     if (!isCurrentMonth) {
-      return `${baseClasses} text-gray-400 opacity-50`
+      return `${baseClasses} text-muted-foreground opacity-50`
     }
     const today = new Date()
     const isToday = date.toDateString() === today.toDateString()
@@ -157,7 +157,7 @@ function CustomCalendarGrid({
     if (colorClasses) {
       return `${baseClasses} ${colorClasses} font-bold border-2`
     }
-    return `${baseClasses} text-gray-900`
+    return `${baseClasses} text-foreground`
   }
 
   const days = getDaysInMonth(currentMonth)
@@ -433,17 +433,16 @@ function StudentCalendar() {
   if (!userId) return <div className="text-center py-10">Please sign in to use the calendar.</div>
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {loading && <div className="text-blue-700">Syncing...</div>}
-        {error && <div className="text-red-600">{error}</div>}
 
         {/* header */}
-        <header className="bg-white rounded-lg shadow-sm border p-6 space-y-6">
+        <header className="bg-card rounded-lg shadow-sm border p-6 space-y-6">
           <div className="text-center">
-            <h1 className="text-3xl font-bold">Student Calendar</h1>
-            <p className="text-gray-600 mt-2">Manage your academic schedule and events</p>
+            <h1 className="text-3xl font-bold textforeground">Student Calendar</h1>
+            <p className="text-muted-foreground mt-2">Manage your academic schedule and events</p>
           </div>
+           {/* Tabs & buttons */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <Tabs
               value={activeTab}
@@ -479,7 +478,7 @@ function StudentCalendar() {
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
             {/* calendar section */}
             <div className="xl:col-span-3 space-y-6">
-              <Card className="shadow-sm">
+              <Card className="shadow-sm p-6">
                 <CardContent className="p-6">
                   <div className="flex justify-center w-full">
                     <div className="w-full max-w-2xl">
