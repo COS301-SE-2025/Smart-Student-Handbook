@@ -1,7 +1,20 @@
-import Link from "next/link"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Calendar, FileText, Heart, Plus, Share2, Star } from "lucide-react"
+"use client";
+
+import Link from "next/link";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Calendar, FileText, Heart, Plus, Share2, Star } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getUserOrganisations } from "@/lib/organisations";
+import { auth } from "@/lib/firebase";
+
+interface Organisation {
+  id: string;
+  name: string;
+  description: string;
+  members: string[];
+  ownerId: string;
+}
 
 const notebooks = [
   {
@@ -32,21 +45,41 @@ const notebooks = [
     timestamp: "1 week ago",
     likes: 1,
   },
-]
+];
 
 const friends = [
   { name: "Ndhlovu Tanaka", role: "Student" },
   { name: "Takudzwa Magunda", role: "Lecturer" },
-]
+];
 
 const upcomingEvents = [
   { title: "COS301", type: "lecture", date: "Sat, 5 May", time: "08:00" },
   { title: "COS332", type: "exam", date: "Tue, 5 June", time: "08:00" },
-]
+];
 
-const studyHours = [2, 5, 8] // Representing hours for 3 days
+const studyHours = [2, 5, 8]; // Representing hours for 3 days
 
 export default function DashboardPage() {
+  const [orgs, setOrgs] = useState<Organisation[]>([]);
+  const [loadingOrgs, setLoadingOrgs] = useState(true);
+
+  useEffect(() => {
+    const loadOrganisations = async () => {
+      if (!auth.currentUser) return;
+      
+      try {
+        const userOrgs = await getUserOrganisations(auth.currentUser.uid);
+        setOrgs(userOrgs as Organisation[]);
+      } catch (error) {
+        console.error("Failed to load organizations:", error);
+      } finally {
+        setLoadingOrgs(false);
+      }
+    };
+    
+    loadOrganisations();
+  }, []);
+
   return (
     <div className="p-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -149,8 +182,61 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Upcoming Events and Total Study Hours Section */}
+        {/* Third Column - Upcoming Events, Study Hours, and My Organisations */}
         <div className="col-span-1 space-y-6">
+          {/* My Organisations Section */}
+          <div className="bg-card p-6 rounded-lg shadow-sm border">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">My Organisations</h2>
+              <Link href="/organisations/new">
+                <Button variant="ghost" size="icon">
+                  <Plus className="h-5 w-5" />
+                </Button>
+              </Link>
+            </div>
+            
+            <div className="space-y-3">
+              {loadingOrgs ? (
+                <p className="text-center text-muted-foreground py-4">Loading organisations...</p>
+              ) : orgs.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground mb-3">You haven't joined any organisations</p>
+                  <Link href="/organisations">
+                    <Button size="sm">Browse Organisations</Button>
+                  </Link>
+                </div>
+              ) : (
+                orgs.slice(0, 3).map((org) => (
+                  <Link href={`/organisations/${org.id}`} key={org.id}>
+                    <div className="flex items-center gap-3 hover:bg-muted/50 transition-colors p-3 rounded-md">
+                      <Avatar>
+                        <AvatarFallback>{org.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{org.name}</p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {org.members.length} member{org.members.length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                        Member
+                      </span>
+                    </div>
+                  </Link>
+                ))
+              )}
+              {orgs.length > 3 && (
+                <div className="text-center mt-4">
+                  <Link href="/organisations/my">
+                    <Button variant="outline" size="sm">
+                      View All Organisations
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Upcoming Events Section */}
           <div className="bg-card p-6 rounded-lg shadow-sm border">
             <h2 className="text-lg font-semibold mb-4">Upcoming Events</h2>
@@ -196,5 +282,5 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
