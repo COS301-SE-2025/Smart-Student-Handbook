@@ -1,6 +1,6 @@
 "use client"
 
-import { BarChart3, Calendar, Settings, Moon, Sun, BookOpen, Edit3 } from "lucide-react"
+import { BarChart3, Calendar, Settings, Moon, Sun, BookOpen, Edit3, Users } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -47,6 +47,12 @@ const items = [
     url: "/profile",
     icon: Settings,
     description: "Account & preferences",
+  },
+   {
+    title: "My Organisations",
+    url: "/organisations",
+    icon: Users,
+    description: "Manage your organisations",
   },
 ]
 

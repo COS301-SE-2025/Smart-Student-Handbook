@@ -1,6 +1,6 @@
 "use client"
 
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,16 +13,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Search, Bell, User, Settings, LogOut, BarChart3, Calendar, BookOpen, Edit3, GraduationCap } from "lucide-react"
+import {
+  Search,
+  Bell,
+  User,
+  Settings,
+  LogOut,
+  BarChart3,
+  Calendar,
+  BookOpen,
+  Edit3,
+  GraduationCap,
+  Users,
+} from "lucide-react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
-import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 
 export function SmartHeader() {
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
+  const [searchValue, setSearchValue] = useState("")
 
   // Today's academic notifications
   const [notifications] = useState([
@@ -49,13 +62,19 @@ export function SmartHeader() {
     },
   ])
 
+  // Initialize search value from URL params
+  useEffect(() => {
+    const searchQuery = searchParams.get("search") || ""
+    setSearchValue(searchQuery)
+  }, [searchParams])
+
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
-        // Simulate user for development
-        setUser({
-            displayName: "Test User",
-            email: "testuser@example.com"
-        })
+      // Simulate user for development
+      setUser({
+        displayName: "Test User",
+        email: "testuser@example.com",
+      })
     }
 
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -77,6 +96,29 @@ export function SmartHeader() {
     }
   }
 
+  // Handle search input changes
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchValue(value)
+
+      // Update URL search params for pages that support search
+      const searchablePages = ["/organisations"]
+      if (searchablePages.includes(pathname)) {
+        const params = new URLSearchParams(searchParams.toString())
+        if (value.trim()) {
+          params.set("search", value.trim())
+        } else {
+          params.delete("search")
+        }
+
+        // Update URL without causing a page reload
+        const newUrl = `${pathname}${params.toString() ? `?${params.toString()}` : ""}`
+        router.replace(newUrl, { scroll: false })
+      }
+    },
+    [pathname, router, searchParams],
+  )
+
   const getPageInfo = () => {
     switch (pathname) {
       case "/dashboard":
@@ -85,6 +127,8 @@ export function SmartHeader() {
         return { title: "Calendar", icon: <Calendar className="h-4 w-4" /> }
       case "/notes":
         return { title: "Library", icon: <BookOpen className="h-4 w-4" /> }
+      case "/organisations":
+        return { title: "Organisations", icon: <Users className="h-4 w-4" /> }
       case "/hardnotes":
         return { title: "Note Editor", icon: <Edit3 className="h-4 w-4" /> }
       case "/profile":
@@ -109,6 +153,20 @@ export function SmartHeader() {
     }
   }
 
+  // Get appropriate placeholder text based on current page
+  const getSearchPlaceholder = () => {
+    switch (pathname) {
+      case "/organisations":
+        return "Search organisations by name or description..."
+      case "/notes":
+        return "Search notes and documents..."
+      case "/dashboard":
+        return "Search notebooks, organisations..."
+      default:
+        return "Search notes, modules, flashcards..."
+    }
+  }
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="flex h-full items-center justify-between px-4">
@@ -126,7 +184,9 @@ export function SmartHeader() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search notes, modules, flashcards..."
+              placeholder={getSearchPlaceholder()}
+              value={searchValue}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-9 h-8 bg-muted/50 border-border focus:bg-background transition-colors"
             />
           </div>

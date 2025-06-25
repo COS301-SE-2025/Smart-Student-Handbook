@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { getOrganisation, joinOrganisation } from "@/lib/organisations";
+// import { getOrganisation, joinOrganisation } from "@/lib/organisations";
 import { auth } from "@/lib/firebase";
 import { useParams, useRouter } from "next/navigation";
 
