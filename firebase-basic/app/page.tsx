@@ -73,19 +73,14 @@ const features = [
 
 export default function Home() {
   const router = useRouter()
-  const [isLoading, setIsLoading] = React.useState(false)
+  const [isLoginLoading, setIsLoginLoading] = React.useState(false)
+  const [isSignupLoading, setIsSignupLoading] = React.useState(false)
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
       {/* Banner Image */}
       <section className="w-full">
         <div className="relative w-full h-[350px] md:h-[500px]">
-          <Image
-            src="/banner.jpeg"
-            alt="Smart Student Handbook Banner"
-            fill
-            className="object-contain"
-            priority
-          />
+          <Image src="/banner.jpeg" alt="Smart Student Handbook Banner" fill className="object-contain" priority />
         </div>
       </section>
 
@@ -106,28 +101,43 @@ export default function Home() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-        
-                <Button size="lg" className="bg-white text-amber-700 hover:bg-amber-50 px-8 py-3 text-lg font-semibold"
+              <Button
+                size="lg"
+                className="bg-white text-amber-700 hover:bg-amber-50 px-8 py-3 text-lg font-semibold transition-all duration-200 disabled:opacity-70"
+                disabled={isLoginLoading}
                 onClick={() => {
-                  setIsLoading(true)
+                  setIsLoginLoading(true)
                   router.push("/login")
                 }}
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Login"}
-                </Button>
-              
-              
-                <Button 
-                size="lg" 
-                className="bg-white text-amber-700 hover:bg-amber-50 px-8 py-3 text-lg font-semibold"
+              >
+                {isLoginLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Redirecting...</span>
+                  </div>
+                ) : (
+                  "Login"
+                )}
+              </Button>
+
+              <Button
+                size="lg"
+                className="bg-white text-amber-700 hover:bg-amber-50 px-8 py-3 text-lg font-semibold transition-all duration-200 disabled:opacity-70"
+                disabled={isSignupLoading}
                 onClick={() => {
-                  setIsLoading(true)
+                  setIsSignupLoading(true)
                   router.push("/signup")
                 }}
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign Up"}
-                </Button>
-              
+              >
+                {isSignupLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Redirecting...</span>
+                  </div>
+                ) : (
+                  "Sign Up"
+                )}
+              </Button>
             </div>
           </div>
         </div>
