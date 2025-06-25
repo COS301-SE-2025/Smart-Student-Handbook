@@ -280,11 +280,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-3">
-              {authLoading || loadingOrgs ? (
-                <div className="text-center py-4">
-                  <p className="text-muted-foreground">Loading organizations...</p>
-                </div>
-              ) : sortedOrganizations.length === 0 ? (
+              {sortedOrganizations.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-muted-foreground mb-3">You haven't joined any organisations</p>
                   <Link href="/organisations">
