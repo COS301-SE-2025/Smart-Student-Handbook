@@ -349,7 +349,7 @@ export default function DashboardPage() {
           {/* Upcoming Events Section */}
           <div className="bg-card p-6 rounded-lg shadow-sm border">
             <h2 className="text-lg font-semibold mb-4">Upcoming Events</h2>
-            <div className="col-span-1 space-y-3">
+            <div className="space-y-3">
               {upcomingEvents.map((event) => (
                 <Link href="/calendar" key={event.title}>
                   <div className="flex items-center gap-3 hover:bg-muted/50 transition-colors p-3 rounded-md">

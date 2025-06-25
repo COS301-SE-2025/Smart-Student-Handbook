@@ -1,22 +1,72 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
-import { getDatabase } from "firebase/database";
+// firebase-basic/lib/firebase.ts
+// ------------------------------------------------------------
+// Central Firebase client-side initialisation
+// • Auth  -> auth
+// • RTDB  -> db
+// • Funcs -> fns
+// ------------------------------------------------------------
 
+import { initializeApp, getApps, getApp } from "firebase/app"
+import {
+  getAuth,
+  connectAuthEmulator,
+  browserLocalPersistence,
+  setPersistence,
+} from "firebase/auth"
+import {
+  getDatabase,
+  connectDatabaseEmulator,
+} from "firebase/database"
+import {
+  getFunctions,
+  connectFunctionsEmulator,
+} from "firebase/functions"
+
+// ──────────────────────────────────────────────────────────────
+// Config (pulled from NEXT_PUBLIC_* env vars)
+// ──────────────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyABkJJG7rmzW2-MZB7R9Nc3pWYisyRqTjQ",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "studenthandbook-a215a.firebaseapp.com",
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://studenthandbook-a215a-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "studenthandbook-a215a",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "studenthandbook-a215a.appspot.com",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "115322354821",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:115322354821:web:7a266195595bb59e5c3dec",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-SD3YP79L2S"
-};
+  apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+  authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  databaseURL:       process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL!,
+  projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket:     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+}
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const fs = getFirestore(app);
-const db = getDatabase(app);
+// ──────────────────────────────────────────────────────────────
+// Initialise (or reuse) Firebase app
+// ──────────────────────────────────────────────────────────────
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 
-export { auth, fs, db };
+// ──────────────────────────────────────────────────────────────
+// Service handles
+// ──────────────────────────────────────────────────────────────
+export const auth = getAuth(app)           // 🔑 Authentication
+export const db   = getDatabase(app)       // 🟢 Realtime Database
+export const fns  = getFunctions(app)      // ⚙️ Callable / HTTPS Functions
+
+// Persist the auth session across reloads / new tabs
+// (falls back to in-memory if IndexedDB/localStorage blocked)
+setPersistence(auth, browserLocalPersistence).catch(() => {
+  /* ignore – in private mode some browsers disallow IndexedDB */
+})
+
+// ──────────────────────────────────────────────────────────────
+// Local emulator suite (optional)
+// ──────────────────────────────────────────────────────────────
+if (process.env.NEXT_PUBLIC_FIREBASE_EMULATOR === "true") {
+  // Auth emulator
+  connectAuthEmulator(auth, "http://localhost:9099", {
+    disableWarnings: true,
+  })
+
+  // Realtime DB emulator
+  connectDatabaseEmulator(db, "localhost", 9000)
+
+  // Functions emulator
+  connectFunctionsEmulator(fns, "localhost", 5001)
+
+  console.info("[Firebase] Connected to local emulators ✔︎")
+}
