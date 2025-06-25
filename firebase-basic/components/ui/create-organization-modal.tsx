@@ -1,7 +1,7 @@
 'use client'
 
-import type React from 'react'
-import { useState, useEffect, useMemo } from 'react'
+import * as React from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -9,18 +9,17 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { httpsCallable } from 'firebase/functions'
-import { fns } from '@/lib/firebase'          // ← use fns, not fn
-import { getAuth } from 'firebase/auth'
-import { Search, UserPlus, Users, Camera, X, Check } from 'lucide-react'
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { getAuth } from "firebase/auth"
+import { getDatabase, ref, get } from "firebase/database"
+import { Search, UserPlus, Users, Camera, X, Check } from "lucide-react"
 
 interface CreateOrganizationModalProps {
   open: boolean
@@ -47,68 +46,84 @@ export function CreateOrganizationModal({
   onCreateOrganization,
 }: CreateOrganizationModalProps) {
   /* ─── Form state ─────────────────────────────────────────── */
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
   const [isPrivate, setIsPrivate] = useState(false)
-  const [organizationImage, setOrganizationImage] = useState<string | null>(
-    null,
-  )
+  const [organizationImage, setOrganizationImage] = useState<string | null>(null)
   const [selectedFriends, setSelectedFriends] = useState<string[]>([])
 
   /* ─── Friends state ──────────────────────────────────────── */
   const [friends, setFriends] = useState<Friend[]>([])
-  const [friendQuery, setFriendQuery] = useState('')
+  const [friendQuery, setFriendQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
   const [loadingFriends, setLoadingFriends] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   /* Exclude current user when listing friends */
   const authClient = getAuth()
+  const me = authClient.currentUser?.uid
 
-  /* Callable: list all users (except me) */
-  const listUsersFn = useMemo(
-    () => httpsCallable<{}, Friend[]>(fns, 'listUsers'),
-    [fns],
-  )
-
-  /* Fetch users when the modal opens */
+  /* ─── Fetch all user profiles ─────────────────────────────── */
   useEffect(() => {
     if (!open) return
     setLoadingFriends(true)
 
-    listUsersFn({})
-      .then((res) => {
-        const allUsers = res.data
-        const me = authClient.currentUser?.uid
-        const filtered = me ? allUsers.filter((u) => u.id !== me) : allUsers
-        setFriends(filtered)
-      })
-      .catch((err) => {
-        console.error('Failed to list users:', err)
+    ;(async () => {
+      try {
+        const db = getDatabase()
+        const snap = await get(ref(db, "users"))
+        const data = snap.val() as Record<string, any> | null
+
+        if (!data) {
+          setFriends([])
+          return
+        }
+
+        const list: Friend[] = Object.entries(data)
+          .flatMap(([uid, node]) => {
+            // pull name + surname from UserSettings
+            const settings = node.UserSettings
+            if (!settings?.name) return []  // skip unnamed
+            const fullName = settings.name + (settings.surname ? ` ${settings.surname}` : "")
+            return [{
+              id: uid,
+              name: fullName,
+              email: settings.email || "",         // if you store email in settings
+              avatarUrl: settings.avatarUrl || ""  // likewise for avatar
+            }]
+          })
+          // filter out current user
+          .filter(u => u.id !== me)
+
+        setFriends(list)
+      } catch (err) {
+        console.error("Failed to load users from RTDB:", err)
         setFriends([])
-      })
-      .finally(() => setLoadingFriends(false))
-  }, [open, listUsersFn, authClient])
+      } finally {
+        setLoadingFriends(false)
+      }
+    })()
+  }, [open, me])
 
-  /* Filter friends by search string */
-  const filtered = friends.filter((f) => {
+  /* ─── Filter friends by search string ────────────────────── */
+  const filtered = useMemo(() => {
     const q = friendQuery.toLowerCase()
-    return (
-      f.name.toLowerCase().includes(q) || f.email.toLowerCase().includes(q)
+    return friends.filter(
+      f =>
+        f.name.toLowerCase().includes(q) ||
+        f.email.toLowerCase().includes(q)
     )
-  })
+  }, [friends, friendQuery])
 
-  /* Toggle friend selection */
+  /* ─── Toggle / remove friend selection ───────────────────── */
   const toggleFriend = (id: string) =>
-    setSelectedFriends((curr) =>
-      curr.includes(id) ? curr.filter((x) => x !== id) : [...curr, id],
+    setSelectedFriends(curr =>
+      curr.includes(id) ? curr.filter(x => x !== id) : [...curr, id]
     )
-
-  /* Remove friend from selection */
   const removeFriend = (friendId: string) =>
-    setSelectedFriends((prev) => prev.filter((id) => id !== friendId))
+    setSelectedFriends(prev => prev.filter(id => id !== friendId))
 
-  /* Image picker */
+  /* ─── Image picker ───────────────────────────────────────── */
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -117,25 +132,25 @@ export function CreateOrganizationModal({
     reader.readAsDataURL(file)
   }
 
-  /* Reset form after submission or close */
+  /* ─── Reset form ─────────────────────────────────────────── */
   const resetForm = () => {
-    setName('')
-    setDescription('')
+    setName("")
+    setDescription("")
     setIsPrivate(false)
     setOrganizationImage(null)
     setSelectedFriends([])
-    setFriendQuery('')
+    setFriendQuery("")
     setShowSearch(false)
   }
 
-  /* Submit handler */
+  /* ─── Submit handler ─────────────────────────────────────── */
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
     setIsSubmitting(true)
 
-    // Simulate API latency
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // Simulate API latency (optional)
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
     await onCreateOrganization({
       name: name.trim(),
@@ -166,17 +181,14 @@ export function CreateOrganizationModal({
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="space-y-6">
-          {/* ── Organisation image ───────────────────────────── */}
+          {/* Organisation image */}
           <div className="space-y-2">
             <Label>Organization Picture (Optional)</Label>
             <div className="flex items-center gap-4">
               <div className="relative">
                 <Avatar className="h-20 w-20">
                   {organizationImage ? (
-                    <AvatarImage
-                      src={organizationImage}
-                      alt="Organization"
-                    />
+                    <AvatarImage src={organizationImage} alt="Organization" />
                   ) : (
                     <AvatarFallback className="text-2xl">
                       <Camera className="h-8 w-8 text-muted-foreground" />
@@ -193,7 +205,6 @@ export function CreateOrganizationModal({
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">
                   Click the circle to upload an image for your organization.
-                  This will help members identify your group.
                 </p>
                 {organizationImage && (
                   <Button
@@ -210,7 +221,7 @@ export function CreateOrganizationModal({
             </div>
           </div>
 
-          {/* ── Name ────────────────────────────────────────── */}
+          {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="name">
               Name <span className="text-red-500">*</span>
@@ -219,29 +230,29 @@ export function CreateOrganizationModal({
               id="name"
               placeholder="e.g., CS301 Study Group"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={e => setName(e.target.value)}
               required
             />
           </div>
 
-          {/* ── Description ─────────────────────────────────── */}
+          {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               placeholder="What's this organization about?"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={e => setDescription(e.target.value)}
               rows={3}
             />
           </div>
 
-          {/* ── Privacy radio group ─────────────────────────── */}
+          {/* Privacy */}
           <div className="space-y-4">
             <Label>Privacy Settings</Label>
             <RadioGroup
-              value={isPrivate ? 'private' : 'public'}
-              onValueChange={(value) => setIsPrivate(value === 'private')}
+              value={isPrivate ? "private" : "public"}
+              onValueChange={v => setIsPrivate(v === "private")}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="public" id="public" />
@@ -264,7 +275,7 @@ export function CreateOrganizationModal({
             </RadioGroup>
           </div>
 
-          {/* ── Add friends section ─────────────────────────── */}
+          {/* Add friends */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Add Friends</Label>
@@ -272,10 +283,10 @@ export function CreateOrganizationModal({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setShowSearch(!showSearch)}
+                onClick={() => setShowSearch(s => !s)}
               >
                 <UserPlus className="h-4 w-4 mr-2" />
-                {showSearch ? 'Hide' : 'Add Friends'}
+                {showSearch ? "Hide" : "Add Friends"}
               </Button>
             </div>
 
@@ -286,11 +297,11 @@ export function CreateOrganizationModal({
                   Selected Friends ({selectedFriends.length})
                 </Label>
                 <div className="flex flex-wrap gap-2">
-                  {selectedFriends.map((friendId) => {
-                    const friend = friends.find((f) => f.id === friendId)
+                  {selectedFriends.map(fid => {
+                    const friend = friends.find(f => f.id === fid)
                     return (
                       <Badge
-                        key={friendId}
+                        key={fid}
                         variant="secondary"
                         className="flex items-center gap-1"
                       >
@@ -300,7 +311,7 @@ export function CreateOrganizationModal({
                           variant="ghost"
                           size="sm"
                           className="h-4 w-4 p-0 hover:bg-transparent"
-                          onClick={() => removeFriend(friendId)}
+                          onClick={() => removeFriend(fid)}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -319,7 +330,7 @@ export function CreateOrganizationModal({
                   <Input
                     placeholder="Search friends by name or email..."
                     value={friendQuery}
-                    onChange={(e) => setFriendQuery(e.target.value)}
+                    onChange={e => setFriendQuery(e.target.value)}
                     className="pl-10"
                   />
                 </div>
@@ -331,16 +342,16 @@ export function CreateOrganizationModal({
                     </p>
                   ) : filtered.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      {friendQuery ? 'No friends found' : 'No friends available'}
+                      {friendQuery ? "No friends found" : "No friends available"}
                     </p>
                   ) : (
-                    filtered.map((fr) => (
+                    filtered.map(fr => (
                       <div
                         key={fr.id}
                         className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
                           selectedFriends.includes(fr.id)
-                            ? 'bg-primary/10 border border-primary/20'
-                            : 'hover:bg-muted/50'
+                            ? "bg-primary/10 border border-primary/20"
+                            : "hover:bg-muted/50"
                         }`}
                         onClick={() => toggleFriend(fr.id)}
                       >
@@ -350,9 +361,7 @@ export function CreateOrganizationModal({
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {fr.name}
-                          </p>
+                          <p className="text-sm font-medium truncate">{fr.name}</p>
                           <p className="text-xs text-muted-foreground truncate">
                             {fr.email}
                           </p>
@@ -368,7 +377,7 @@ export function CreateOrganizationModal({
             )}
           </div>
 
-          {/* ── Footer ───────────────────────────────────────── */}
+          {/* Footer */}
           <DialogFooter>
             <Button
               type="button"
