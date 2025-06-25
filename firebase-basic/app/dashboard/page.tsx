@@ -144,8 +144,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* 2nd column: Friends + My Organisations */}
+        <div className="col-span-1 space-y-6">
         {/* Friends Section */}
-        <div className="col-span-1 bg-card p-6 rounded-lg shadow-sm border">
+        <div className="bg-card p-6 rounded-lg shadow-sm border">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Friends</h2>
             <Link href="#">
@@ -180,10 +182,8 @@ export default function DashboardPage() {
               </Link>
             ))}
           </div>
-        </div>
+          </div>
 
-        {/* Third Column - Upcoming Events, Study Hours, and My Organisations */}
-        <div className="col-span-1 space-y-6">
           {/* My Organisations Section */}
           <div className="bg-card p-6 rounded-lg shadow-sm border">
             <div className="flex justify-between items-center mb-4">
@@ -236,11 +236,16 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Third Column - Upcoming Events, Study Hours, and My Organisations */}
+        <div className="col-span-1 space-y-6">
+          
 
           {/* Upcoming Events Section */}
           <div className="bg-card p-6 rounded-lg shadow-sm border">
             <h2 className="text-lg font-semibold mb-4">Upcoming Events</h2>
-            <div className="space-y-3">
+            <div className="col-span-1 space-y-3">
               {upcomingEvents.map((event) => (
                 <Link href="/calendar" key={event.title}>
                   <div className="flex items-center gap-3 hover:bg-muted/50 transition-colors p-3 rounded-md">
