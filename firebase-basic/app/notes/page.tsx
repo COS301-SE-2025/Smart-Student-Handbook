@@ -375,19 +375,7 @@ export default function HardNotesPage() {
           {/* Sidebar Header */}
           <div className="p-4 border-b border-gray-300 dark:border-gray-700 bg-white dark:bg-black flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <Link href="/dashboard">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-black dark:text-white border-gray-300 dark:border-gray-600"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back
-                  </Button>
-                </Link>
-              </div>
-
+ 
               <Button variant="ghost" size="sm" className="text-gray-500 dark:text-gray-400">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>

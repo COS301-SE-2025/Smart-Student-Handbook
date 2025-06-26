@@ -9,6 +9,7 @@ import { CreateOrganizationModal } from "@/components/ui/create-organization-mod
 import { Users, Lock, Globe } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { httpsCallable } from "firebase/functions"
+//import { db, functions } from "@/lib/firebase"
 import { fns } from "@/lib/firebase"
 import { getDatabase, ref, get } from "firebase/database"
 import { useUserId } from "@/hooks/useUserId"

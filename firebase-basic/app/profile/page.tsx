@@ -56,7 +56,7 @@ export default function ProfilePage() {
       }
 
       const userID = user.uid
-      const friendsRef = ref(db, `${userID}/Friends`)
+      const friendsRef = ref(db, `users/${userID}/Friends`)
 
       onValue(friendsRef, async (snapshot) => {
         const friendsData = snapshot.val()
@@ -73,7 +73,7 @@ export default function ProfilePage() {
 
         await Promise.all(
           friendIDs.map(async (fid) => {
-            const nameRef = ref(db, `${fid}/UserSettings/name`)
+            const nameRef = ref(db, `users/${fid}/UserSettings/name`)
             const nameSnap = await get(nameRef)
             const friendName = nameSnap.exists() ? nameSnap.val() : "Unknown"
             friendsList.push({ id: fid, name: friendName })
