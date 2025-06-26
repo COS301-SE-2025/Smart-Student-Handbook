@@ -605,9 +605,24 @@ export default function FriendsPage() {
                   </Avatar>
                   <span>{req.name} {req.surname}</span>
                 </Link>
-                <div className="flex gap-1">
-                  <Button size="sm" onClick={() => handleAccept(req.uid)}><Check className="h-4 w-4" /></Button>
-                  <Button size="sm" variant="outline" onClick={() => handleReject(req.uid)}><X className="h-4 w-4" /></Button>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    onClick={() => handleAccept(req.uid)} 
+                    className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Check className="h-4 w-4" />
+                    Accept
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => handleReject(req.uid)} 
+                    className="flex items-center gap-1 border-red-500 text-red-600 hover:bg-red-50 hover:border-red-600"
+                  >
+                    <X className="h-4 w-4" />
+                    Reject
+                  </Button>
                 </div>
               </div>
             ))}
@@ -624,8 +639,14 @@ export default function FriendsPage() {
                   </Avatar>
                   <span>{req.name} {req.surname}</span>
                 </Link>
-                <Button size="sm" variant="outline" onClick={() => handleCancel(req.uid)}>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => handleCancel(req.uid)} 
+                  className="flex items-center gap-1 border-red-500 text-red-600 hover:bg-red-50 hover:border-red-600"
+                >
                   <X className="h-4 w-4" />
+                  Cancel Request
                 </Button>
               </div>
             ))}
