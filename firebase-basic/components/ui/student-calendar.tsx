@@ -34,8 +34,7 @@ import {
 } from "lucide-react"
 import { useUserId } from "@/hooks/useUserId"
 
- const callFn = <TReq, TRes>(name: string, data: TReq) => httpsCallable<TReq, TRes>(fns, name)(data).then((r) => r.data)
-
+const callFn = <TReq, TRes>(name: string, data: TReq) => httpsCallable<TReq, TRes>(fns, name)(data).then((r) => r.data)
 
 interface Event {
   id: string
@@ -139,7 +138,7 @@ function CustomCalendarGrid({
     const baseClasses = "h-12 w-full flex items-center justify-center text-sm font-medium rounded-md transition-colors"
 
     if (!isCurrentMonth) {
-      return `${baseClasses} text-gray-400`
+      return `${baseClasses} text-muted-foreground`
     }
 
     const today = new Date()
@@ -152,41 +151,46 @@ function CustomCalendarGrid({
 
     let colorClasses = ""
     if (eventTypes.size > 1) {
-      colorClasses = "bg-purple-100 border border-purple-300 text-purple-800"
+      colorClasses =
+        "bg-purple-100 border border-purple-300 text-purple-800 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300"
     } else if (eventTypes.has("exam")) {
-      colorClasses = "bg-red-100 border border-red-300 text-red-800"
+      colorClasses =
+        "bg-red-100 border border-red-300 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-300"
     } else if (eventTypes.has("assignment")) {
-      colorClasses = "bg-blue-100 border border-blue-300 text-blue-800"
+      colorClasses =
+        "bg-blue-100 border border-blue-300 text-blue-800 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300"
     } else if (eventTypes.has("reminder")) {
-      colorClasses = "bg-yellow-100 border border-yellow-300 text-yellow-800"
+      colorClasses =
+        "bg-yellow-100 border border-yellow-300 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-300"
     } else if (eventTypes.has("class")) {
-      colorClasses = "bg-green-100 border border-green-300 text-green-800"
+      colorClasses =
+        "bg-green-100 border border-green-300 text-green-800 dark:bg-green-900/30 dark:border-green-700 dark:text-green-300"
     }
 
-    const interactiveClasses = "cursor-pointer hover:bg-gray-50 hover:border-gray-200 border border-transparent"
+    const interactiveClasses = "cursor-pointer hover:bg-muted/50 hover:border-border border border-transparent"
 
     if (isSelected) {
       return `${baseClasses} ${interactiveClasses} bg-primary text-primary-foreground border-primary`
     }
     if (isToday) {
-      return `${baseClasses} ${interactiveClasses} bg-accent text-accent-foreground font-semibold border-2 border-blue-400 ${colorClasses}`
+      return `${baseClasses} ${interactiveClasses} bg-accent text-accent-foreground font-semibold border-2 border-primary ${colorClasses}`
     }
     if (colorClasses) {
       return `${baseClasses} ${interactiveClasses} ${colorClasses} font-semibold`
     }
-    return `${baseClasses} ${interactiveClasses} text-gray-900`
+    return `${baseClasses} ${interactiveClasses} text-foreground`
   }
 
   const days = getDaysInMonth(currentMonth)
 
   return (
-    <div className="w-full bg-white rounded-lg border">
-      <div className="flex items-center justify-between p-4 border-b">
-        <button onClick={() => navigateMonth("prev")} className="p-2 hover:bg-gray-100 rounded-md transition-colors">
+    <div className="w-full bg-card rounded-lg border border-border">
+      <div className="flex items-center justify-between p-4 border-b border-border">
+        <button onClick={() => navigateMonth("prev")} className="p-2 hover:bg-muted rounded-md transition-colors">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <h2 className="text-lg font-semibold">{format(currentMonth, "MMMM yyyy")}</h2>
-        <button onClick={() => navigateMonth("next")} className="p-2 hover:bg-gray-100 rounded-md transition-colors">
+        <h2 className="text-lg font-semibold text-foreground">{format(currentMonth, "MMMM yyyy")}</h2>
+        <button onClick={() => navigateMonth("next")} className="p-2 hover:bg-muted rounded-md transition-colors">
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -194,7 +198,7 @@ function CustomCalendarGrid({
       <div className="p-4">
         <div className="grid grid-cols-7 gap-1 mb-2">
           {daysOfWeek.map((day) => (
-            <div key={day} className="h-8 flex items-center justify-center text-xs font-medium text-gray-500">
+            <div key={day} className="h-8 flex items-center justify-center text-xs font-medium text-muted-foreground">
               {day}
             </div>
           ))}
@@ -223,7 +227,6 @@ function StudentCalendar() {
   const [date, setDate] = React.useState<Date>(new Date())
   const [events, setEvents] = React.useState<Event[]>([])
   const [lectureSlots, setLectureSlots] = React.useState<LectureSlot[]>([])
-  // Remove hardcoded semester data - start with empty array
   const [semesters, setSemesters] = React.useState<Semester[]>([])
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [isLectureDialogOpen, setIsLectureDialogOpen] = React.useState(false)
@@ -256,7 +259,6 @@ function StudentCalendar() {
   })
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  // Add separate loading state for initial data fetch
   const [initialLoading, setInitialLoading] = React.useState(true)
 
   const lectureTimeSlots = [
@@ -279,10 +281,8 @@ function StudentCalendar() {
     return () => clearInterval(t)
   }, [])
 
-  // Update getActiveSemester function to handle null properly
   const getActiveSemester = () => semesters.find((s) => s.isActive) || null
 
-  // Add new function to check if date has valid semester
   const getSemesterForDate = (date: Date) => {
     return semesters.find((s) => date >= s.startDate && date <= s.endDate) || null
   }
@@ -335,7 +335,6 @@ function StudentCalendar() {
           })),
         )
       } else {
-        // If no semesters exist, create a default one
         console.log("No semesters found, creating default semester")
         const defaultSemester = {
           name: "Semester 1 2025",
@@ -347,7 +346,6 @@ function StudentCalendar() {
           semester: defaultSemester,
         })
 
-        // Activate the newly created semester
         await callFn<{ semesterId: string }, { success: boolean }>("setActiveSemester", {
           semesterId: addedSemester.id,
         })
@@ -368,7 +366,6 @@ function StudentCalendar() {
     }
   }, [userId])
 
-  // Initial data fetch when component mounts
   React.useEffect(() => {
     const initializeData = async () => {
       if (!userId) {
@@ -378,7 +375,6 @@ function StudentCalendar() {
 
       setInitialLoading(true)
       try {
-        // Fetch semesters first
         await fetchSemesters()
       } catch (err) {
         console.error("Error initializing data:", err)
@@ -390,7 +386,6 @@ function StudentCalendar() {
     initializeData()
   }, [userId, fetchSemesters])
 
-  // Fetch lectures and events when semesters change
   React.useEffect(() => {
     if (!userId || semesters.length === 0) return
 
@@ -399,14 +394,13 @@ function StudentCalendar() {
   }, [userId, semesters, fetchLectures, fetchEvents])
 
   const handleAddLecture = async () => {
-    setError(null) // Clear any existing errors
+    setError(null)
 
     const semesterForDate = getSemesterForDate(timetableDate)
     if (!semesterForDate) {
       const errorMsg = `No semester covers ${format(timetableDate, "MMM d, yyyy")}. Please add a semester that includes this date.`
       setError(errorMsg)
 
-      // Auto-clear error after 8 seconds
       setTimeout(() => {
         setError(null)
       }, 8000)
@@ -453,14 +447,13 @@ function StudentCalendar() {
 
   const handleAddEvent = async () => {
     if (!selectedDate) return
-    setError(null) // Clear any existing errors
+    setError(null)
 
     const semesterForDate = getSemesterForDate(selectedDate)
     if (!semesterForDate) {
       const errorMsg = `No semester covers ${format(selectedDate, "MMM d, yyyy")}. Please add a semester that includes this date.`
       setError(errorMsg)
 
-      // Auto-clear error after 8 seconds
       setTimeout(() => {
         setError(null)
       }, 8000)
@@ -540,7 +533,6 @@ function StudentCalendar() {
   }
 
   const handleTimeSlotClick = (slotStart: string) => {
-    // Clear any existing errors first
     setError(null)
 
     const semesterForDate = getSemesterForDate(timetableDate)
@@ -548,7 +540,6 @@ function StudentCalendar() {
       const errorMsg = `No semester covers ${format(timetableDate, "MMM d, yyyy")}. Please add a semester that includes this date in Manage Semesters.`
       setError(errorMsg)
 
-      // Auto-clear error after 8 seconds
       setTimeout(() => {
         setError(null)
       }, 8000)
@@ -603,7 +594,6 @@ function StudentCalendar() {
 
     setLoading(true)
     try {
-      // Pass the semester data with ID included
       const semesterData = {
         id: editingSemester.id,
         name: newSemester.name,
@@ -615,7 +605,6 @@ function StudentCalendar() {
         semester: semesterData,
       })
 
-      // Update the local state with the updated semester
       setSemesters((prev) =>
         prev.map((s) =>
           s.id === editingSemester.id
@@ -674,24 +663,22 @@ function StudentCalendar() {
       return nd
     })
 
- 
-
-  if (!userId) return <div className="text-center py-10">Please sign in to use the calendar.</div>
+  if (!userId) return <div className="text-center py-10 text-foreground">Please sign in to use the calendar.</div>
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {loading && <div className="text-blue-600 text-sm">Loading...</div>}
+        {loading && <div className="text-primary text-sm">Loading...</div>}
         {error && (
           <div className="fixed top-4 right-4 z-50 max-w-md">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 shadow-lg">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 shadow-lg">
               <div className="flex items-start">
-                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5 mr-3 flex-shrink-0" />
                 <div className="flex-1">
-                  <h3 className="text-sm font-medium text-red-800 mb-1">Error</h3>
-                  <p className="text-sm text-red-700">{error}</p>
+                  <h3 className="text-sm font-medium text-destructive mb-1">Error</h3>
+                  <p className="text-sm text-destructive/80">{error}</p>
                 </div>
-                <button onClick={() => setError(null)} className="ml-3 text-red-400 hover:text-red-600">
+                <button onClick={() => setError(null)} className="ml-3 text-destructive/60 hover:text-destructive">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -701,10 +688,10 @@ function StudentCalendar() {
           </div>
         )}
 
-        <header className="bg-white rounded-lg border p-6">
+        <header className="bg-card rounded-lg border border-border p-6">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Student Calendar</h1>
-            <p className="text-gray-600 mt-1">Manage your academic schedule and events</p>
+            <h1 className="text-2xl font-bold text-foreground">Student Calendar</h1>
+            <p className="text-muted-foreground mt-1">Manage your academic schedule and events</p>
           </div>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <Tabs
@@ -744,15 +731,30 @@ function StudentCalendar() {
 
               <Card>
                 <CardContent className="p-4">
-                  <h4 className="font-medium mb-3 text-sm">Event Types</h4>
+                  <h4 className="font-medium mb-3 text-sm text-foreground">Event Types</h4>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <LegendDot color="bg-red-100 border border-red-300" label="Exams" />
-                    <LegendDot color="bg-blue-100 border border-blue-300" label="Assignments" />
-                    <LegendDot color="bg-yellow-100 border border-blue-300" label="Reminders" />
-                    <LegendDot color="bg-green-100 border border-green-300" label="Classes" />
+                    <LegendDot
+                      color="bg-red-100 border border-red-300 dark:bg-red-900/30 dark:border-red-700"
+                      label="Exams"
+                    />
+                    <LegendDot
+                      color="bg-blue-100 border border-blue-300 dark:bg-blue-900/30 dark:border-blue-700"
+                      label="Assignments"
+                    />
+                    <LegendDot
+                      color="bg-yellow-100 border border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700"
+                      label="Reminders"
+                    />
+                    <LegendDot
+                      color="bg-green-100 border border-green-300 dark:bg-green-900/30 dark:border-green-700"
+                      label="Classes"
+                    />
                   </div>
-                  <div className="mt-3 pt-3 border-t">
-                    <LegendDot color="bg-purple-100 border border-purple-300" label="Multiple types" />
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <LegendDot
+                      color="bg-purple-100 border border-purple-300 dark:bg-purple-900/30 dark:border-purple-700"
+                      label="Multiple types"
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -793,9 +795,9 @@ function StudentCalendar() {
             <CardContent>
               {!getActiveSemester() ? (
                 <div className="text-center py-8">
-                  <Clock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Semester</h3>
-                  <p className="text-gray-600 mb-4">Please activate a semester to view and manage lectures.</p>
+                  <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">No Active Semester</h3>
+                  <p className="text-muted-foreground mb-4">Please activate a semester to view and manage lectures.</p>
                   <Button onClick={() => setIsSemesterDialogOpen(true)}>
                     <Settings className="h-4 w-4 mr-2" />
                     Manage Semesters
@@ -883,7 +885,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-2 text-sm">
       <div className={`w-3 h-3 rounded ${color}`} />
-      <span className="text-gray-700">{label}</span>
+      <span className="text-foreground">{label}</span>
     </div>
   )
 }
@@ -953,7 +955,7 @@ function Sidebar({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Current Semester</CardTitle>
-          <p className="text-sm text-gray-600">{getActiveSemester()?.name || "No active semester"}</p>
+          <p className="text-sm text-muted-foreground">{getActiveSemester()?.name || "No active semester"}</p>
         </CardHeader>
         <CardContent className="pt-0 space-y-4">
           {getActiveSemester() ? (
@@ -962,8 +964,8 @@ function Sidebar({
                 <InfoRow label="Start:" value={format(getActiveSemester()!.startDate, "MMM d, yyyy")} />
                 <InfoRow label="End:" value={format(getActiveSemester()!.endDate, "MMM d, yyyy")} />
               </div>
-              <div className="border-t pt-4">
-                <h4 className="font-medium text-sm mb-3">Today's Lectures</h4>
+              <div className="border-t border-border pt-4">
+                <h4 className="font-medium text-sm mb-3 text-foreground">Today's Lectures</h4>
                 <div className="min-h-[100px] max-h-[150px] overflow-y-auto space-y-2">
                   {getLecturesForDay(new Date()).length ? (
                     getLecturesForDay(new Date()).map((lec) => (
@@ -977,7 +979,7 @@ function Sidebar({
             </>
           ) : (
             <div className="text-center py-4">
-              <p className="text-sm text-gray-500 mb-3">No active semester selected</p>
+              <p className="text-sm text-muted-foreground mb-3">No active semester selected</p>
               <Button variant="outline" size="sm" onClick={() => setIsSemesterDialogOpen(true)} className="text-xs">
                 Manage Semesters
               </Button>
@@ -991,8 +993,8 @@ function Sidebar({
 
 const InfoRow = ({ label, value }: { label: string; value: string }) => (
   <div className="flex justify-between text-sm">
-    <span className="text-gray-600">{label}</span>
-    <span className="font-medium">{value}</span>
+    <span className="text-muted-foreground">{label}</span>
+    <span className="font-medium text-foreground">{value}</span>
   </div>
 )
 
@@ -1000,12 +1002,16 @@ const EmptyState = ({ message, small }: { message: string; small?: boolean }) =>
   <div
     className={
       small
-        ? "flex items-center justify-center h-[100px] text-gray-500"
-        : "flex items-center justify-center h-[200px] text-gray-500"
+        ? "flex items-center justify-center h-[100px] text-muted-foreground"
+        : "flex items-center justify-center h-[200px] text-muted-foreground"
     }
   >
     <div className="text-center">
-      <Clock className={small ? "h-6 w-6 mx-auto mb-1 text-gray-400" : "h-8 w-8 mx-auto mb-2 text-gray-400"} />
+      <Clock
+        className={
+          small ? "h-6 w-6 mx-auto mb-1 text-muted-foreground/50" : "h-8 w-8 mx-auto mb-2 text-muted-foreground/50"
+        }
+      />
       <p className={small ? "text-xs" : "text-sm"}>{message}</p>
     </div>
   </div>
@@ -1023,20 +1029,23 @@ function LectureChip({
   const endTime = calculateLectureEndTime(lecture.timeSlot, lecture.duration)
 
   return (
-    <div className="p-3 border rounded-lg bg-green-50 border-green-200">
+    <div className="p-3 border rounded-lg bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <BookOpen className="h-4 w-4 text-green-600" />
-            <h4 className="font-medium text-sm truncate">{lecture.subject}</h4>
-            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
+            <BookOpen className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <h4 className="font-medium text-sm truncate text-foreground">{lecture.subject}</h4>
+            <Badge
+              variant="outline"
+              className="bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs"
+            >
               {lecture.duration}min
             </Badge>
           </div>
-          <p className="text-xs text-gray-600 mb-1">
+          <p className="text-xs text-muted-foreground mb-1">
             {lecture.timeSlot} – {endTime}
           </p>
-          <p className="text-xs text-gray-600 truncate">
+          <p className="text-xs text-muted-foreground truncate">
             {lecture.lecturer} • {lecture.room}
           </p>
         </div>
@@ -1044,7 +1053,7 @@ function LectureChip({
           variant="ghost"
           size="sm"
           onClick={handleDelete}
-          className="text-red-600 hover:text-red-800 h-8 w-8 p-0"
+          className="text-destructive hover:text-destructive h-8 w-8 p-0"
         >
           <Trash2 className="h-3 w-3" />
         </Button>
@@ -1065,29 +1074,29 @@ function EventChip({
   handleDelete: () => void
 }) {
   return (
-    <div className="p-3 border rounded-lg bg-white">
+    <div className="p-3 border border-border rounded-lg bg-card">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             {getEventTypeIcon(event.type)}
-            <h4 className="font-medium text-sm truncate">{event.title}</h4>
+            <h4 className="font-medium text-sm truncate text-foreground">{event.title}</h4>
             <Badge variant="outline" className={`${getEventTypeColor(event.type)} text-xs`}>
               {event.type}
             </Badge>
           </div>
           {event.time && (
-            <p className="text-xs text-gray-600 mb-1">
+            <p className="text-xs text-muted-foreground mb-1">
               {event.time}
               {event.endTime && ` – ${event.endTime}`}
             </p>
           )}
-          {event.description && <p className="text-xs text-gray-600 truncate">{event.description}</p>}
+          {event.description && <p className="text-xs text-muted-foreground truncate">{event.description}</p>}
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={handleDelete}
-          className="text-red-600 hover:text-red-800 h-8 w-8 p-0"
+          className="text-destructive hover:text-destructive h-8 w-8 p-0"
         >
           <Trash2 className="h-3 w-3" />
         </Button>
@@ -1103,9 +1112,9 @@ function LectureToday({
   const endTime = calculateLectureEndTime(lecture.timeSlot, lecture.duration)
 
   return (
-    <div className="p-2 bg-green-50 rounded border border-green-200">
-      <div className="font-medium text-sm truncate">{lecture.subject}</div>
-      <div className="text-xs text-gray-600 truncate">
+    <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+      <div className="font-medium text-sm truncate text-foreground">{lecture.subject}</div>
+      <div className="text-xs text-muted-foreground truncate">
         {lecture.timeSlot} – {endTime} • {lecture.room}
       </div>
     </div>
@@ -1133,14 +1142,14 @@ function TimeSlotRow({
 
   return (
     <div
-      className={`flex items-start gap-4 border-l-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-r-lg p-3 ${
-        isCurrent ? "border-l-blue-500 bg-blue-50" : "border-l-gray-200 bg-white"
+      className={`flex items-start gap-4 border-l-4 cursor-pointer hover:bg-muted/50 transition-colors rounded-r-lg p-3 ${
+        isCurrent ? "border-l-primary bg-primary/10" : "border-l-border bg-card"
       }`}
       style={{ minHeight: `${baseHeight}px` }}
       onClick={onClick}
     >
       <div
-        className={`text-sm font-mono w-16 text-center py-2 ${isCurrent ? "text-blue-700 font-semibold" : "text-gray-500"}`}
+        className={`text-sm font-mono w-16 text-center py-2 ${isCurrent ? "text-primary font-semibold" : "text-muted-foreground"}`}
       >
         <div className="font-medium">{slot.start}</div>
         <div className="text-xs opacity-75">{slot.end}</div>
@@ -1156,8 +1165,8 @@ function TimeSlotRow({
               return (
                 <div
                   key={lec.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border relative ${
-                    isCurrent ? "bg-green-50 border-green-200" : "bg-white border-gray-200"
+                  className={`flex items-start gap-3 p-3 rounded-lg border border-border relative ${
+                    isCurrent ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" : "bg-card"
                   }`}
                   style={{ minHeight: `${spanningHeight}px` }}
                 >
@@ -1166,11 +1175,14 @@ function TimeSlotRow({
                     style={{ height: `${spanningHeight}px` }}
                   />
 
-                  <BookOpen className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
+                  <BookOpen className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-1" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium text-base">{lec.subject}</span>
-                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
+                      <span className="font-medium text-base text-foreground">{lec.subject}</span>
+                      <Badge
+                        variant="outline"
+                        className="bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs"
+                      >
                         {lec.duration}min
                       </Badge>
                       {isCurrent && (
@@ -1179,10 +1191,10 @@ function TimeSlotRow({
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mb-1">
+                    <p className="text-sm text-muted-foreground mb-1">
                       {lec.lecturer} • {lec.room}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       {lec.timeSlot} - {endTime}
                     </p>
                   </div>
@@ -1193,7 +1205,7 @@ function TimeSlotRow({
                       e.stopPropagation()
                       onDeleteLecture(lec.id)
                     }}
-                    className="text-red-600 hover:text-red-800 h-8 w-8 p-0 flex-shrink-0"
+                    className="text-destructive hover:text-destructive h-8 w-8 p-0 flex-shrink-0"
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -1202,7 +1214,7 @@ function TimeSlotRow({
             })}
           </div>
         ) : (
-          <div className="text-sm italic py-4 text-gray-400">Click to add lecture</div>
+          <div className="text-sm italic py-4 text-muted-foreground">Click to add lecture</div>
         )}
       </div>
     </div>
@@ -1223,7 +1235,7 @@ function NavigationBar({
       <Button variant="outline" size="sm" onClick={() => navigate("prev")}>
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <div className="text-sm font-medium min-w-[140px] text-center px-3 py-2 bg-gray-50 rounded border">
+      <div className="text-sm font-medium min-w-[140px] text-center px-3 py-2 bg-muted rounded border border-border">
         {format(timetableDate, "EEEE, MMM d")}
       </div>
       <Button variant="outline" size="sm" onClick={() => navigate("next")}>
@@ -1512,7 +1524,7 @@ function LectureDialog({
               onChange={handleCustomDurationChange}
             />
           )}
-          <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+          <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
             <strong>Note:</strong> Lectures can span multiple time slots. A 150-minute lecture will occupy 3 consecutive
             slots.
           </div>
@@ -1566,13 +1578,13 @@ function SemesterDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <h4 className="font-medium">Current Semesters</h4>
+            <h4 className="font-medium text-foreground">Current Semesters</h4>
             {semesters.map((s) => (
-              <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div key={s.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
                 <div>
-                  <span className="font-medium">{s.name}</span>
+                  <span className="font-medium text-foreground">{s.name}</span>
                   {s.isActive && <Badge className="ml-2">Active</Badge>}
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     {format(s.startDate, "MMM d, yyyy")} – {format(s.endDate, "MMM d, yyyy")}
                   </p>
                 </div>
@@ -1591,7 +1603,7 @@ function SemesterDialog({
                       variant="outline"
                       size="sm"
                       onClick={() => handleDeleteSemester(s.id)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -1601,8 +1613,8 @@ function SemesterDialog({
             ))}
           </div>
 
-          <div className="border-t pt-4 space-y-4">
-            <h4 className="font-medium">{editingSemester ? "Edit Semester" : "Add New Semester"}</h4>
+          <div className="border-t border-border pt-4 space-y-4">
+            <h4 className="font-medium text-foreground">{editingSemester ? "Edit Semester" : "Add New Semester"}</h4>
             <InputBlock
               label="Semester Name"
               id="sem-name"
@@ -1670,9 +1682,11 @@ function getEventTypeIcon(t: Event["type"]) {
 
 function getEventTypeColor(t: Event["type"]) {
   return {
-    exam: "bg-red-100 text-red-800 border-red-200",
-    assignment: "bg-blue-100 text-blue-800 border-blue-200",
-    reminder: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    class: "bg-green-100 text-green-800 border-green-200",
+    exam: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700",
+    assignment: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
+    reminder:
+      "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700",
+    class:
+      "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700",
   }[t]
 }
