@@ -25,5 +25,3 @@ export const fns  = getFunctions(app);
 setPersistence(auth, browserLocalPersistence).catch(() => {
   // Some environments block IndexedDB/localStorage — silent fallback to in-memory
 });
-
-export { app };
