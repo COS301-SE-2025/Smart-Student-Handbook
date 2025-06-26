@@ -7,7 +7,7 @@ import Link from "next/link"
 import QuillEditor from "@/components/quilleditor"
 import "react-quill/dist/quill.snow.css"
 
-import { db } from "../../lib/firebase";
+import { db } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
 
 const user = getAuth().currentUser;
