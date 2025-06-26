@@ -10,6 +10,7 @@ import {
   Trash2,
   Plus,
   ArrowLeft,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import QuillEditor from "@/components/quilleditor";
@@ -17,10 +18,23 @@ import "react-quill/dist/quill.snow.css";
 
 import { db } from "../../lib/firebase";
 import { getAuth } from "firebase/auth";
+import { toast } from "sonner";
+
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "@/lib/firebase"; // Your Firebase app config
 
 const user = getAuth().currentUser;
 
 import { child, get, getDatabase, onValue, ref, set } from "firebase/database";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 type Note = {
   ownerId: string;
@@ -53,8 +67,42 @@ export default function NotePage() {
   const [loading, setLoading] = useState(true);
   const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
 
+  const functions = getFunctions(app);
+  const shareNote = httpsCallable(functions, "shareNote");
+
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [userId, setUserId] = useState("");
+  const [open, setOpen] = useState(false);
+  const [collaboratorId, setCollaboratorId] = useState("");
+
+  const noteId = "your-note-id";
+
+  const handleShare = async (e: React.MouseEvent, noteId: string) => {
+    e.stopPropagation();
+
+    if (!noteId || !collaboratorId) {
+      toast.error("Missing note or collaborator ID");
+      return;
+    }
+
+    try {
+      const functions = getFunctions(app);
+      const shareNote = httpsCallable(functions, "shareNote");
+
+      const result = await shareNote({ collaboratorId, noteId });
+      console.log(`Shared note ${noteId} with ${collaboratorId}`, result);
+
+      toast.success("Note shared successfully!");
+      setOpen(false);
+      setCollaboratorId("");
+    } catch (error: any) {
+      console.error("Error sharing note:", error);
+      toast.error("Failed to share note.");
+    }
+  };
 
   useEffect(() => {
     const user = getAuth().currentUser;
@@ -222,7 +270,7 @@ export default function NotePage() {
             type: "note",
             collaborators: raw.collaborators ?? {},
             parentId: "__shared__",
-            ownerId: owner, // ✅ Add this line
+            ownerId: owner,
           });
         }
       } catch (err) {
@@ -404,7 +452,6 @@ export default function NotePage() {
     if (selectedNote && selectedNote.id === id) {
       setSelectedNote({ ...selectedNote, [field]: value });
 
-      // 🔥 Sync to Firebase
       const db = getDatabase();
       const user = getAuth().currentUser;
       if (!user) return;
@@ -427,7 +474,6 @@ export default function NotePage() {
       children: [],
       collaborators: {
         placeholder: false,
-        DwgkN26pduWlurcPB5w8jBF8LU03: true,
       },
     };
 
@@ -465,7 +511,6 @@ export default function NotePage() {
       type: "note",
       collaborators: {
         placeholder: false,
-        DwgkN26pduWlurcPB5w8jBF8LU03: true,
       },
       ownerId: user.uid,
     };
@@ -633,6 +678,53 @@ export default function NotePage() {
             >
               <Trash2 className="h-3 w-3" />
             </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-1 h-auto opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(true);
+              }}
+            >
+              <Share2 className="h-3 w-3" />
+            </Button>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogContent
+                className="sm:max-w-md"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <DialogHeader>
+                  <DialogTitle>Share Note</DialogTitle>
+                </DialogHeader>
+
+                <Input
+                  placeholder="Enter collaborator's User ID"
+                  value={collaboratorId}
+                  onChange={(e) => setCollaboratorId(e.target.value)}
+                />
+
+                <DialogFooter className="mt-4">
+                  <Button
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={(e) => handleShare(e, node.id)}
+                    disabled={!collaboratorId.trim()}
+                  >
+                    Share
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         );
       }
