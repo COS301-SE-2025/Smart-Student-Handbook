@@ -48,7 +48,6 @@ export default function OrganisationsPage() {
   const [filter, setFilter] = useState<Filter>("all")
   const [showCreate, setShowCreate] = useState(false)
 
-  // Track loading states for individual organizations
   const [joiningOrgs, setJoiningOrgs] = useState<Set<string>>(new Set())
   const [leavingOrgs, setLeavingOrgs] = useState<Set<string>>(new Set())
 
@@ -96,11 +95,9 @@ export default function OrganisationsPage() {
     fetchOrgs()
   }, [fetchOrgs])
 
-  // Silent background update for favorites (no loading state)
   const handleToggleFav = async (orgId: string) => {
     if (!userId) return
 
-    // Optimistically update the UI first (silent)
     const newFavState = !favorites[orgId]
     setFavorites((prev) => ({
       ...prev,
@@ -108,7 +105,6 @@ export default function OrganisationsPage() {
     }))
 
     try {
-      // Update database in background silently
       const favRef = ref(db, `userFavorites/${userId}/${orgId}`)
       if (newFavState) {
         await set(favRef, true)
@@ -117,7 +113,6 @@ export default function OrganisationsPage() {
       }
     } catch (e) {
       console.error("Failed to update favorite:", e)
-      // Revert the optimistic update on error
       setFavorites((prev) => ({
         ...prev,
         [orgId]: !newFavState,
@@ -125,14 +120,11 @@ export default function OrganisationsPage() {
     }
   }
 
-  // Join organization with card-only loading and updates
   const handleJoin = async (orgId: string) => {
     if (!userId || joiningOrgs.has(orgId)) return
 
-    // Set loading state for this specific card
     setJoiningOrgs((prev) => new Set(prev).add(orgId))
 
-    // Optimistically update the UI for this specific organization
     setOrgsData((prev) =>
       prev.map((org) =>
         org.id === orgId
@@ -147,13 +139,10 @@ export default function OrganisationsPage() {
     )
 
     try {
-      // Make API call in background
       await joinOrg({ orgId })
-      // Success - the optimistic update is already in place
       console.log(`Successfully joined organization: ${orgId}`)
     } catch (e) {
       console.error("Failed to join organization:", e)
-      // Revert the optimistic update on error
       setOrgsData((prev) =>
         prev.map((org) =>
           org.id === orgId
@@ -167,7 +156,6 @@ export default function OrganisationsPage() {
         ),
       )
     } finally {
-      // Remove loading state for this specific card
       setJoiningOrgs((prev) => {
         const newSet = new Set(prev)
         newSet.delete(orgId)
@@ -176,17 +164,13 @@ export default function OrganisationsPage() {
     }
   }
 
-  // Leave organization with card-only loading and updates
   const handleLeave = async (orgId: string) => {
     if (!userId || leavingOrgs.has(orgId)) return
 
-    // Set loading state for this specific card
     setLeavingOrgs((prev) => new Set(prev).add(orgId))
 
-    // Store the original state in case we need to revert
     const originalOrg = orgsData.find((org) => org.id === orgId)
 
-    // Optimistically update the UI for this specific organization
     setOrgsData((prev) =>
       prev.map((org) =>
         org.id === orgId
@@ -201,21 +185,15 @@ export default function OrganisationsPage() {
     )
 
     try {
-      // Make API call in background
       const result = await leaveOrg({ orgId })
 
-      // Handle special cases without full page refresh
       if (result.data.transferred) {
         console.log("Organization ownership was transferred")
-        // Update the specific organization with new owner info if needed
-        // For now, we'll keep the optimistic update as is
       }
 
-      // Success - the optimistic update is already in place
       console.log(`Successfully left organization: ${orgId}`)
     } catch (e) {
       console.error("Failed to leave organization:", e)
-      // Revert to the original state on error
       if (originalOrg) {
         setOrgsData((prev) =>
           prev.map((org) =>
@@ -229,7 +207,6 @@ export default function OrganisationsPage() {
         )
       }
     } finally {
-      // Remove loading state for this specific card
       setLeavingOrgs((prev) => {
         const newSet = new Set(prev)
         newSet.delete(orgId)
@@ -281,7 +258,6 @@ export default function OrganisationsPage() {
       })
   }, [orgsData, searchQuery, filter, favorites])
 
-  // Show the SmartLayout-style loader while auth or data is loading
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -294,8 +270,7 @@ export default function OrganisationsPage() {
   }
 
   return (
-    <div className="min-h-screen pt-14">
-      {/* Header */}
+    <div className="min-h-screen bg-background">
       <div className="border-b bg-background">
         <div className="p-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-8">
@@ -320,7 +295,6 @@ export default function OrganisationsPage() {
             </Button>
           </div>
 
-          {/* Filters */}
           <div className="flex justify-center">
             <div className="inline-flex gap-2 p-2 bg-muted/50 rounded-2xl border">
               {(["all", "joined", "public", "private"] as const).map((f) => (
@@ -351,7 +325,6 @@ export default function OrganisationsPage() {
         </div>
       </div>
 
-      {/* Body */}
       <div className="p-8">
         <div className="min-h-[calc(100vh-400px)]">
           {orgs.length === 0 ? (
@@ -388,9 +361,9 @@ export default function OrganisationsPage() {
                 const isJoining = joiningOrgs.has(o.id)
                 const isLeaving = leavingOrgs.has(o.id)
                 const gradients = [
-                  "bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200",
-                  "bg-gradient-to-br from-purple-50 to-pink-100 border-purple-200",
-                  "bg-gradient-to-br from-green-50 to-emerald-100 border-green-200",
+                  "bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200 dark:from-blue-950/20 dark:to-indigo-950/20 dark:border-blue-800/30",
+                  "bg-gradient-to-br from-purple-50 to-pink-100 border-purple-200 dark:from-purple-950/20 dark:to-pink-950/20 dark:border-purple-800/30",
+                  "bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 dark:from-green-950/20 dark:to-emerald-950/20 dark:border-green-800/30",
                 ]
                 const gradientClass =
                   gradients[Math.abs(o.id.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % gradients.length]
@@ -405,7 +378,7 @@ export default function OrganisationsPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm"
+                      className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm dark:bg-black/80 dark:hover:bg-black"
                       onClick={() => handleToggleFav(o.id)}
                       disabled={isJoining || isLeaving}
                     >
@@ -417,8 +390,8 @@ export default function OrganisationsPage() {
                     </Button>
 
                     <div className="flex items-start gap-4 mb-6">
-                      <Avatar className="h-16 w-16 border-4 border-white shadow-lg">
-                        <AvatarFallback className="text-xl font-bold bg-white text-primary">
+                      <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-black">
+                        <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-black">
                           {o.name.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -427,7 +400,7 @@ export default function OrganisationsPage() {
                         <div className="flex items-center gap-2 text-sm">
                           <Badge
                             variant="secondary"
-                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1"
+                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
                           >
                             <Users className="h-3 w-3" />
                             <span>
@@ -436,7 +409,7 @@ export default function OrganisationsPage() {
                           </Badge>
                           <Badge
                             variant="secondary"
-                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1"
+                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
                           >
                             {o.isPrivate ? (
                               <>
@@ -478,7 +451,7 @@ export default function OrganisationsPage() {
                         </Badge>
                       )}
                       {isFav && (
-                        <Badge className="px-3 py-1 bg-red-100 text-red-600">
+                        <Badge className="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
                           <Heart className="h-3 w-3 inline-block mr-1" />
                           Favorite
                         </Badge>
@@ -491,7 +464,7 @@ export default function OrganisationsPage() {
                       )}
                     </div>
 
-                    <div className="flex gap-3 mt-auto pt-4 border-t border-white/30">
+                    <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-black/30">
                       {o.joined && !isLeaving ? (
                         <Link href={`/organisations/${o.id}/notes`}>
                           <Button size="lg" className="shadow-md" disabled={isJoining || isLeaving}>

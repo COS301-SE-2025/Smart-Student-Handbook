@@ -1,6 +1,7 @@
-'use client'
+"use client"
 
-import React, { useEffect, useState } from "react"
+import type React from "react"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/ui/app-sidebar"
@@ -20,6 +21,7 @@ const PROTECTED_PAGES = [
   "/profile",
   "/settings",
   "/organizations",
+  "/friends",
 ]
 
 interface SmartLayoutProps {
@@ -32,9 +34,7 @@ export function SmartLayout({ children }: SmartLayoutProps) {
   const [loading, setLoading] = useState(true)
 
   const isStandalonePage = STANDALONE_PAGES.includes(pathname)
-  const isProtectedPage = PROTECTED_PAGES.some(page =>
-    pathname.startsWith(page)
-  )
+  const isProtectedPage = PROTECTED_PAGES.some((page) => pathname.startsWith(page))
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -44,7 +44,7 @@ export function SmartLayout({ children }: SmartLayoutProps) {
     return () => unsubscribe()
   }, [])
 
-  // 1️⃣ Built-in spinner while we determine auth state
+  // Loading spinner
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -56,23 +56,18 @@ export function SmartLayout({ children }: SmartLayoutProps) {
     )
   }
 
-  // 2️⃣ Standalone pages (no header/sidebar)
+  // Standalone pages (no header/sidebar)
   if (isStandalonePage) {
-    return <>{children}</>
+    return <div className="min-h-screen bg-background">{children}</div>
   }
 
-  // 3️⃣ Protected pages require login
+  // Protected pages require login
   if (isProtectedPage && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-6 max-w-sm mx-auto p-6">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto">
-            <svg
-              className="w-6 h-6 text-primary-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-6 h-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -101,20 +96,16 @@ export function SmartLayout({ children }: SmartLayoutProps) {
     )
   }
 
-  // 4️⃣ Everything else gets the full app chrome
+  // Full app layout
   return (
     <SidebarProvider>
       <div className="flex h-screen w-screen bg-background overflow-hidden">
         <AppSidebar />
-
-        {/* Right side: header + scrollable content */}
         <div className="flex flex-col flex-1 relative">
           <SmartHeader />
-
-          {/* Main scrollable content with padding to avoid overlapping header */}
-          <div className="absolute top-14 bottom-0 left-0 right-0 overflow-y-auto px-6 pb-6">
-            {children}
-          </div>
+          <main className="flex-1 overflow-auto pt-14">
+            <div className="min-h-full bg-background">{children}</div>
+          </main>
         </div>
       </div>
     </SidebarProvider>
