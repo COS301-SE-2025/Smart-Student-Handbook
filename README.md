@@ -50,7 +50,11 @@ Built to boost academic productivity and make studying simpler and smarter.
 
 ### Project Links
 
- - 📝 [Functional Requirements (SRS)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
+ ## 📑 Project Documentation
+
+ - 📝 [Functional Requirements (SRS v1)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
+ - 📄 [Functional Requirements (SRS v2)](https://docs.google.com/document/d/1GNNrZV6f3-w9E6491yCxKhAI8Hea4iuT/edit?usp=sharing&ouid=110216960497066760698&rtpof=true&sd=true)
+ - `</>` [Coding Standards & Style Guide](https://docs.google.com/document/d/1jon85aK5e1c0lPFog6cDFowFoMS-bff--frhNm1pH8U/edit?usp=sharing)
  - 🗂️ [GitHub Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
  - ❗ [GitHub Issues](https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues)
  - 📈 [Pulse (Activity)](https://github.com/COS301-SE-2025/Smart-Student-Handbook/pulse)
