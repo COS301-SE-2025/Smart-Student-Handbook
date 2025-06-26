@@ -734,14 +734,6 @@ export default function NotePage() {
     <div className="h-[calc(100vh-3.5rem)] flex bg-background overflow-hidden">
       <div className="w-80 border-r border-border bg-card/30 flex flex-col">
         <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <Link href="/dashboard">
-              <Button variant="outline" size="sm" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-            </Link>
-          </div>
 
           <div className="flex gap-2">
             <Button

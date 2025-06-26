@@ -1,21 +1,26 @@
-"use client"
+'use client'
 
-import type React from "react"
-
+import React, { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/ui/app-sidebar"
 import { SmartHeader } from "./smart-header"
-import { useEffect, useState } from "react"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth } from "@/lib/firebase"
-
 
 // Pages that should not have the sidebar layout
 const STANDALONE_PAGES = ["/", "/login", "/signup"]
 
 // Pages that require authentication
-const PROTECTED_PAGES = ["/dashboard", "/calendar", "/notes", "/hardnotes", "/profile"]
+const PROTECTED_PAGES = [
+  "/dashboard",
+  "/calendar",
+  "/notes",
+  "/hardnotes",
+  "/profile",
+  "/settings",
+  "/organizations",
+]
 
 interface SmartLayoutProps {
   children: React.ReactNode
@@ -26,71 +31,56 @@ export function SmartLayout({ children }: SmartLayoutProps) {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
-  // Check if current page should use sidebar layout
   const isStandalonePage = STANDALONE_PAGES.includes(pathname)
-  const isProtectedPage = PROTECTED_PAGES.some((page) => pathname.startsWith(page))
+  const isProtectedPage = PROTECTED_PAGES.some(page =>
+    pathname.startsWith(page)
+  )
 
   useEffect(() => {
-    // In development, use mock authentication
-    if (process.env.NODE_ENV === "development") {
-      setTimeout(() => {
-        // Simulate being logged in for protected pages
-        if (isProtectedPage) {
-            setUser({
-                displayName: "Test User",
-                email: "testuser@example.com"
-            })
-        } else {
-          setUser(null)
-        }
-        setLoading(false)
-      }, 500)
-      return
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user)
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u)
       setLoading(false)
     })
-
     return () => unsubscribe()
-  }, [isProtectedPage])
+  }, [])
 
-  // Show loading state
+  // 1️⃣ Built-in spinner while we determine auth state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3">
-          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent mx-auto"></div>
-          <p className="text-muted-foreground text-sm">Loading...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent mx-auto"></div>
+          <p className="text-muted-foreground text-sm">Loading…</p>
         </div>
       </div>
     )
   }
 
-  // Standalone pages (home, login, signup) - no sidebar
+  // 2️⃣ Standalone pages (no header/sidebar)
   if (isStandalonePage) {
     return <>{children}</>
   }
 
-  // Protected pages require authentication
+  // 3️⃣ Protected pages require login
   if (isProtectedPage && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-6 max-w-sm mx-auto p-6">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto">
-            <svg className="w-6 h-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-6 h-6 text-primary-foreground"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2  
+                   2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               />
             </svg>
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold mb-2">Sign in required</h2>
-            <p className="text-muted-foreground text-sm">Please sign in to access your student handbook.</p>
           </div>
           <div className="space-y-3">
             <a
@@ -111,18 +101,20 @@ export function SmartLayout({ children }: SmartLayoutProps) {
     )
   }
 
-  // App pages with clean unified layout
+  // 4️⃣ Everything else gets the full app chrome
   return (
     <SidebarProvider>
-      <div className="min-h-screen bg-background">
-        <SmartHeader />
-        <div className="flex pt-14">
-          <AppSidebar />
-          <main className="flex-1 min-w-0">
-            <div className="h-[calc(100vh-3.5rem)] overflow-auto">
-              <div className="p-6">{children}</div>
-            </div>
-          </main>
+      <div className="flex h-screen w-screen bg-background overflow-hidden">
+        <AppSidebar />
+
+        {/* Right side: header + scrollable content */}
+        <div className="flex flex-col flex-1 relative">
+          <SmartHeader />
+
+          {/* Main scrollable content with padding to avoid overlapping header */}
+          <div className="absolute top-14 bottom-0 left-0 right-0 overflow-y-auto px-6 pb-6">
+            {children}
+          </div>
         </div>
       </div>
     </SidebarProvider>
