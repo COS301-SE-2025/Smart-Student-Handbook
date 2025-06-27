@@ -23,7 +23,7 @@ import { getAuth } from "firebase/auth";
 import { toast } from "sonner";
 
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "@/lib/firebase"; // Your Firebase app config
+import { app } from "@/lib/firebase";
 
 const user = getAuth().currentUser;
 
@@ -81,12 +81,11 @@ export default function NotePage() {
   const [open, setOpen] = useState(false);
   const [collaboratorId, setCollaboratorId] = useState("");
 
-  const noteId = "your-note-id";
 
-  const handleShare = async (e: React.MouseEvent, noteId: string) => {
+  const handleShare = async (e: React.MouseEvent, noteId: string, permission: string) => {
     e.stopPropagation();
 
-    if (!noteId || !collaboratorId) {
+    if (!noteId || !collaboratorId || !permission) {
       toast.error("Missing note or collaborator ID");
       return;
     }
@@ -95,7 +94,7 @@ export default function NotePage() {
       const functions = getFunctions(app);
       const shareNote = httpsCallable(functions, "shareNote");
 
-      const result = await shareNote({ collaboratorId, noteId });
+      const result = await shareNote({ collaboratorId, noteId , permission});
       console.log(`Shared note ${noteId} with ${collaboratorId}`, result);
 
       toast.success("Note shared successfully!");
@@ -690,6 +689,7 @@ export default function NotePage() {
             >
               <Share2 className="h-3 w-3" />
             </Button>
+
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogContent
                 className="sm:max-w-md"
