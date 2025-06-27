@@ -209,7 +209,7 @@ export default function NotePage() {
       );
       const snapshot = await get(noteRef);
       if (snapshot.exists()) {
-        setPermission(snapshot.val()); // "read" or "write"
+        setPermission(snapshot.val());
       } else {
         setPermission("none");
       }
