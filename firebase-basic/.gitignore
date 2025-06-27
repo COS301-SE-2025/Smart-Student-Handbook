@@ -41,3 +41,5 @@ yarn-error.log*
 next-env.d.ts
 
 lib/serviceAccountKey.json
+
+populate_users.py

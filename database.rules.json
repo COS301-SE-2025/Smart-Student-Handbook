@@ -1,0 +1,46 @@
+{
+  "rules": {
+    "$user_id": {
+      ".read": "auth != null && auth.uid === $user_id",
+      ".write": "auth != null && auth.uid === $user_id"
+    },
+
+    "users": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+
+      "$user_id": {
+        "notes": {
+          ".read": "auth != null && auth.uid === $user_id",
+          ".write": "auth != null && auth.uid === $user_id",
+
+          "$note_id": {
+            ".read": "auth != null && (auth.uid === $user_id || data.child('collaborators').hasChild(auth.uid))",
+            ".write": "auth != null && (auth.uid === $user_id || data.child('collaborators').hasChild(auth.uid))"
+          }
+        },
+
+        "sharedNotes": {
+          ".read": "auth != null && auth.uid === $user_id",
+          ".write": "auth != null && auth.uid === $user_id",
+
+          "$noteId": {
+            ".read": "auth != null && auth.uid === $user_id",
+            ".write": "auth != null && auth.uid === $user_id"
+          }
+        }
+      }
+    },
+"userFavorites": {
+    "$user_id": {
+       ".read": "auth != null && auth.uid === $user_id",
+       ".write": "auth != null && auth.uid === $user_id"
+     }
+   },
+    "organizations": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["isPrivate"]
+    }
+  }
+}

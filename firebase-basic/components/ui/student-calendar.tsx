@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { format } from "date-fns"
+import { httpsCallable } from "firebase/functions"
+import { fns } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -28,11 +30,12 @@ import {
   ChevronRight,
   Plus,
   Settings,
+  Edit,
 } from "lucide-react"
-import { calendarApi } from "@/lib/calendarApi"
-import { useUserId } from "@/hooks/useUserId" // <-- Make sure this path is correct
+import { useUserId } from "@/hooks/useUserId"
 
-// --- Interfaces ---
+const callFn = <TReq, TRes>(name: string, data: TReq) => httpsCallable<TReq, TRes>(fns, name)(data).then((r) => r.data)
+
 interface Event {
   id: string
   title: string
@@ -50,6 +53,7 @@ interface LectureSlot {
   room: string
   dayOfWeek: number
   timeSlot: string
+  duration: number
   semesterId: string
 }
 
@@ -61,7 +65,15 @@ interface Semester {
   isActive: boolean
 }
 
-// --- Custom Calendar Grid Component ---
+function calculateLectureEndTime(startTime: string, duration: number): string {
+  const [hours, minutes] = startTime.split(":").map(Number)
+  const startMinutes = hours * 60 + minutes
+  const endMinutes = startMinutes + duration
+  const endHours = Math.floor(endMinutes / 60)
+  const endMins = endMinutes % 60
+  return `${endHours.toString().padStart(2, "0")}:${endMins.toString().padStart(2, "0")}`
+}
+
 function CustomCalendarGrid({
   selectedDate,
   onDateClick,
@@ -85,7 +97,6 @@ function CustomCalendarGrid({
     const startingDayOfWeek = firstDay.getDay()
     const days = []
 
-    // Add previous month's trailing days
     const prevMonth = new Date(year, month - 1, 0)
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
       days.push({
@@ -93,15 +104,15 @@ function CustomCalendarGrid({
         isCurrentMonth: false,
       })
     }
-    // Add current month's days
+
     for (let day = 1; day <= daysInMonth; day++) {
       days.push({
         date: new Date(year, month, day),
         isCurrentMonth: true,
       })
     }
-    // Add next month's leading days to complete the grid
-    const remainingDays = 42 - days.length // 6 rows × 7 days
+
+    const remainingDays = 42 - days.length
     for (let day = 1; day <= remainingDays; day++) {
       days.push({
         date: new Date(year, month + 1, day),
@@ -124,96 +135,99 @@ function CustomCalendarGrid({
   }
 
   const getDateClasses = (date: Date, isCurrentMonth: boolean) => {
-    const baseClasses =
-      "h-12 w-full flex items-center justify-center text-sm font-medium rounded-md cursor-pointer transition-colors border border-transparent hover:border-gray-200 hover:bg-gray-50"
+    const baseClasses = "h-12 w-full flex items-center justify-center text-sm font-medium rounded-md transition-colors"
+
     if (!isCurrentMonth) {
-      return `${baseClasses} text-gray-400 opacity-50`
+      return `${baseClasses} text-muted-foreground`
     }
+
     const today = new Date()
     const isToday = date.toDateString() === today.toDateString()
     const isSelected = selectedDate && date.toDateString() === selectedDate.toDateString()
-    // Check for events
+
     const events = getEventsForDate(date)
     const lectures = getLecturesForDay(date)
     const eventTypes = new Set([...events.map((e) => e.type), ...(lectures.length > 0 ? ["class"] : [])])
+
     let colorClasses = ""
     if (eventTypes.size > 1) {
-      colorClasses = "bg-gradient-to-br from-red-100 via-blue-100 to-green-100 border-purple-300 text-purple-800"
+      colorClasses =
+        "bg-purple-100 border border-purple-300 text-purple-800 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300"
     } else if (eventTypes.has("exam")) {
-      colorClasses = "bg-red-100 border-red-300 text-red-800"
+      colorClasses =
+        "bg-red-100 border border-red-300 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-300"
     } else if (eventTypes.has("assignment")) {
-      colorClasses = "bg-blue-100 border-blue-300 text-blue-800"
+      colorClasses =
+        "bg-blue-100 border border-blue-300 text-blue-800 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300"
     } else if (eventTypes.has("reminder")) {
-      colorClasses = "bg-yellow-100 border-yellow-300 text-yellow-800"
+      colorClasses =
+        "bg-yellow-100 border border-yellow-300 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-300"
     } else if (eventTypes.has("class")) {
-      colorClasses = "bg-green-100 border-green-300 text-green-800"
+      colorClasses =
+        "bg-green-100 border border-green-300 text-green-800 dark:bg-green-900/30 dark:border-green-700 dark:text-green-300"
     }
+
+    const interactiveClasses = "cursor-pointer hover:bg-muted/50 hover:border-border border border-transparent"
+
     if (isSelected) {
-      return `${baseClasses} bg-primary text-primary-foreground border-primary ${colorClasses ? "ring-2 ring-primary ring-offset-2" : ""}`
+      return `${baseClasses} ${interactiveClasses} bg-primary text-primary-foreground border-primary`
     }
     if (isToday) {
-      return `${baseClasses} bg-accent text-accent-foreground font-bold border-2 border-blue-400 ${colorClasses}`
+      return `${baseClasses} ${interactiveClasses} bg-accent text-accent-foreground font-semibold border-2 border-primary ${colorClasses}`
     }
     if (colorClasses) {
-      return `${baseClasses} ${colorClasses} font-bold border-2`
+      return `${baseClasses} ${interactiveClasses} ${colorClasses} font-semibold`
     }
-    return `${baseClasses} text-gray-900`
+    return `${baseClasses} ${interactiveClasses} text-foreground`
   }
 
   const days = getDaysInMonth(currentMonth)
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={() => navigateMonth("prev")} className="p-2 hover:bg-gray-100 rounded-md transition-colors">
+    <div className="w-full bg-card rounded-lg border border-border">
+      <div className="flex items-center justify-between p-4 border-b border-border">
+        <button onClick={() => navigateMonth("prev")} className="p-2 hover:bg-muted rounded-md transition-colors">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <h2 className="text-lg font-semibold">{format(currentMonth, "MMMM yyyy")}</h2>
-        <button onClick={() => navigateMonth("next")} className="p-2 hover:bg-gray-100 rounded-md transition-colors">
+        <h2 className="text-lg font-semibold text-foreground">{format(currentMonth, "MMMM yyyy")}</h2>
+        <button onClick={() => navigateMonth("next")} className="p-2 hover:bg-muted rounded-md transition-colors">
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {daysOfWeek.map((day) => (
-          <div key={day} className="h-10 flex items-center justify-center text-sm font-medium text-gray-500">
-            {day}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {days.map((day, index) => (
-          <button
-            key={index}
-            onClick={() => day.isCurrentMonth && onDateClick(day.date)}
-            className={getDateClasses(day.date, day.isCurrentMonth)}
-            disabled={!day.isCurrentMonth}
-          >
-            {day.date.getDate()}
-          </button>
-        ))}
+
+      <div className="p-4">
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {daysOfWeek.map((day) => (
+            <div key={day} className="h-8 flex items-center justify-center text-xs font-medium text-muted-foreground">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((day, index) => (
+            <button
+              key={index}
+              onClick={() => day.isCurrentMonth && onDateClick(day.date)}
+              className={getDateClasses(day.date, day.isCurrentMonth)}
+              disabled={!day.isCurrentMonth}
+            >
+              {day.date.getDate()}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
 }
 
-// --- Main Component ---
 function StudentCalendar() {
-  // --- Auth ---
-  const { userId, loading: authLoading } = useUserId();
+  const { userId, loading: authLoading } = useUserId()
 
-  // --- State ---
   const [date, setDate] = React.useState<Date>(new Date())
   const [events, setEvents] = React.useState<Event[]>([])
   const [lectureSlots, setLectureSlots] = React.useState<LectureSlot[]>([])
-  const [semesters, setSemesters] = React.useState<Semester[]>([
-    {
-      id: "sem1_2025",
-      name: "Semester 1 2025",
-      startDate: new Date("2025-02-10"),
-      endDate: new Date("2025-06-21"),
-      isActive: true,
-    },
-  ])
+  const [semesters, setSemesters] = React.useState<Semester[]>([])
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [isLectureDialogOpen, setIsLectureDialogOpen] = React.useState(false)
   const [isSemesterDialogOpen, setIsSemesterDialogOpen] = React.useState(false)
@@ -222,6 +236,7 @@ function StudentCalendar() {
   const [timetableDate, setTimetableDate] = React.useState<Date>(new Date())
   const [currentTime, setCurrentTime] = React.useState<Date>(new Date())
   const [activeTab, setActiveTab] = React.useState<"calendar" | "timetable">("calendar")
+  const [editingSemester, setEditingSemester] = React.useState<Semester | null>(null)
   const [newEvent, setNewEvent] = React.useState({
     title: "",
     description: "",
@@ -233,8 +248,9 @@ function StudentCalendar() {
     subject: "",
     lecturer: "",
     room: "",
-    dayOfWeek: 1,
+    dayOfWeek: 0,
     timeSlot: "",
+    duration: 50,
   })
   const [newSemester, setNewSemester] = React.useState({
     name: "",
@@ -243,8 +259,8 @@ function StudentCalendar() {
   })
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [initialLoading, setInitialLoading] = React.useState(true)
 
-  // --- Time slots ---
   const lectureTimeSlots = [
     { start: "07:30", end: "08:20" },
     { start: "08:30", end: "09:20" },
@@ -260,118 +276,238 @@ function StudentCalendar() {
   ]
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
-  // --- Effects ---
   React.useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 60_000)
     return () => clearInterval(t)
   }, [])
 
-  // --- API HANDLERS ---
-  const getActiveSemester = () => semesters.find((s) => s.isActive) || semesters[0]
+  const getActiveSemester = () => semesters.find((s) => s.isActive) || null
+
+  const getSemesterForDate = (date: Date) => {
+    return semesters.find((s) => date >= s.startDate && date <= s.endDate) || null
+  }
 
   const fetchLectures = React.useCallback(async () => {
-    if (!userId) return;
     const active = getActiveSemester()
-    if (!active) return
-    setLoading(true)
-    try {
-      const data = await calendarApi.getLectures(active.id)
-      setLectureSlots(data)
-      setError(null)
-    } catch (e: any) {
-      setError(e.message || "Failed to fetch lectures")
+    if (!userId || !active) {
+      setLectureSlots([])
+      return
     }
-    setLoading(false)
+
+    try {
+      const data = await callFn<{ semesterId: string }, LectureSlot[]>("getLectures", { semesterId: active.id })
+      setLectureSlots(data)
+    } catch (err: any) {
+      console.error("Failed to fetch lectures:", err)
+      setLectureSlots([])
+    }
   }, [userId, semesters])
 
   const fetchEvents = React.useCallback(async () => {
-    if (!userId) return;
     const active = getActiveSemester()
-    if (!active) return
-    setLoading(true)
-    try {
-      const data = await calendarApi.getEvents(active.id)
-      setEvents(data.map((e: any) => ({ ...e, date: new Date(e.date) })))
-      setError(null)
-    } catch (e: any) {
-      setError(e.message || "Failed to fetch events")
+    if (!userId || !active) {
+      setEvents([])
+      return
     }
-    setLoading(false)
+
+    try {
+      const data = await callFn<{ semesterId: string }, any[]>("getEvents", { semesterId: active.id })
+      setEvents(data.map((e) => ({ ...e, date: new Date(e.date) })))
+    } catch (err: any) {
+      console.error("Failed to fetch events:", err)
+      setEvents([])
+    }
   }, [userId, semesters])
 
-  React.useEffect(() => {
+  const fetchSemesters = React.useCallback(async () => {
     if (!userId) return
+
+    try {
+      const data = await callFn<{}, any[]>("getSemesters", {})
+      console.log("Fetched semesters from Firebase:", data)
+
+      if (data && data.length > 0) {
+        setSemesters(
+          data.map((s) => ({
+            ...s,
+            startDate: new Date(s.startDate),
+            endDate: new Date(s.endDate),
+          })),
+        )
+      } else {
+        console.log("No semesters found, creating default semester")
+        const defaultSemester = {
+          name: "Semester 1 2025",
+          startDate: "2025-02-10",
+          endDate: "2025-06-21",
+        }
+
+        const addedSemester = await callFn<{ semester: any }, any>("addSemester", {
+          semester: defaultSemester,
+        })
+
+        await callFn<{ semesterId: string }, { success: boolean }>("setActiveSemester", {
+          semesterId: addedSemester.id,
+        })
+
+        setSemesters([
+          {
+            ...addedSemester,
+            startDate: new Date(addedSemester.startDate),
+            endDate: new Date(addedSemester.endDate),
+            isActive: true,
+          },
+        ])
+      }
+      setError(null)
+    } catch (err: any) {
+      console.error("Failed to fetch semesters:", err)
+      setError(err.message ?? "Failed to fetch semesters")
+    }
+  }, [userId])
+
+  React.useEffect(() => {
+    const initializeData = async () => {
+      if (!userId) {
+        setInitialLoading(false)
+        return
+      }
+
+      setInitialLoading(true)
+      try {
+        await fetchSemesters()
+      } catch (err) {
+        console.error("Error initializing data:", err)
+      } finally {
+        setInitialLoading(false)
+      }
+    }
+
+    initializeData()
+  }, [userId, fetchSemesters])
+
+  React.useEffect(() => {
+    if (!userId || semesters.length === 0) return
+
     fetchLectures()
     fetchEvents()
-  }, [userId, fetchLectures, fetchEvents])
+  }, [userId, semesters, fetchLectures, fetchEvents])
 
-  // --- Add, Delete, Update handlers (always require userId!) ---
   const handleAddLecture = async () => {
-    const active = getActiveSemester()
-    if (!active || !newLecture.subject || !newLecture.timeSlot || !userId) return
+    setError(null)
+
+    const semesterForDate = getSemesterForDate(timetableDate)
+    if (!semesterForDate) {
+      const errorMsg = `No semester covers ${format(timetableDate, "MMM d, yyyy")}. Please add a semester that includes this date.`
+      setError(errorMsg)
+
+      setTimeout(() => {
+        setError(null)
+      }, 8000)
+      return
+    }
+    if (!newLecture.subject || !newLecture.timeSlot || !userId) return
+
     setLoading(true)
     try {
-      const res = await calendarApi.addLecture( newLecture, active.id)
+      const res = await callFn<{ semesterId: string; lecture: typeof newLecture }, LectureSlot>("addLecture", {
+        semesterId: semesterForDate.id,
+        lecture: newLecture,
+      })
+
       setLectureSlots((prev) => [...prev, res])
-      setNewLecture({ subject: "", lecturer: "", room: "", dayOfWeek: 1, timeSlot: "" })
+      setNewLecture({
+        subject: "",
+        lecturer: "",
+        room: "",
+        dayOfWeek: 0,
+        timeSlot: "",
+        duration: 50,
+      })
       setIsLectureDialogOpen(false)
       setError(null)
-    } catch (e: any) {
-      setError(e.message || "Failed to add lecture")
+    } catch (err: any) {
+      setError(err.message ?? "Failed to add lecture")
     }
     setLoading(false)
   }
 
   const handleDeleteLecture = async (id: string) => {
-    if (!userId) return;
+    if (!userId) return
     setLoading(true)
     try {
-      await calendarApi.deleteLecture(id)
+      await callFn<{ lectureId: string }, { success: boolean }>("deleteLecture", { lectureId: id })
       setLectureSlots((prev) => prev.filter((l) => l.id !== id))
       setError(null)
-    } catch (e: any) {
-      setError(e.message || "Failed to delete lecture")
+    } catch (err: any) {
+      setError(err.message ?? "Failed to delete lecture")
     }
     setLoading(false)
   }
 
   const handleAddEvent = async () => {
-    const active = getActiveSemester()
-    if (!active || !selectedDate || !newEvent.title || !userId) return
+    if (!selectedDate) return
+    setError(null)
+
+    const semesterForDate = getSemesterForDate(selectedDate)
+    if (!semesterForDate) {
+      const errorMsg = `No semester covers ${format(selectedDate, "MMM d, yyyy")}. Please add a semester that includes this date.`
+      setError(errorMsg)
+
+      setTimeout(() => {
+        setError(null)
+      }, 8000)
+      return
+    }
+    if (!newEvent.title || !userId) return
+
     setLoading(true)
     try {
-      const eventPayload = { ...newEvent, date: selectedDate.toISOString() }
-      const res = await calendarApi.addEvent(eventPayload, active.id)
+      const payload = {
+        semesterId: semesterForDate.id,
+        event: { ...newEvent, date: selectedDate.toISOString() },
+      }
+
+      const res = await callFn<typeof payload, Event>("addEvent", payload)
+
       setEvents((prev) => [...prev, { ...res, date: new Date(res.date) }])
-      setNewEvent({ title: "", description: "", type: "reminder", time: "", endTime: "" })
+      setNewEvent({
+        title: "",
+        description: "",
+        type: "reminder",
+        time: "",
+        endTime: "",
+      })
       setIsDialogOpen(false)
       setError(null)
-    } catch (e: any) {
-      setError(e.message || "Failed to add event")
+    } catch (err: any) {
+      setError(err.message ?? "Failed to add event")
     }
     setLoading(false)
   }
 
   const handleDeleteEvent = async (id: string) => {
-    if (!userId) return;
+    if (!userId) return
     setLoading(true)
     try {
-      await calendarApi.deleteEvent(id)
+      await callFn<{ eventId: string }, { success: boolean }>("deleteEvent", { eventId: id })
       setEvents((prev) => prev.filter((e) => e.id !== id))
       setError(null)
-    } catch (e: any) {
-      setError(e.message || "Failed to delete event")
+    } catch (err: any) {
+      setError(err.message ?? "Failed to delete event")
     }
     setLoading(false)
   }
 
-  // --- UI Logic ---
   const getEventsForDate = (d: Date) => events.filter((e) => e.date.toDateString() === d.toDateString())
 
   const getLecturesForDay = (d: Date) => {
-    const active = getActiveSemester()
-    if (d < active.startDate || d > active.endDate) return []
-    return lectureSlots.filter((l) => l.dayOfWeek === d.getDay() && l.semesterId === active.id)
+    const semesterForDate = getSemesterForDate(d)
+    if (!semesterForDate) return []
+
+    const dayOfWeek = d.getDay()
+    const filtered = lectureSlots.filter((l) => l.dayOfWeek === dayOfWeek && l.semesterId === semesterForDate.id)
+    return filtered
   }
 
   const isCurrentLectureSlot = (start: string) => {
@@ -391,34 +527,133 @@ function StudentCalendar() {
   const handleDateClick = (d?: Date) => {
     if (!d) return
     setSelectedDate(d)
-    setIsDialogOpen(true)
     setDate(d)
+    setTimetableDate(d)
+    setIsDialogOpen(true)
   }
 
   const handleTimeSlotClick = (slotStart: string) => {
+    setError(null)
+
+    const semesterForDate = getSemesterForDate(timetableDate)
+    if (!semesterForDate) {
+      const errorMsg = `No semester covers ${format(timetableDate, "MMM d, yyyy")}. Please add a semester that includes this date in Manage Semesters.`
+      setError(errorMsg)
+
+      setTimeout(() => {
+        setError(null)
+      }, 8000)
+      return
+    }
+
     setSelectedTimeSlot(slotStart)
     setNewLecture({ ...newLecture, timeSlot: slotStart, dayOfWeek: timetableDate.getDay() })
     setIsLectureDialogOpen(true)
   }
 
-  const handleAddSemester = () => {
-    if (!newSemester.name || !newSemester.startDate || !newSemester.endDate) return
-    setSemesters((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        name: newSemester.name,
-        startDate: new Date(newSemester.startDate),
-        endDate: new Date(newSemester.endDate),
-        isActive: false,
-      },
-    ])
-    setNewSemester({ name: "", startDate: "", endDate: "" })
+  const handleAddSemester = async () => {
+    if (!newSemester.name || !newSemester.startDate || !newSemester.endDate || !userId) return
+
+    setLoading(true)
+    try {
+      const addedSemester = await callFn<{ semester: any }, Semester>("addSemester", {
+        semester: {
+          name: newSemester.name,
+          startDate: newSemester.startDate,
+          endDate: newSemester.endDate,
+        },
+      })
+
+      setSemesters((prev) => [
+        ...prev,
+        {
+          ...addedSemester,
+          startDate: new Date(addedSemester.startDate),
+          endDate: new Date(addedSemester.endDate),
+        },
+      ])
+      setNewSemester({ name: "", startDate: "", endDate: "" })
+      setError(null)
+    } catch (err: any) {
+      setError(err.message ?? "Failed to add semester")
+    }
+    setLoading(false)
   }
 
-  const handleActivateSemester = (id: string) => {
-    setSemesters((prev) => prev.map((s) => ({ ...s, isActive: s.id === id })))
-    setLectureSlots((prev) => prev.filter((l) => l.semesterId === id))
+  const handleEditSemester = (semester: Semester) => {
+    setEditingSemester(semester)
+    setNewSemester({
+      name: semester.name,
+      startDate: format(semester.startDate, "yyyy-MM-dd"),
+      endDate: format(semester.endDate, "yyyy-MM-dd"),
+    })
+  }
+
+  const handleUpdateSemester = async () => {
+    if (!editingSemester || !newSemester.name || !newSemester.startDate || !newSemester.endDate || !userId) return
+
+    setLoading(true)
+    try {
+      const semesterData = {
+        id: editingSemester.id,
+        name: newSemester.name,
+        startDate: newSemester.startDate,
+        endDate: newSemester.endDate,
+      }
+
+      const response = await callFn<{ semester: any }, { success: boolean; semester: any }>("updateSemester", {
+        semester: semesterData,
+      })
+
+      setSemesters((prev) =>
+        prev.map((s) =>
+          s.id === editingSemester.id
+            ? {
+                ...s,
+                name: semesterData.name,
+                startDate: new Date(semesterData.startDate),
+                endDate: new Date(semesterData.endDate),
+              }
+            : s,
+        ),
+      )
+
+      setEditingSemester(null)
+      setNewSemester({ name: "", startDate: "", endDate: "" })
+      setError(null)
+    } catch (err: any) {
+      setError(err.message ?? "Failed to update semester")
+    }
+    setLoading(false)
+  }
+
+  const handleDeleteSemester = async (id: string) => {
+    if (!userId) return
+
+    setLoading(true)
+    try {
+      await callFn<{ semesterId: string }, { success: boolean }>("deleteSemester", { semesterId: id })
+      setSemesters((prev) => prev.filter((s) => s.id !== id))
+      setError(null)
+    } catch (err: any) {
+      setError(err.message ?? "Failed to delete semester")
+    }
+    setLoading(false)
+  }
+
+  const handleActivateSemester = async (id: string) => {
+    if (!userId) return
+
+    setLoading(true)
+    try {
+      await callFn<{ semesterId: string }, { success: boolean }>("setActiveSemester", { semesterId: id })
+
+      setSemesters((prev) => prev.map((s) => ({ ...s, isActive: s.id === id })))
+      setError(null)
+    } catch (err: any) {
+      setError(err.message ?? "Failed to activate semester")
+    }
+    setLoading(false)
   }
 
   const navigateTimetableDate = (dir: "prev" | "next") =>
@@ -428,21 +663,35 @@ function StudentCalendar() {
       return nd
     })
 
-  // --- Render ---
-  if (authLoading) return <div className="text-center py-10">Loading user...</div>
-  if (!userId) return <div className="text-center py-10">Please sign in to use the calendar.</div>
+  if (!userId) return <div className="text-center py-10 text-foreground">Please sign in to use the calendar.</div>
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {loading && <div className="text-blue-700">Loading...</div>}
-        {error && <div className="text-red-600">{error}</div>}
+    <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {loading && <div className="text-primary text-sm">Loading...</div>}
+        {error && (
+          <div className="fixed top-4 right-4 z-50 max-w-md">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 shadow-lg">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5 mr-3 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-medium text-destructive mb-1">Error</h3>
+                  <p className="text-sm text-destructive/80">{error}</p>
+                </div>
+                <button onClick={() => setError(null)} className="ml-3 text-destructive/60 hover:text-destructive">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-        {/* header */}
-        <header className="bg-white rounded-lg shadow-sm border p-6 space-y-6">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold">Student Calendar</h1>
-            <p className="text-gray-600 mt-2">Manage your academic schedule and events</p>
+        <header className="bg-card rounded-lg border border-border p-6">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-foreground">Student Calendar</h1>
+            <p className="text-muted-foreground mt-1">Manage your academic schedule and events</p>
           </div>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <Tabs
@@ -450,22 +699,18 @@ function StudentCalendar() {
               onValueChange={(v) => setActiveTab(v as "calendar" | "timetable")}
               className="w-full lg:w-auto"
             >
-              <TabsList className="grid w-full grid-cols-2 lg:w-auto h-10">
-                <TabsTrigger value="calendar" className="h-8">
-                  Calendar View
-                </TabsTrigger>
-                <TabsTrigger value="timetable" className="h-8">
-                  Daily Timetable
-                </TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 lg:w-auto">
+                <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+                <TabsTrigger value="timetable">Daily Timetable</TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="flex gap-3 justify-center lg:justify-end">
-              <Button variant="outline" onClick={() => setIsSemesterDialogOpen(true)} className="h-10 px-4">
+              <Button variant="outline" onClick={() => setIsSemesterDialogOpen(true)}>
                 <Settings className="h-4 w-4 mr-2" />
                 Manage Semesters
               </Button>
               {activeTab === "timetable" && (
-                <Button variant="outline" onClick={() => setIsLectureDialogOpen(true)} className="h-10 px-4">
+                <Button variant="outline" onClick={() => setIsLectureDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Lecture
                 </Button>
@@ -474,46 +719,47 @@ function StudentCalendar() {
           </div>
         </header>
 
-        {/* calendar view */}
         {activeTab === "calendar" && (
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* calendar section */}
             <div className="xl:col-span-3 space-y-6">
-              <Card className="shadow-sm">
-                <CardContent className="p-6">
-                  <div className="flex justify-center w-full">
-                    <div className="w-full max-w-2xl">
-                      <CustomCalendarGrid
-                        selectedDate={date}
-                        onDateClick={handleDateClick}
-                        getEventsForDate={getEventsForDate}
-                        getLecturesForDay={getLecturesForDay}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <CustomCalendarGrid
+                selectedDate={date}
+                onDateClick={handleDateClick}
+                getEventsForDate={getEventsForDate}
+                getLecturesForDay={getLecturesForDay}
+              />
 
-              {/* legend */}
-              <Card className="shadow-sm">
+              <Card>
                 <CardContent className="p-4">
-                  <h4 className="font-medium mb-3 text-sm">Event Types</h4>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <LegendDot color="bg-red-200 border border-red-300" label="Exams" />
-                    <LegendDot color="bg-blue-200 border border-blue-300" label="Assignments" />
-                    <LegendDot color="bg-yellow-200 border border-yellow-300" label="Reminders" />
-                    <LegendDot color="bg-green-200 border border-green-300" label="Classes/Lectures" />
-                  </div>
-                  <div className="mt-3 pt-3 border-t">
+                  <h4 className="font-medium mb-3 text-sm text-foreground">Event Types</h4>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <LegendDot
-                      color="bg-gradient-to-r from-red-200 via-blue-200 to-green-200 border border-purple-300"
-                      label="Multiple event types"
+                      color="bg-red-100 border border-red-300 dark:bg-red-900/30 dark:border-red-700"
+                      label="Exams"
+                    />
+                    <LegendDot
+                      color="bg-blue-100 border border-blue-300 dark:bg-blue-900/30 dark:border-blue-700"
+                      label="Assignments"
+                    />
+                    <LegendDot
+                      color="bg-yellow-100 border border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700"
+                      label="Reminders"
+                    />
+                    <LegendDot
+                      color="bg-green-100 border border-green-300 dark:bg-green-900/30 dark:border-green-700"
+                      label="Classes"
+                    />
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <LegendDot
+                      color="bg-purple-100 border border-purple-300 dark:bg-purple-900/30 dark:border-purple-700"
+                      label="Multiple types"
                     />
                   </div>
                 </CardContent>
               </Card>
             </div>
-            {/* sidebar */}
+
             <Sidebar
               date={date}
               getEventsForDate={getEventsForDate}
@@ -524,19 +770,20 @@ function StudentCalendar() {
               handleDeleteEvent={handleDeleteEvent}
               handleDeleteLecture={handleDeleteLecture}
               getActiveSemester={getActiveSemester}
-              currentTime={currentTime}
+              setIsSemesterDialogOpen={setIsSemesterDialogOpen}
             />
           </div>
         )}
 
-        {/* timetable view */}
         {activeTab === "timetable" && (
-          <Card className="shadow-sm">
+          <Card>
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <CardTitle className="flex items-center gap-2 text-xl">
+                <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Lecture Timetable – {getActiveSemester().name}
+                  {getActiveSemester()
+                    ? `Lecture Timetable – ${getActiveSemester()!.name}`
+                    : "Lecture Timetable – No Active Semester"}
                 </CardTitle>
                 <NavigationBar
                   timetableDate={timetableDate}
@@ -546,27 +793,55 @@ function StudentCalendar() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {lectureTimeSlots.map((slot) => {
-                  const lecturesAtTime = getLecturesForDay(timetableDate).filter((l) => l.timeSlot === slot.start)
-                  const currentSlot = isCurrentLectureSlot(slot.start)
-                  return (
-                    <TimeSlotRow
-                      key={slot.start}
-                      slot={slot}
-                      isCurrent={currentSlot}
-                      lectures={lecturesAtTime}
-                      onDeleteLecture={handleDeleteLecture}
-                      onClick={() => handleTimeSlotClick(slot.start)}
-                    />
-                  )
-                })}
-              </div>
+              {!getActiveSemester() ? (
+                <div className="text-center py-8">
+                  <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">No Active Semester</h3>
+                  <p className="text-muted-foreground mb-4">Please activate a semester to view and manage lectures.</p>
+                  <Button onClick={() => setIsSemesterDialogOpen(true)}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Manage Semesters
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-1 max-h-[600px] overflow-y-auto">
+                  {lectureTimeSlots.map((slot, slotIndex) => {
+                    const lecturesForDay = getLecturesForDay(timetableDate)
+                    const lecturesAtTime = lecturesForDay.filter((l) => l.timeSlot === slot.start)
+                    const currentSlot = isCurrentLectureSlot(slot.start)
+
+                    const isCoveredByEarlierLecture = lecturesForDay.some((lecture) => {
+                      const lectureStartIndex = lectureTimeSlots.findIndex((s) => s.start === lecture.timeSlot)
+                      const currentSlotIndex = slotIndex
+                      const slotsNeeded = Math.ceil(lecture.duration / 50)
+                      const lectureEndIndex = lectureStartIndex + slotsNeeded - 1
+
+                      return lectureStartIndex < currentSlotIndex && currentSlotIndex <= lectureEndIndex
+                    })
+
+                    if (isCoveredByEarlierLecture) {
+                      return null
+                    }
+
+                    return (
+                      <TimeSlotRow
+                        key={slot.start}
+                        slot={slot}
+                        slotIndex={slotIndex}
+                        isCurrent={currentSlot}
+                        lectures={lecturesAtTime}
+                        onDeleteLecture={handleDeleteLecture}
+                        onClick={() => handleTimeSlotClick(slot.start)}
+                        lectureTimeSlots={lectureTimeSlots}
+                      />
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* dialogs */}
         <EventDialog
           open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
@@ -593,7 +868,12 @@ function StudentCalendar() {
           semesters={semesters}
           newSemester={newSemester}
           setNewSemester={setNewSemester}
+          editingSemester={editingSemester}
+          setEditingSemester={setEditingSemester}
           handleAddSemester={handleAddSemester}
+          handleUpdateSemester={handleUpdateSemester}
+          handleEditSemester={handleEditSemester}
+          handleDeleteSemester={handleDeleteSemester}
           handleActivateSemester={handleActivateSemester}
         />
       </div>
@@ -601,30 +881,13 @@ function StudentCalendar() {
   )
 }
 
-
-
-// ------ Helper components below (same as before, but all in this file) ------
-
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      <div className={`w-4 h-4 rounded-md ${color}`} />
-      <span className="font-medium text-xs">{label}</span>
+      <div className={`w-3 h-3 rounded ${color}`} />
+      <span className="text-foreground">{label}</span>
     </div>
   )
-}
-
-interface SidebarProps {
-  date: Date | undefined
-  getEventsForDate: (d: Date) => Event[]
-  getLecturesForDay: (d: Date) => LectureSlot[]
-  lectureTimeSlots: { start: string; end: string }[]
-  getEventTypeIcon: (t: Event["type"]) => React.ReactNode
-  getEventTypeColor: (t: Event["type"]) => string
-  handleDeleteEvent: (id: string) => void
-  handleDeleteLecture: (id: string) => void
-  getActiveSemester: () => Semester
-  currentTime: Date
 }
 
 function Sidebar({
@@ -637,15 +900,26 @@ function Sidebar({
   handleDeleteEvent,
   handleDeleteLecture,
   getActiveSemester,
-}: SidebarProps) {
+  setIsSemesterDialogOpen,
+}: {
+  date: Date | undefined
+  getEventsForDate: (d: Date) => Event[]
+  getLecturesForDay: (d: Date) => LectureSlot[]
+  lectureTimeSlots: { start: string; end: string }[]
+  getEventTypeIcon: (t: Event["type"]) => React.ReactNode
+  getEventTypeColor: (t: Event["type"]) => string
+  handleDeleteEvent: (id: string) => void
+  handleDeleteLecture: (id: string) => void
+  getActiveSemester: () => Semester | null
+  setIsSemesterDialogOpen: (open: boolean) => void
+}) {
   return (
     <div className="xl:col-span-1 space-y-6">
-      {/* events card */}
-      <Card className="shadow-sm h-fit">
+      <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <CalendarDays className="h-5 w-5" />
-            {date ? `Events for ${format(date, "yyyy/MM/dd")}` : "Select a date"}
+            {date ? format(date, "MMM d, yyyy") : "Select a date"}
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
@@ -678,29 +952,39 @@ function Sidebar({
         </CardContent>
       </Card>
 
-      {/* semester card */}
-      <Card className="shadow-sm h-fit">
+      <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Current Semester</CardTitle>
-          <p className="text-sm text-gray-600">{getActiveSemester().name}</p>
+          <p className="text-sm text-muted-foreground">{getActiveSemester()?.name || "No active semester"}</p>
         </CardHeader>
         <CardContent className="pt-0 space-y-4">
-          <div className="space-y-2">
-            <InfoRow label="Start:" value={format(getActiveSemester().startDate, "yyyy/MM/dd")} />
-            <InfoRow label="End:" value={format(getActiveSemester().endDate, "yyyy/MM/dd")} />
-          </div>
-          <div className="border-t pt-4">
-            <h4 className="font-medium text-sm mb-3">Today's Lectures</h4>
-            <div className="min-h-[100px] max-h-[150px] overflow-y-auto">
-              {getLecturesForDay(new Date()).length ? (
-                getLecturesForDay(new Date()).map((lec) => (
-                  <LectureToday key={lec.id} lecture={lec} lectureTimeSlots={lectureTimeSlots} />
-                ))
-              ) : (
-                <EmptyState message="No lectures today" small />
-              )}
+          {getActiveSemester() ? (
+            <>
+              <div className="space-y-2">
+                <InfoRow label="Start:" value={format(getActiveSemester()!.startDate, "MMM d, yyyy")} />
+                <InfoRow label="End:" value={format(getActiveSemester()!.endDate, "MMM d, yyyy")} />
+              </div>
+              <div className="border-t border-border pt-4">
+                <h4 className="font-medium text-sm mb-3 text-foreground">Today's Lectures</h4>
+                <div className="min-h-[100px] max-h-[150px] overflow-y-auto space-y-2">
+                  {getLecturesForDay(new Date()).length ? (
+                    getLecturesForDay(new Date()).map((lec) => (
+                      <LectureToday key={lec.id} lecture={lec} lectureTimeSlots={lectureTimeSlots} />
+                    ))
+                  ) : (
+                    <EmptyState message="No lectures today" small />
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground mb-3">No active semester selected</p>
+              <Button variant="outline" size="sm" onClick={() => setIsSemesterDialogOpen(true)} className="text-xs">
+                Manage Semesters
+              </Button>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -709,27 +993,25 @@ function Sidebar({
 
 const InfoRow = ({ label, value }: { label: string; value: string }) => (
   <div className="flex justify-between text-sm">
-    <span className="text-gray-600">{label}</span>
-    <span className="font-medium">{value}</span>
+    <span className="text-muted-foreground">{label}</span>
+    <span className="font-medium text-foreground">{value}</span>
   </div>
 )
 
-const EmptyState = ({
-  message,
-  small,
-}: {
-  message: string
-  small?: boolean
-}) => (
+const EmptyState = ({ message, small }: { message: string; small?: boolean }) => (
   <div
     className={
       small
-        ? "flex items-center justify-center h-[100px] text-gray-500"
-        : "flex items-center justify-center h-[200px] text-gray-500"
+        ? "flex items-center justify-center h-[100px] text-muted-foreground"
+        : "flex items-center justify-center h-[200px] text-muted-foreground"
     }
   >
     <div className="text-center">
-      <Clock className={small ? "h-6 w-6 mx-auto mb-1 text-gray-400" : "h-8 w-8 mx-auto mb-2 text-gray-400"} />
+      <Clock
+        className={
+          small ? "h-6 w-6 mx-auto mb-1 text-muted-foreground/50" : "h-8 w-8 mx-auto mb-2 text-muted-foreground/50"
+        }
+      />
       <p className={small ? "text-xs" : "text-sm"}>{message}</p>
     </div>
   </div>
@@ -744,23 +1026,26 @@ function LectureChip({
   lectureTimeSlots: { start: string; end: string }[]
   handleDelete: () => void
 }) {
-  const end = lectureTimeSlots.find((s) => s.start === lecture.timeSlot)?.end
+  const endTime = calculateLectureEndTime(lecture.timeSlot, lecture.duration)
+
   return (
-    <div className="p-3 border rounded-lg bg-green-50 border-green-200">
+    <div className="p-3 border rounded-lg bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <BookOpen className="h-4 w-4 text-green-600" />
-            <h4 className="font-medium text-sm truncate">{lecture.subject}</h4>
-            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
-              Lecture
+            <BookOpen className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <h4 className="font-medium text-sm truncate text-foreground">{lecture.subject}</h4>
+            <Badge
+              variant="outline"
+              className="bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs"
+            >
+              {lecture.duration}min
             </Badge>
           </div>
-          <p className="text-xs text-gray-600 mb-1 flex items-center">
-            <Clock className="h-3 w-3 mr-1" />
-            {lecture.timeSlot} – {end}
+          <p className="text-xs text-muted-foreground mb-1">
+            {lecture.timeSlot} – {endTime}
           </p>
-          <p className="text-xs text-gray-600 truncate">
+          <p className="text-xs text-muted-foreground truncate">
             {lecture.lecturer} • {lecture.room}
           </p>
         </div>
@@ -768,7 +1053,7 @@ function LectureChip({
           variant="ghost"
           size="sm"
           onClick={handleDelete}
-          className="text-red-600 hover:text-red-800 h-8 w-8 p-0"
+          className="text-destructive hover:text-destructive h-8 w-8 p-0"
         >
           <Trash2 className="h-3 w-3" />
         </Button>
@@ -789,30 +1074,29 @@ function EventChip({
   handleDelete: () => void
 }) {
   return (
-    <div className="p-3 border rounded-lg bg-white">
+    <div className="p-3 border border-border rounded-lg bg-card">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             {getEventTypeIcon(event.type)}
-            <h4 className="font-medium text-sm truncate">{event.title}</h4>
+            <h4 className="font-medium text-sm truncate text-foreground">{event.title}</h4>
             <Badge variant="outline" className={`${getEventTypeColor(event.type)} text-xs`}>
               {event.type}
             </Badge>
           </div>
           {event.time && (
-            <p className="text-xs text-gray-600 mb-1 flex items-center">
-              <Clock className="h-3 w-3 mr-1" />
+            <p className="text-xs text-muted-foreground mb-1">
               {event.time}
               {event.endTime && ` – ${event.endTime}`}
             </p>
           )}
-          {event.description && <p className="text-xs text-gray-600 truncate">{event.description}</p>}
+          {event.description && <p className="text-xs text-muted-foreground truncate">{event.description}</p>}
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={handleDelete}
-          className="text-red-600 hover:text-red-800 h-8 w-8 p-0"
+          className="text-destructive hover:text-destructive h-8 w-8 p-0"
         >
           <Trash2 className="h-3 w-3" />
         </Button>
@@ -824,16 +1108,14 @@ function EventChip({
 function LectureToday({
   lecture,
   lectureTimeSlots,
-}: {
-  lecture: LectureSlot
-  lectureTimeSlots: { start: string; end: string }[]
-}) {
-  const end = lectureTimeSlots.find((s) => s.start === lecture.timeSlot)?.end ?? ""
+}: { lecture: LectureSlot; lectureTimeSlots: { start: string; end: string }[] }) {
+  const endTime = calculateLectureEndTime(lecture.timeSlot, lecture.duration)
+
   return (
-    <div className="p-2 bg-green-50 rounded border border-green-200">
-      <div className="font-medium text-sm truncate">{lecture.subject}</div>
-      <div className="text-xs text-gray-600 truncate">
-        {lecture.timeSlot} – {end} • {lecture.room}
+    <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+      <div className="font-medium text-sm truncate text-foreground">{lecture.subject}</div>
+      <div className="text-xs text-muted-foreground truncate">
+        {lecture.timeSlot} – {endTime} • {lecture.room}
       </div>
     </div>
   )
@@ -841,70 +1123,98 @@ function LectureToday({
 
 function TimeSlotRow({
   slot,
+  slotIndex,
   isCurrent,
   lectures,
   onDeleteLecture,
   onClick,
+  lectureTimeSlots,
 }: {
   slot: { start: string; end: string }
+  slotIndex: number
   isCurrent: boolean
   lectures: LectureSlot[]
   onDeleteLecture: (id: string) => void
   onClick: () => void
+  lectureTimeSlots: { start: string; end: string }[]
 }) {
+  const baseHeight = 60
+
   return (
     <div
-      className={`flex items-center gap-4 p-4 border-l-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-r-lg ${
-        isCurrent ? "border-l-blue-500 bg-blue-50" : "border-l-gray-200 bg-white"
+      className={`flex items-start gap-4 border-l-4 cursor-pointer hover:bg-muted/50 transition-colors rounded-r-lg p-3 ${
+        isCurrent ? "border-l-primary bg-primary/10" : "border-l-border bg-card"
       }`}
+      style={{ minHeight: `${baseHeight}px` }}
       onClick={onClick}
     >
       <div
-        className={`text-sm font-mono w-20 text-center ${isCurrent ? "text-blue-700 font-semibold" : "text-gray-500"}`}
+        className={`text-sm font-mono w-16 text-center py-2 ${isCurrent ? "text-primary font-semibold" : "text-muted-foreground"}`}
       >
         <div className="font-medium">{slot.start}</div>
         <div className="text-xs opacity-75">{slot.end}</div>
       </div>
-      <div className="flex-1 min-h-[60px] flex items-center">
+      <div className="flex-1 py-2 flex items-start">
         {lectures.length ? (
           <div className="w-full space-y-2">
-            {lectures.map((lec) => (
-              <div
-                key={lec.id}
-                className={`flex items-center gap-3 p-3 rounded-lg border ${
-                  isCurrent ? "bg-green-50 border-green-200" : "bg-white border-gray-200"
-                }`}
-              >
-                <BookOpen className="h-4 w-4 text-green-600 flex-shrink-0" />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">{lec.subject}</span>
-                    {isCurrent && (
-                      <Badge variant="default" className="bg-green-600 text-xs">
-                        Live
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {lec.lecturer} • {lec.room}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDeleteLecture(lec.id)
-                  }}
-                  className="text-red-600 hover:text-red-800 h-8 w-8 p-0"
+            {lectures.map((lec) => {
+              const endTime = calculateLectureEndTime(lec.timeSlot, lec.duration)
+              const slotsNeeded = Math.ceil(lec.duration / 50)
+              const spanningHeight = slotsNeeded * baseHeight + (slotsNeeded - 1) * 4
+
+              return (
+                <div
+                  key={lec.id}
+                  className={`flex items-start gap-3 p-3 rounded-lg border border-border relative ${
+                    isCurrent ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" : "bg-card"
+                  }`}
+                  style={{ minHeight: `${spanningHeight}px` }}
                 >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
+                  <div
+                    className="absolute left-0 top-0 w-1 bg-green-500 rounded-r"
+                    style={{ height: `${spanningHeight}px` }}
+                  />
+
+                  <BookOpen className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-1" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-medium text-base text-foreground">{lec.subject}</span>
+                      <Badge
+                        variant="outline"
+                        className="bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs"
+                      >
+                        {lec.duration}min
+                      </Badge>
+                      {isCurrent && (
+                        <Badge variant="default" className="bg-green-600 text-xs">
+                          Live
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-1">
+                      {lec.lecturer} • {lec.room}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {lec.timeSlot} - {endTime}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDeleteLecture(lec.id)
+                    }}
+                    className="text-destructive hover:text-destructive h-8 w-8 p-0 flex-shrink-0"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              )
+            })}
           </div>
         ) : (
-          <div className="text-gray-400 text-sm italic">Click to add lecture</div>
+          <div className="text-sm italic py-4 text-muted-foreground">Click to add lecture</div>
         )}
       </div>
     </div>
@@ -922,23 +1232,21 @@ function NavigationBar({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <Button variant="outline" size="sm" onClick={() => navigate("prev")} className="h-9">
+      <Button variant="outline" size="sm" onClick={() => navigate("prev")}>
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <div className="text-sm font-medium min-w-[140px] text-center px-3 py-2 bg-gray-50 rounded border">
+      <div className="text-sm font-medium min-w-[140px] text-center px-3 py-2 bg-muted rounded border border-border">
         {format(timetableDate, "EEEE, MMM d")}
       </div>
-      <Button variant="outline" size="sm" onClick={() => navigate("next")} className="h-9">
+      <Button variant="outline" size="sm" onClick={() => navigate("next")}>
         <ChevronRight className="h-4 w-4" />
       </Button>
-      <Button variant="outline" size="sm" onClick={resetToday} className="h-9">
+      <Button variant="outline" size="sm" onClick={resetToday}>
         Today
       </Button>
     </div>
   )
 }
-
-// ----- Input/Select/Textarea blocks -----
 
 function InputBlock({
   label,
@@ -950,13 +1258,13 @@ function InputBlock({
   label: string
   id: string
   type?: string
-  value: string
+  value: string | number
   onChange: (v: string) => void
 }) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} className="h-10" />
+      <Input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   )
 }
@@ -966,12 +1274,7 @@ function TextareaBlock({
   id,
   value,
   onChange,
-}: {
-  label: string
-  id: string
-  value: string
-  onChange: (v: string) => void
-}) {
+}: { label: string; id: string; value: string; onChange: (v: string) => void }) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
@@ -998,7 +1301,7 @@ function SelectBlock({
     <div className="grid gap-2">
       <Label>{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-10">
+        <SelectTrigger>
           <SelectValue placeholder="Select" />
         </SelectTrigger>
         <SelectContent>
@@ -1012,8 +1315,6 @@ function SelectBlock({
     </div>
   )
 }
-
-// ---- Dialogs: Event, Lecture, Semester ----
 
 function EventDialog({
   open,
@@ -1050,7 +1351,7 @@ function EventDialog({
         <DialogHeader>
           <DialogTitle>Add Event</DialogTitle>
           <DialogDescription>
-            Add a new event for {selectedDate && format(selectedDate, "yyyy/MM/dd")}
+            Add a new event for {selectedDate && format(selectedDate, "MMMM d, yyyy")}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -1090,10 +1391,10 @@ function EventDialog({
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="h-10">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleAddEvent} disabled={!newEvent.title} className="h-10">
+          <Button onClick={handleAddEvent} disabled={!newEvent.title}>
             Add Event
           </Button>
         </DialogFooter>
@@ -1122,6 +1423,7 @@ function LectureDialog({
     room: string
     dayOfWeek: number
     timeSlot: string
+    duration: number
   }
   setNewLecture: React.Dispatch<
     React.SetStateAction<{
@@ -1130,11 +1432,40 @@ function LectureDialog({
       room: string
       dayOfWeek: number
       timeSlot: string
+      duration: number
     }>
   >
   selectedTimeSlot: string
   handleAddLecture: () => void
 }) {
+  const durationOptions = [
+    { label: "50 minutes (1 slot)", value: "50" },
+    { label: "100 minutes (2 slots)", value: "100" },
+    { label: "150 minutes (3 slots)", value: "150" },
+    { label: "200 minutes (4 slots)", value: "200" },
+    { label: "Custom", value: "custom" },
+  ]
+
+  const [customDuration, setCustomDuration] = React.useState("")
+  const [showCustom, setShowCustom] = React.useState(false)
+
+  const handleDurationChange = (value: string) => {
+    if (value === "custom") {
+      setShowCustom(true)
+    } else {
+      setShowCustom(false)
+      setNewLecture({ ...newLecture, duration: Number.parseInt(value) })
+    }
+  }
+
+  const handleCustomDurationChange = (value: string) => {
+    setCustomDuration(value)
+    const duration = Number.parseInt(value)
+    if (!isNaN(duration) && duration > 0) {
+      setNewLecture({ ...newLecture, duration })
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -1178,12 +1509,31 @@ function LectureDialog({
               value: s.start,
             }))}
           />
+          <SelectBlock
+            label="Duration"
+            value={showCustom ? "custom" : newLecture.duration.toString()}
+            onChange={handleDurationChange}
+            items={durationOptions}
+          />
+          {showCustom && (
+            <InputBlock
+              label="Custom Duration (minutes)"
+              id="custom-duration"
+              type="number"
+              value={customDuration}
+              onChange={handleCustomDurationChange}
+            />
+          )}
+          <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+            <strong>Note:</strong> Lectures can span multiple time slots. A 150-minute lecture will occupy 3 consecutive
+            slots.
+          </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="h-10">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleAddLecture} disabled={!newLecture.subject} className="h-10">
+          <Button onClick={handleAddLecture} disabled={!newLecture.subject}>
             Add Lecture
           </Button>
         </DialogFooter>
@@ -1198,7 +1548,12 @@ function SemesterDialog({
   semesters,
   newSemester,
   setNewSemester,
+  editingSemester,
+  setEditingSemester,
   handleAddSemester,
+  handleUpdateSemester,
+  handleEditSemester,
+  handleDeleteSemester,
   handleActivateSemester,
 }: {
   open: boolean
@@ -1206,7 +1561,12 @@ function SemesterDialog({
   semesters: Semester[]
   newSemester: { name: string; startDate: string; endDate: string }
   setNewSemester: React.Dispatch<React.SetStateAction<{ name: string; startDate: string; endDate: string }>>
+  editingSemester: Semester | null
+  setEditingSemester: React.Dispatch<React.SetStateAction<Semester | null>>
   handleAddSemester: () => void
+  handleUpdateSemester: () => void
+  handleEditSemester: (semester: Semester) => void
+  handleDeleteSemester: (id: string) => void
   handleActivateSemester: (id: string) => void
 }) {
   return (
@@ -1214,32 +1574,47 @@ function SemesterDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Manage Semesters</DialogTitle>
-          <DialogDescription>Create new semesters and switch between them</DialogDescription>
+          <DialogDescription>Create new semesters, edit existing ones, and switch between them</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          {/* list */}
           <div className="space-y-2">
-            <h4 className="font-medium">Current Semesters</h4>
+            <h4 className="font-medium text-foreground">Current Semesters</h4>
             {semesters.map((s) => (
-              <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div key={s.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
                 <div>
-                  <span className="font-medium">{s.name}</span>
+                  <span className="font-medium text-foreground">{s.name}</span>
                   {s.isActive && <Badge className="ml-2">Active</Badge>}
-                  <p className="text-sm text-gray-600">
-                    {format(s.startDate, "yyyy/MM/dd")} – {format(s.endDate, "yyyy/MM/dd")}
+                  <p className="text-sm text-muted-foreground">
+                    {format(s.startDate, "MMM d, yyyy")} – {format(s.endDate, "MMM d, yyyy")}
                   </p>
                 </div>
-                {!s.isActive && (
-                  <Button variant="outline" size="sm" onClick={() => handleActivateSemester(s.id)} className="h-9">
-                    Activate
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleEditSemester(s)}>
+                    <Edit className="h-3 w-3 mr-1" />
+                    Edit
                   </Button>
-                )}
+                  {!s.isActive && (
+                    <Button variant="outline" size="sm" onClick={() => handleActivateSemester(s.id)}>
+                      Activate
+                    </Button>
+                  )}
+                  {semesters.length > 1 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteSemester(s.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
-          {/* add */}
-          <div className="border-t pt-4 space-y-4">
-            <h4 className="font-medium">Add New Semester</h4>
+
+          <div className="border-t border-border pt-4 space-y-4">
+            <h4 className="font-medium text-foreground">{editingSemester ? "Edit Semester" : "Add New Semester"}</h4>
             <InputBlock
               label="Semester Name"
               id="sem-name"
@@ -1262,17 +1637,30 @@ function SemesterDialog({
                 onChange={(v) => setNewSemester({ ...newSemester, endDate: v })}
               />
             </div>
-            <Button
-              onClick={handleAddSemester}
-              disabled={!newSemester.name || !newSemester.startDate || !newSemester.endDate}
-              className="h-10"
-            >
-              Add Semester
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={editingSemester ? handleUpdateSemester : handleAddSemester}
+                disabled={!newSemester.name || !newSemester.startDate || !newSemester.endDate}
+                className="flex-1"
+              >
+                {editingSemester ? "Update Semester" : "Add Semester"}
+              </Button>
+              {editingSemester && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditingSemester(null)
+                    setNewSemester({ name: "", startDate: "", endDate: "" })
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="h-10">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
         </DialogFooter>
@@ -1281,10 +1669,8 @@ function SemesterDialog({
   )
 }
 
-// --- Export ---
 export default StudentCalendar
 
-// ----- Helper: Event Icon/Color -----
 function getEventTypeIcon(t: Event["type"]) {
   return {
     exam: <BookOpen className="h-4 w-4" />,
@@ -1293,11 +1679,14 @@ function getEventTypeIcon(t: Event["type"]) {
     class: <Clock className="h-4 w-4" />,
   }[t]
 }
+
 function getEventTypeColor(t: Event["type"]) {
   return {
-    exam: "bg-red-100 text-red-800 border-red-200",
-    assignment: "bg-blue-100 text-blue-800 border-blue-200",
-    reminder: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    class: "bg-green-100 text-green-800 border-green-200",
+    exam: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700",
+    assignment: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
+    reminder:
+      "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700",
+    class:
+      "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700",
   }[t]
 }
