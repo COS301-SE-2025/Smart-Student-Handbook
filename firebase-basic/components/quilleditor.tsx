@@ -54,13 +54,20 @@ export default function QuillEditor({
 
   useEffect(() => {
     if (!registered.current) {
-      const Quill = require('react-quill-new');
+      const Quill = require("react-quill-new");
 
-      const Font = Quill.Quill.import('formats/font');
-      Font.whitelist = ['sans-serif', 'serif', 'monospace', 'roboto', 'arial', 'times-new-roman'];
+      const Font = Quill.Quill.import("formats/font");
+      Font.whitelist = [
+        "sans-serif",
+        "serif",
+        "monospace",
+        "roboto",
+        "arial",
+        "times-new-roman",
+      ];
       Quill.Quill.register(Font, true);
 
-      const List = Quill.Quill.import('formats/list');
+      const List = Quill.Quill.import("formats/list");
       Quill.Quill.register(List, true);
 
       registered.current = true;
@@ -73,9 +80,9 @@ export default function QuillEditor({
       onChange={onChange}
       readOnly={readOnly}
       theme="snow"
-      modules={modules}
+      modules={readOnly ? { toolbar: false } : modules}
       formats={formats}
-      className="h-full [&_.ql-container]:h-full [&_.ql-editor]:h-full [&_.ql-editor]:overflow-y-auto"
+      className="h-full w-[600px] [&_.ql-container]:h-full [&_.ql-editor]:h-full [&_.ql-editor]:overflow-y-auto"
     />
   );
 }
