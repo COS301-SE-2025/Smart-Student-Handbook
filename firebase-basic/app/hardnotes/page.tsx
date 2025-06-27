@@ -14,6 +14,7 @@ import {
   Share2,
   Users,
   User,
+  UserIcon,
 } from "lucide-react";
 import Link from "next/link";
 import QuillEditor from "@/components/quilleditor";
@@ -62,6 +63,13 @@ type Folder = {
     [userId: string]: boolean;
   };
 };
+
+type UserProfile = {
+  uid: string
+  name: string
+  surname: string
+  profilePicture: string
+}
 
 type FileNode = Note | Folder;
 
@@ -233,40 +241,6 @@ export default function NotePage() {
     setTree((prev) => toggle(prev));
   };
 
-  async function addSharedNoteToCurrentUser({
-    noteId,
-    ownerId,
-  }: {
-    noteId: string;
-    ownerId: string;
-  }) {
-    const user = getAuth().currentUser;
-    if (!user) throw new Error("User not logged in");
-
-    const collaboratorId = user.uid;
-    const db = getDatabase();
-
-    const sharedNoteRef = ref(
-      db,
-      `users/${collaboratorId}/sharedNotes/${noteId}`
-    );
-
-    const data = {
-      owner: ownerId,
-      noteId: noteId,
-    };
-
-    try {
-      await set(sharedNoteRef, data);
-      console.log(
-        `Shared note ${noteId} (owner: ${ownerId}) added to user ${collaboratorId}`
-      );
-    } catch (error) {
-      console.error("Error adding shared note:", error);
-      throw error;
-    }
-  }
-
   function buildTree(items: any[], parentId: string | null = null): FileNode[] {
     return items
       .filter((item) => (item.parentId ?? null) === parentId)
@@ -317,6 +291,23 @@ export default function NotePage() {
 
     return result;
   }
+
+  const [collaboratorProfiles, setCollaboratorProfiles] = useState<UserProfile[]>([])
+
+  const loadUsers = async (ids: string[], setter: (users: UserProfile[]) => void) => {
+    const profiles: UserProfile[] = []
+    for (const id of ids) {
+      const snap = await get(ref(db, `users/${id}/UserSettings`))
+      if (snap.exists()) profiles.push({ uid: id, ...snap.val() })
+    }
+    setter(profiles)
+  }
+
+  useEffect(() => {
+    const ids = Object.keys(selectedNote?.collaborators ?? {}).filter(uid => selectedNote?.collaborators?.[uid]);
+    console.log(ids);
+    loadUsers(ids, setCollaboratorProfiles);
+  }, [selectedNote]);
 
   async function saveTreeToRealtimeDB(tree: FileNode[]) {
     const user = getAuth().currentUser;
@@ -484,9 +475,8 @@ export default function NotePage() {
         return (
           <div key={node.id} className="mb-1">
             <div
-              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${
-                isSelected ? "bg-muted" : ""
-              }`}
+              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${isSelected ? "bg-muted" : ""
+                }`}
               style={{ marginLeft: depth * 20 }}
             >
               <Button
@@ -569,18 +559,16 @@ export default function NotePage() {
         return (
           <div
             key={node.id}
-            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${
-              isSelected ? "bg-blue-50 border border-blue-200" : ""
-            }`}
+            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${isSelected ? "bg-blue-50 border border-blue-200" : ""
+              }`}
             style={{ marginLeft: (depth + 1) * 20 }}
             onClick={() => handleSelectNote(node)}
           >
             <FileText className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
 
             <span
-              className={`flex-1 text-sm truncate ${
-                isSelected ? "font-medium text-blue-700" : ""
-              }`}
+              className={`flex-1 text-sm truncate ${isSelected ? "font-medium text-blue-700" : ""
+                }`}
             >
               {node.name}
             </span>
@@ -680,82 +668,69 @@ export default function NotePage() {
               <Users className="h-3 w-3" />
             </Button>
 
-            <Dialog
-              open={showCollaboratorsDialog}
-              onOpenChange={setShowCollaboratorsDialog}
-            >
+            <Dialog open={showCollaboratorsDialog} onOpenChange={setShowCollaboratorsDialog}>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Manage Collaborators</DialogTitle>
                 </DialogHeader>
 
-                {selectedNote &&
-                Object.keys(selectedNote.collaborators || {}).length > 0 ? (
+                {collaboratorProfiles.length > 0 ? (
                   <ul className="space-y-2">
-                    {Object.entries(selectedNote.collaborators).map(
-                      ([uid, isActive]) =>
-                        isActive && (
-                          <li
-                            key={uid}
-                            className="flex items-center justify-between"
-                          >
-                            <span className="flex items-center gap-2 text-sm">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              {uid}
-                            </span>
+                    {collaboratorProfiles.map((user) => (
+                      <li key={user.uid} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <UserIcon className="h-4 w-4" />
+                          <span>
+                            {user.name && user.surname
+                              ? `${user.name} ${user.surname}`
+                              : user.name || user.surname || user.uid}
+                          </span>
+                        </div>
 
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={async () => {
-                                try {
-                                  const functions = getFunctions();
-                                  const removeCollaborator = httpsCallable(
-                                    functions,
-                                    "removeCollaborator"
-                                  );
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const functions = getFunctions();
+                              const removeCollaborator = httpsCallable(functions, "removeCollaborator");
 
-                                  await removeCollaborator({
-                                    noteId: selectedNote?.id,
-                                    collaboratorId: uid,
-                                  });
+                              await removeCollaborator({
+                                noteId: selectedNote?.id,
+                                collaboratorId: user.uid,
+                              });
 
-                                  toast.success(`Removed collaborator ${uid}`);
-                                  setShowCollaboratorsDialog(false);
+                              toast.success(`Removed collaborator ${user.name || user.uid}`);
+                              setShowCollaboratorsDialog(false);
 
-                                  setSelectedNote((prev) =>
-                                    prev
-                                      ? {
-                                          ...prev,
-                                          collaborators: {
-                                            ...prev.collaborators,
-                                            [uid]: false,
-                                          },
-                                        }
-                                      : null
-                                  );
-                                } catch (err) {
-                                  console.error(
-                                    "Error removing collaborator:",
-                                    err
-                                  );
-                                  toast.error("Failed to remove collaborator");
-                                }
-                              }}
-                            >
-                              Remove
-                            </Button>
-                          </li>
-                        )
-                    )}
+                              setSelectedNote((prev) =>
+                                prev
+                                  ? {
+                                    ...prev,
+                                    collaborators: {
+                                      ...prev.collaborators,
+                                      [user.uid]: false,
+                                    },
+                                  }
+                                  : null
+                              );
+                            } catch (err) {
+                              console.error("Error removing collaborator:", err);
+                              toast.error("Failed to remove collaborator");
+                            }
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </li>
+                    ))}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No collaborators yet.
-                  </p>
+                  <p className="text-sm text-muted-foreground">No collaborators found.</p>
                 )}
               </DialogContent>
             </Dialog>
+
           </div>
         );
       }
@@ -767,109 +742,109 @@ export default function NotePage() {
         title="Notes Editor"
         description="Browse, organize, and edit your personal and shared notes all in one place."
       />
-    <div className="h-[calc(100vh-3.5rem)] flex bg-background overflow-hidden">
-      <div className="w-80 border-r border-border bg-card/30 flex flex-col">
-        <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
+      <div className="h-[calc(100vh-3.5rem)] flex bg-background overflow-hidden">
+        <div className="w-80 border-r border-border bg-card/30 flex flex-col">
+          <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
 
-          <div className="flex gap-2">
-            <Button
-              onClick={addFolder}
-              size="sm"
-              variant="outline"
-              className="flex-1 gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Folder
-            </Button>
-            <Button onClick={addNote} size="sm" className="flex-1 gap-2">
-              <Plus className="h-4 w-4" />
-              Note
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="space-y-1">
-            {testTree.length > 0 ? (
-              renderTree(testTree)
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No notes yet</p>
-                <p className="text-xs">Create your first note or folder</p>
-              </div>
-            )}
-
-            {sharedTree.length > 0 && (
-              <>
-                <h4 className="text-sm text-muted-foreground pl-2 mb-1">
-                  Shared
-                </h4>
-                {renderTree(sharedTree)}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {selectedNote ? (
-          <>
-            <div className="p-6 border-b border-border bg-background/80 backdrop-blur-sm">
-              <input
-                type="text"
-                value={selectedNote.name}
-                onChange={(e) =>
-                  handleNoteChange(selectedNote.id, "name", e.target.value)
-                }
-                placeholder="Untitled Note"
-                className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 w-full placeholder:text-muted-foreground"
-              />
+            <div className="flex gap-2">
+              <Button
+                onClick={addFolder}
+                size="sm"
+                variant="outline"
+                className="flex-1 gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Folder
+              </Button>
+              <Button onClick={addNote} size="sm" className="flex-1 gap-2">
+                <Plus className="h-4 w-4" />
+                Note
+              </Button>
             </div>
+          </div>
 
-            <div className="flex-1 overflow-hidden">
-              <div className="h-full p-6">
-                <div className="h-full max-w-4xl mx-auto">
-                  <div className="h-full [&_.ql-container]:h-[calc(100%-42px)] [&_.ql-editor]:h-full">
-                    <QuillEditor
-                      key={selectedNote.id}
-                      value={selectedNote.content}
-                      readOnly={permission === "read"}
-                      onChange={(newContent) =>
-                        handleNoteChange(selectedNote.id, "content", newContent)
-                      }
-                    />
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="space-y-1">
+              {testTree.length > 0 ? (
+                renderTree(testTree)
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No notes yet</p>
+                  <p className="text-xs">Create your first note or folder</p>
+                </div>
+              )}
+
+              {sharedTree.length > 0 && (
+                <>
+                  <h4 className="text-sm text-muted-foreground pl-2 mb-1">
+                    Shared
+                  </h4>
+                  {renderTree(sharedTree)}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {selectedNote ? (
+            <>
+              <div className="p-6 border-b border-border bg-background/80 backdrop-blur-sm">
+                <input
+                  type="text"
+                  value={selectedNote.name}
+                  onChange={(e) =>
+                    handleNoteChange(selectedNote.id, "name", e.target.value)
+                  }
+                  placeholder="Untitled Note"
+                  className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 w-full placeholder:text-muted-foreground"
+                />
+              </div>
+
+              <div className="flex-1 overflow-hidden">
+                <div className="h-full p-6">
+                  <div className="h-full max-w-4xl mx-auto">
+                    <div className="h-full [&_.ql-container]:h-[calc(100%-42px)] [&_.ql-editor]:h-full">
+                      <QuillEditor
+                        key={selectedNote.id}
+                        value={selectedNote.content}
+                        readOnly={permission === "read"}
+                        onChange={(newContent) =>
+                          handleNoteChange(selectedNote.id, "content", newContent)
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center bg-muted/20">
-            <div className="text-center max-w-md">
-              <FileText className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-muted-foreground mb-2">
-                Select a note to start writing
-              </h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                Choose a note from the sidebar or create a new one to begin
-                taking notes
-              </p>
-              <div className="flex gap-2 justify-center">
-                <Button onClick={addNote} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Note
-                </Button>
-                <Button onClick={addFolder} variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Folder
-                </Button>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center bg-muted/20">
+              <div className="text-center max-w-md">
+                <FileText className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                  Select a note to start writing
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Choose a note from the sidebar or create a new one to begin
+                  taking notes
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <Button onClick={addNote} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create Note
+                  </Button>
+                  <Button onClick={addFolder} variant="outline" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create Folder
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
     </div>
   );
 }
