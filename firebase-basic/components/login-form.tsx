@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { Apple, Facebook, Github } from "lucide-react"
+import Image from "next/image"
 
 
 export function LoginForm({
@@ -132,12 +133,17 @@ export function LoginForm({
             </div>
           </form>
 
-          <div className="relative hidden bg-muted md:block">
-            <img
-              src="/login2.png"
-              alt="Image"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
-            />
+          {/* right: logo panel */}
+          <div className="hidden md:flex items-center justify-center bg-white p-0">
+            <div className="relative w-120 h-120">
+              <Image
+                src="/sshblogo.png"
+                alt="Smart Student Handbook Logo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
