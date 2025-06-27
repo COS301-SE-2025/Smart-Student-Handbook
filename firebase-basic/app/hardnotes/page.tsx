@@ -11,6 +11,8 @@ import {
   Plus,
   ArrowLeft,
   Share2,
+  Users,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 import QuillEditor from "@/components/quilleditor";
@@ -72,6 +74,8 @@ export default function NotePage() {
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+
+  const [showCollaboratorsDialog , setShowCollaboratorsDialog] = useState(false) ; 
 
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState("");
@@ -725,6 +729,97 @@ export default function NotePage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-1 h-auto opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCollaboratorsDialog(true);
+              }}
+            >
+              <Users className="h-3 w-3" />
+            </Button>
+
+            <Dialog
+              open={showCollaboratorsDialog}
+              onOpenChange={setShowCollaboratorsDialog}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Manage Collaborators</DialogTitle>
+                </DialogHeader>
+
+                {selectedNote &&
+                Object.keys(selectedNote.collaborators || {}).length > 0 ? (
+                  <ul className="space-y-2">
+                    {Object.entries(selectedNote.collaborators).map(
+                      ([uid, isActive]) =>
+                        isActive && (
+                          <li
+                            key={uid}
+                            className="flex items-center justify-between"
+                          >
+                            <span className="flex items-center gap-2 text-sm">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              {uid}
+                            </span>
+
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  const functions = getFunctions();
+                                  const removeCollaborator = httpsCallable(
+                                    functions,
+                                    "removeCollaborator"
+                                  );
+
+                                  await removeCollaborator({
+                                    noteId: selectedNote?.id,
+                                    collaboratorId: uid,
+                                  });
+
+                                  toast.success(`Removed collaborator ${uid}`);
+                                  setShowCollaboratorsDialog(false);
+
+                                  setSelectedNote((prev) =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          collaborators: {
+                                            ...prev.collaborators,
+                                            [uid]: false,
+                                          },
+                                        }
+                                      : null
+                                  );
+                                } catch (err) {
+                                  console.error(
+                                    "Error removing collaborator:",
+                                    err
+                                  );
+                                  toast.error("Failed to remove collaborator");
+                                }
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </li>
+                        )
+                    )}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No collaborators yet.
+                  </p>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            
           </div>
         );
       }
