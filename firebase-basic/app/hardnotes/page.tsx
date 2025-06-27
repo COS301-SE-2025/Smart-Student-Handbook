@@ -783,6 +783,74 @@ export default function NotePage() {
       }
     });
 
+    const renderShareTree = (nodes: FileNode[], depth = 0) =>
+    nodes.map((node) => {
+      if (node.type === "folder") {
+        const isSelected = selectedFolderId === node.id;
+        return (
+          <div key={node.id} className="mb-1">
+            <div
+              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${isSelected ? "bg-muted" : ""
+                }`}
+              style={{ marginLeft: depth * 20 }}
+            >
+              <FolderIcon className="h-4 w-4 text-blue-500 mr-2 flex-shrink-0" />
+
+              <div className="flex-1 min-w-0">
+                {isSelected ? (
+                  <input
+                    type="text"
+                    value={node.name}
+                    onChange={(e) =>
+                      handleFolderNameChange(node.id, e.target.value)
+                    }
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-transparent border-none focus:outline-none focus:ring-0 w-full font-medium text-sm"
+                    autoFocus
+                  />
+                ) : (
+                  <span
+                    className="font-medium text-sm truncate cursor-pointer"
+                    onClick={() => {
+                      setSelectedFolderId(node.id);
+                      setSelectedNote(null);
+                    }}
+                  >
+                    {node.name}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {node.expanded && (
+              <div className="mt-1">{renderTree(node.children, depth + 1)}</div>
+            )}
+          </div>
+        );
+      } else {
+        const isSelected = selectedNote?.id === node.id;
+        return (
+          <div
+            key={node.id}
+            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${isSelected ? "bg-blue-50 border border-blue-200" : ""
+              }`}
+            style={{ marginLeft: (depth + 1) * 20 }}
+            onClick={() => handleSelectNote(node)}
+          >
+            <FileText className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
+
+            <span
+              className={`flex-1 text-sm truncate ${isSelected ? "font-medium text-blue-700" : ""
+                }`}
+            >
+              {node.name}
+            </span>
+          </div>
+        );
+      }
+    });
+
+
   return (
     <div className="min-h-screen bg-background">
       <PageHeader
@@ -827,7 +895,7 @@ export default function NotePage() {
                   <h4 className="text-sm text-muted-foreground pl-2 mb-1">
                     Shared
                   </h4>
-                  {renderTree(sharedTree)}
+                  {renderShareTree(sharedTree)}
                 </>
               )}
             </div>
