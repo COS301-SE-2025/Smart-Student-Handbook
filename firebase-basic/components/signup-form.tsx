@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
+import Image from "next/image"
 
 export function SignupForm(
   { className, ...props }: React.ComponentProps<'div'>,
@@ -153,13 +154,18 @@ export function SignupForm(
           </form>
 
           {/* ── Side image ── */}
-          <div className="relative hidden bg-muted md:block">
-            <img
-              src="/login.png"
-              alt="Signup Illustration"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
-            />
-          </div>
+          {/* right: logo panel */}
+            <div className="hidden md:flex items-center justify-center bg-white p-0">
+              <div className="relative w-120 h-120">
+                <Image
+                  src="/sshblogo.png"
+                  alt="Smart Student Handbook Logo"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            </div>
         </CardContent>
       </Card>
 

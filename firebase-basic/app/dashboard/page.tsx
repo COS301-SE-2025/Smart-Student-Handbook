@@ -371,7 +371,7 @@ export default function DashboardPage() {
               {upcomingEvents.map((event) => (
                 <Link href="/calendar" key={event.title}>
                   <div className="flex items-center gap-3 hover:bg-muted/50 transition-colors p-3 rounded-md">
-                    <div className="p-2 bg-amber-100 text-amber-700 rounded-md">
+                    <div className="p-2 bg-blue-100 text-blue-700 rounded-md">
                       <Calendar className="h-5 w-5" />
                     </div>
                     <div>
@@ -395,7 +395,7 @@ export default function DashboardPage() {
               {studyHours.map((hours, index) => (
                 <div key={index} className="flex flex-col items-center gap-2">
                   <div
-                    className="bg-gradient-to-t from-amber-500 to-amber-400 w-8 rounded-t-md transition-all duration-300 hover:from-amber-600 hover:to-amber-500"
+                    className="bg-gradient-to-t from-blue-500 to-blue-400 w-8 rounded-t-md transition-all duration-300 hover:from-amber-600 hover:to-amber-500"
                     style={{ height: `${Math.max(hours * 8, 8)}px` }}
                   ></div>
                   <span className="text-xs text-muted-foreground">{hours}h</span>
