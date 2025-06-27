@@ -44,31 +44,34 @@ const formats = [
 export default function QuillEditor({
   value,
   onChange,
+  readOnly = false,
 }: {
   value: string;
   onChange: (val: string) => void;
+  readOnly?: boolean;
 }) {
-  const [editor, setEditor] = useState<any>(null);
+  const registered = useRef(false);
 
-  // When ReactQuill calls onFocus, grab the editor instance
-  const handleFocus = (range: any, source: any, editorInstance: any) => {
-    setEditor(editorInstance);
-  };
-
-  // Sync editor content when `value` changes
   useEffect(() => {
-    if (!editor || !editor.root) return; // <-- ADD THIS CHECK
+    if (!registered.current) {
+      const Quill = require('react-quill-new');
 
-    if (value !== editor.root.innerHTML) {
-      editor.root.innerHTML = value;
+      const Font = Quill.Quill.import('formats/font');
+      Font.whitelist = ['sans-serif', 'serif', 'monospace', 'roboto', 'arial', 'times-new-roman'];
+      Quill.Quill.register(Font, true);
+
+      const List = Quill.Quill.import('formats/list');
+      Quill.Quill.register(List, true);
+
+      registered.current = true;
     }
-  }, [value, editor]);
+  }, []);
 
   return (
     <ReactQuill
       value={value}
       onChange={onChange}
-      onFocus={handleFocus} // gets editor instance on first focus
+      readOnly={readOnly}
       theme="snow"
       modules={modules}
       formats={formats}

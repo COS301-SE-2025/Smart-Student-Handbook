@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup , RadioGroupItem } from "@/components/ui/radio-group"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type Note = {
   ownerId: string;
@@ -77,12 +77,17 @@ export default function NotePage() {
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
   const [showCollaboratorsDialog, setShowCollaboratorsDialog] = useState(false);
-  const [permission , setPermission] = useState<"read" | "write">("read") ; 
+  const [permission, setPermission] = useState<"read" | "write" | "none">(
+    "none"
+  );
   const [open, setOpen] = useState(false);
   const [collaboratorId, setCollaboratorId] = useState("");
 
-
-  const handleShare = async (e: React.MouseEvent, noteId: string, permission: string) => {
+  const handleShare = async (
+    e: React.MouseEvent,
+    noteId: string,
+    permission: string
+  ) => {
     e.stopPropagation();
 
     if (!noteId || !collaboratorId || !permission) {
@@ -94,7 +99,7 @@ export default function NotePage() {
       const functions = getFunctions(app);
       const shareNote = httpsCallable(functions, "shareNote");
 
-      const result = await shareNote({ collaboratorId, noteId , permission});
+      const result = await shareNote({ collaboratorId, noteId, permission });
       console.log(`Shared note ${noteId} with ${collaboratorId}`, result);
 
       toast.success("Note shared successfully!");
@@ -192,6 +197,26 @@ export default function NotePage() {
       noteListeners.forEach((unsub) => unsub());
     };
   }, []);
+
+  useEffect(() => {
+    const fetchPermission = async () => {
+      const user = getAuth().currentUser;
+      if (!user || !selectedNote) return;
+
+      const noteRef = ref(
+        db,
+        `users/${selectedNote.ownerId}/notes/${selectedNote.id}/collaborators/${user.uid}`
+      );
+      const snapshot = await get(noteRef);
+      if (snapshot.exists()) {
+        setPermission(snapshot.val()); // "read" or "write"
+      } else {
+        setPermission("none");
+      }
+    };
+
+    fetchPermission();
+  }, [selectedNote]);
 
   const toggleExpand = (folder: Folder) => {
     const toggle = (nodes: FileNode[]): FileNode[] =>
@@ -562,8 +587,9 @@ export default function NotePage() {
         return (
           <div key={node.id} className="mb-1">
             <div
-              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${isSelected ? "bg-muted" : ""
-                }`}
+              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${
+                isSelected ? "bg-muted" : ""
+              }`}
               style={{ marginLeft: depth * 20 }}
             >
               <Button
@@ -646,16 +672,18 @@ export default function NotePage() {
         return (
           <div
             key={node.id}
-            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${isSelected ? "bg-blue-50 border border-blue-200" : ""
-              }`}
+            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${
+              isSelected ? "bg-blue-50 border border-blue-200" : ""
+            }`}
             style={{ marginLeft: (depth + 1) * 20 }}
             onClick={() => handleSelectNote(node)}
           >
             <FileText className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
 
             <span
-              className={`flex-1 text-sm truncate ${isSelected ? "font-medium text-blue-700" : ""
-                }`}
+              className={`flex-1 text-sm truncate ${
+                isSelected ? "font-medium text-blue-700" : ""
+              }`}
             >
               {node.name}
             </span>
@@ -765,7 +793,7 @@ export default function NotePage() {
                 </DialogHeader>
 
                 {selectedNote &&
-                  Object.keys(selectedNote.collaborators || {}).length > 0 ? (
+                Object.keys(selectedNote.collaborators || {}).length > 0 ? (
                   <ul className="space-y-2">
                     {Object.entries(selectedNote.collaborators).map(
                       ([uid, isActive]) =>
@@ -801,12 +829,12 @@ export default function NotePage() {
                                   setSelectedNote((prev) =>
                                     prev
                                       ? {
-                                        ...prev,
-                                        collaborators: {
-                                          ...prev.collaborators,
-                                          [uid]: false,
-                                        },
-                                      }
+                                          ...prev,
+                                          collaborators: {
+                                            ...prev.collaborators,
+                                            [uid]: false,
+                                          },
+                                        }
                                       : null
                                   );
                                 } catch (err) {
@@ -831,8 +859,6 @@ export default function NotePage() {
                 )}
               </DialogContent>
             </Dialog>
-
-
           </div>
         );
       }
@@ -914,6 +940,7 @@ export default function NotePage() {
                     <QuillEditor
                       key={selectedNote.id}
                       value={selectedNote.content}
+                      readOnly={permission === "read"}
                       onChange={(newContent) =>
                         handleNoteChange(selectedNote.id, "content", newContent)
                       }
