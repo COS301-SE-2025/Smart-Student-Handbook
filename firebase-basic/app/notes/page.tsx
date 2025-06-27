@@ -8,16 +8,14 @@ import {
   FileText,
   FolderIcon,
   Trash2,
-  ArrowLeft,
-  MoreHorizontal,
   Edit3,
   Save,
   FolderPlus,
   FilePlus,
 } from "lucide-react"
-import Link from "next/link"
 import QuillEditor from "@/components/quilleditor"
 import "react-quill/dist/quill.snow.css"
+import { PageHeader } from "@/components/ui/page-header"
 
 type Note = {
   id: string
@@ -226,21 +224,21 @@ export default function HardNotesPage() {
         return (
           <div key={node.id} className="select-none">
             <div
-              className={`flex items-center py-2.5 px-3 mx-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 group cursor-pointer ${
-                isSelected ? "bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600" : ""
+              className={`flex items-center py-2.5 px-3 mx-1 rounded-lg text-foreground hover:bg-muted/50 hover:text-foreground transition-all duration-200 group cursor-pointer ${
+                isSelected ? "bg-primary text-primary-foreground border border-primary" : ""
               }`}
               style={{ marginLeft: depth * 16 }}
             >
               <Button
                 variant="ghost"
                 size="sm"
-                className="p-0 h-6 w-6 mr-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md"
+                className="p-0 h-6 w-6 mr-2 hover:bg-muted rounded-md"
                 onClick={() => toggleExpand(node)}
               >
                 {node.expanded ? (
-                  <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 )}
               </Button>
 
@@ -251,7 +249,7 @@ export default function HardNotesPage() {
                   setSelectedNote(null)
                 }}
               >
-                <FolderIcon className="h-4 w-4 text-gray-600 dark:text-gray-400 mr-3 flex-shrink-0" />
+                <FolderIcon className="h-4 w-4 text-primary mr-3 flex-shrink-0" />
 
                 {isSelected ? (
                   <input
@@ -259,18 +257,18 @@ export default function HardNotesPage() {
                     value={node.name}
                     onChange={(e) => handleFolderNameChange(node.id, e.target.value)}
                     onClick={(e) => e.stopPropagation()}
-                    className="bg-transparent border-none focus:outline-none focus:ring-0 w-full font-medium text-sm text-black dark:text-white"
+                    className="bg-transparent border-none focus:outline-none focus:ring-0 w-full font-medium text-sm"
                     autoFocus
                   />
                 ) : (
-                  <span className="font-medium text-sm text-black dark:text-white truncate">{node.name}</span>
+                  <span className="font-medium text-sm truncate">{node.name}</span>
                 )}
               </div>
 
               <Button
                 variant="ghost"
                 size="sm"
-                className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md"
+                className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 rounded-md"
                 onClick={(e) => {
                   e.stopPropagation()
                   if (window.confirm(`Delete folder "${node.name}" and all its contents?`)) {
@@ -295,10 +293,8 @@ export default function HardNotesPage() {
         return (
           <div
             key={node.id}
-            className={`flex items-center py-2.5 px-3 mx-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 group cursor-pointer select-none ${
-              isSelected
-                ? "bg-black dark:bg-white text-white dark:text-black border border-gray-300 dark:border-gray-600"
-                : ""
+            className={`flex items-center py-2.5 px-3 mx-1 rounded-lg transition-all duration-200 cursor-pointer select-none ${
+              isSelected ? "bg-primary text-primary-foreground border border-primary" : "text-foreground hover:bg-muted/50 hover:text-foreground"
             }`}
             style={{ marginLeft: (depth + 1) * 16 }}
             onClick={() => handleSelectNote(node)}
@@ -306,20 +302,16 @@ export default function HardNotesPage() {
             <div className="w-6 mr-2" />
             <FileText
               className={`h-4 w-4 mr-3 flex-shrink-0 ${
-                isSelected ? "text-white dark:text-black" : "text-gray-500 dark:text-gray-400"
+                isSelected ? "text-primary-foreground" : "text-muted-foreground"
               }`}
             />
-            <span
-              className={`flex-1 text-sm truncate ${
-                isSelected ? "font-medium text-white dark:text-black" : "text-black dark:text-white"
-              }`}
-            >
+            <span className={`flex-1 text-sm truncate font-medium ${isSelected ? "text-primary-foreground" : ""}`}>
               {node.name}
             </span>
             <Button
               variant="ghost"
               size="sm"
-              className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md"
+              className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 rounded-md"
               onClick={(e) => {
                 e.stopPropagation()
                 if (window.confirm(`Delete note "${node.name}"?`)) {
@@ -339,75 +331,23 @@ export default function HardNotesPage() {
     })
 
   return (
-    <>
-      <style jsx global>{`
-        /* COMPLETELY REMOVE ALL INTERNAL SCROLLBARS */
-        .ql-container {
-          border: none !important;
-          height: 100% !important;
-          overflow: visible !important;
-        }
-        .ql-toolbar {
-          border: none !important;
-          border-bottom: 1px solid #d1d5db !important;
-        }
-        .dark .ql-toolbar {
-          border-bottom: 1px solid #374151 !important;
-        }
-        .ql-editor {
-          height: auto !important;
-          min-height: 500px !important;
-          border: none !important;
-          overflow: visible !important;
-        }
-        /* Hide all scrollbars except browser scrollbar */
-        .ql-editor::-webkit-scrollbar {
-          display: none !important;
-        }
-        .ql-container .ql-editor {
-          overflow: visible !important;
-        }
-      `}</style>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        title="Library"
+        description="Organize your folders and notes, then write or edit rich-text content seamlessly."
+      />
 
-      <div className="min-h-[calc(100vh-3.5rem)] flex bg-white dark:bg-black">
+      <div className="h-[calc(100vh-8rem)] flex">
         {/* Sidebar - Fixed width, no internal scroll */}
-        <div className="w-80 bg-white dark:bg-black border-r border-gray-300 dark:border-gray-700 flex flex-col min-h-[calc(100vh-3.5rem)]">
+        <div className="w-80 bg-background border-r border-border flex flex-col">
           {/* Sidebar Header */}
-          <div className="p-4 border-b border-gray-300 dark:border-gray-700 bg-white dark:bg-black flex-shrink-0">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <Link href="/dashboard">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-black dark:text-white border-gray-300 dark:border-gray-600"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back
-                  </Button>
-                </Link>
-              </div>
-
-              <Button variant="ghost" size="sm" className="text-gray-500 dark:text-gray-400">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </div>
-
+          <div className="p-4 border-b border-border bg-background flex-shrink-0">
             <div className="flex gap-2">
-              <Button
-                onClick={addFolder}
-                size="sm"
-                variant="outline"
-                className="flex-1 gap-2 text-black dark:text-white border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
+              <Button onClick={addFolder} size="sm" variant="outline" className="flex-1 gap-2 bg-transparent">
                 <FolderPlus className="h-4 w-4" />
                 Folder
               </Button>
-              <Button
-                onClick={addNote}
-                size="sm"
-                className="flex-1 gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200"
-              >
+              <Button onClick={addNote} size="sm" className="flex-1 gap-2">
                 <FilePlus className="h-4 w-4" />
                 Note
               </Button>
@@ -415,24 +355,18 @@ export default function HardNotesPage() {
           </div>
 
           {/* File Tree - Expandable content */}
-          <div className="flex-1 p-2">
+          <div className="flex-1 p-2 overflow-y-auto">
             {tree.length > 0 ? (
               <div className="space-y-1">{renderTree(tree)}</div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                  <FileText className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                  <FileText className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="font-medium text-black dark:text-white mb-2">No notes yet</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                  Create your first note or folder to get started
-                </p>
+                <h3 className="font-medium mb-2">No notes yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">Create your first note or folder to get started</p>
                 <div className="flex gap-2">
-                  <Button
-                    onClick={addNote}
-                    size="sm"
-                    className="gap-2 bg-black dark:bg-white text-white dark:text-black"
-                  >
+                  <Button onClick={addNote} size="sm" className="gap-2">
                     <FilePlus className="h-4 w-4" />
                     Create Note
                   </Button>
@@ -442,32 +376,32 @@ export default function HardNotesPage() {
           </div>
         </div>
 
-        {/* Main Content Area - NO INTERNAL CONTAINERS */}
-        <div className="flex-1 bg-white dark:bg-black">
+        {/* Main Content Area */}
+        <div className="flex-1 bg-background">
           {selectedNote ? (
-            <div className="w-full">
+            <div className="w-full h-full flex flex-col">
               {/* Note Header */}
-              <div className="p-6 border-b border-gray-300 dark:border-gray-700 bg-white dark:bg-black">
+              <div className="p-6 border-b border-border bg-background">
                 <div className="flex items-center gap-4">
-                  <Edit3 className="h-5 w-5 text-black dark:text-white" />
+                  <Edit3 className="h-5 w-5 text-primary" />
                   <input
                     type="text"
                     value={selectedNote.name}
                     onChange={(e) => handleNoteChange(selectedNote.id, "name", e.target.value)}
                     placeholder="Untitled Note"
-                    className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 flex-1 text-black dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 flex-1 placeholder:text-muted-foreground"
                   />
-                  <Button variant="ghost" size="sm" className="gap-2 text-gray-500 dark:text-gray-400">
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
                     <Save className="h-4 w-4" />
                     Saved
                   </Button>
                 </div>
               </div>
 
-              {/* Editor Area - NO CONTAINERS, NO FIXED HEIGHT */}
-              <div className="p-6 bg-gray-50 dark:bg-gray-900">
+              {/* Editor Area */}
+              <div className="flex-1 p-6 bg-muted/30 overflow-y-auto">
                 <div className="max-w-4xl mx-auto">
-                  <div className="bg-white dark:bg-black rounded-lg border border-gray-300 dark:border-gray-700">
+                  <div className="bg-background rounded-lg border border-border min-h-[600px]">
                     <QuillEditor
                       key={selectedNote.id}
                       value={selectedNote.content}
@@ -478,29 +412,22 @@ export default function HardNotesPage() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center min-h-[calc(100vh-3.5rem)] bg-gray-50 dark:bg-gray-900">
+            <div className="flex items-center justify-center h-full bg-muted/30">
               <div className="text-center max-w-md">
-                <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Edit3 className="h-10 w-10 text-black dark:text-white" />
+                <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Edit3 className="h-10 w-10 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold text-black dark:text-white mb-3">Ready to take notes?</h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">
+                <h3 className="text-xl font-semibold mb-3">Ready to take notes?</h3>
+                <p className="text-muted-foreground mb-6 leading-relaxed">
                   Select a note from the sidebar or create a new one to start writing your thoughts, ideas, and
                   important information.
                 </p>
                 <div className="flex gap-3 justify-center">
-                  <Button
-                    onClick={addNote}
-                    className="gap-2 bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200"
-                  >
+                  <Button onClick={addNote} className="gap-2">
                     <FilePlus className="h-4 w-4" />
                     Create Note
                   </Button>
-                  <Button
-                    onClick={addFolder}
-                    variant="outline"
-                    className="gap-2 border-gray-300 dark:border-gray-600 text-black dark:text-white"
-                  >
+                  <Button onClick={addFolder} variant="outline" className="gap-2 bg-transparent">
                     <FolderPlus className="h-4 w-4" />
                     Create Folder
                   </Button>
@@ -510,6 +437,6 @@ export default function HardNotesPage() {
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 }

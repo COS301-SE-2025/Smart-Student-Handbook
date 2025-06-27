@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { PageHeader } from "@/components/ui/page-header"
 import { MessageSquareIcon, MoreVertical, UserIcon, TrendingUp, Clock, BookOpen, Calendar } from "lucide-react"
 import {
   DropdownMenu,
@@ -56,7 +57,7 @@ export default function ProfilePage() {
       }
 
       const userID = user.uid
-      const friendsRef = ref(db, `${userID}/Friends`)
+      const friendsRef = ref(db, `users/${userID}/Friends`)
 
       onValue(friendsRef, async (snapshot) => {
         const friendsData = snapshot.val()
@@ -73,7 +74,7 @@ export default function ProfilePage() {
 
         await Promise.all(
           friendIDs.map(async (fid) => {
-            const nameRef = ref(db, `${fid}/UserSettings/name`)
+            const nameRef = ref(db, `users/${fid}/UserSettings/name`)
             const nameSnap = await get(nameRef)
             const friendName = nameSnap.exists() ? nameSnap.val() : "Unknown"
             friendsList.push({ id: fid, name: friendName })
@@ -143,7 +144,13 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto max-w-7xl p-6 space-y-6">
+    <div className="min-h-screen bg-background">
+      {/* page header */}
+      <PageHeader
+        title="Settings"
+        description="Manage your account information, security, and preferences."
+      />
+      <div className="container mx-auto max-w-7xl p-6 space-y-6">
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* Profile Settings - Takes up 3 columns */}
@@ -415,6 +422,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+    </div>
     </div>
   )
 }

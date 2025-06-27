@@ -17,7 +17,7 @@ export const saveUserSettings = async (
     return;
   }
 
-  const path = `${userID}/UserSettings`;
+  const path = `users/${userID}/UserSettings`;
 
   try {
     await set(ref(db, path), settings);
