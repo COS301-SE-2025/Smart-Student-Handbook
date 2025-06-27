@@ -850,7 +850,6 @@ export default function NotePage() {
       }
     });
 
-
   return (
     <div className="min-h-screen bg-background">
       <PageHeader
@@ -919,7 +918,7 @@ export default function NotePage() {
 
               <div className="flex-1 overflow-hidden">
                 <div className="h-full p-6">
-                  <div className="h-full max-w-4xl mx-auto">
+                  <div className="h-full max-w mx-auto">
                     <div className="h-full [&_.ql-container]:h-[calc(100%-42px)] [&_.ql-editor]:h-full">
                       <QuillEditor
                         key={selectedNote.id}
