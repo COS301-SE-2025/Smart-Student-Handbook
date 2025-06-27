@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   ChevronDown,
   ChevronRight,
@@ -731,6 +732,11 @@ export default function NotePage() {
     });
 
   return (
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        title="Notes Editor"
+        description="Browse, organize, and edit your personal and shared notes all in one place."
+      />
     <div className="h-[calc(100vh-3.5rem)] flex bg-background overflow-hidden">
       <div className="w-80 border-r border-border bg-card/30 flex flex-col">
         <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
@@ -832,6 +838,7 @@ export default function NotePage() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

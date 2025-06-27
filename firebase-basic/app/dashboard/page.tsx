@@ -9,10 +9,13 @@ import { CreateOrganizationModal } from "@/components/ui/create-organization-mod
 import { Users, Lock, Globe } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { httpsCallable } from "firebase/functions"
+import { getAuth, onAuthStateChanged } from "firebase/auth"
 //import { db, functions } from "@/lib/firebase"
 import { fns } from "@/lib/firebase"
 import { getDatabase, ref, get } from "firebase/database"
 import { useUserId } from "@/hooks/useUserId"
+import { PageHeader } from "@/components/ui/page-header"
+
 
 interface Org {
   id: string
@@ -78,6 +81,17 @@ const studyHours = [2, 5, 8] // Representing hours for 3 days
 
 export default function DashboardPage() {
   const { userId, loading: authLoading } = useUserId()
+  const [userName, setUserName] = useState<string>("")
+  useEffect(() => {
+    const auth = getAuth()
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) return
+      // take their displayName or fallback to email prefix
+      const raw = user.displayName || user.email?.split("@")[0] || "Student"
+      setUserName(raw.charAt(0).toUpperCase() + raw.slice(1))
+    })
+    return unsubscribe
+  }, [])
   const [organizations, setOrganizations] = useState<(Org & { joined: boolean; role?: string })[]>([])
   const [favorites, setFavorites] = useState<Record<string, boolean>>({})
   const [loadingOrgs, setLoadingOrgs] = useState(false)
@@ -168,7 +182,14 @@ export default function DashboardPage() {
   }
 
   return (
+    <div className="min-h-screen bg-background">
+      {/* Welcome banner */}
+      <PageHeader
+        title={`Welcome ${userName}`}
+        description="Here’s an overview of your notebooks, study buddies, events, and more."
+      />
     <div className="p-6">
+      
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* My Notebooks Section */}
         <div className="col-span-1 bg-card p-6 rounded-lg shadow-sm border">
@@ -393,6 +414,7 @@ export default function DashboardPage() {
         onOpenChange={setShowCreateModal}
         onCreateOrganization={handleCreateOrganization}
       />
+    </div>
     </div>
   )
 }

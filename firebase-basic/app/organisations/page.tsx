@@ -289,8 +289,8 @@ export default function OrganisationsPage() {
                 </div>
               )}
             </div>
-            <Button onClick={() => setShowCreate(true)} size="lg" className="shadow-lg px-10 py-4 text-lg h-auto">
-              <Plus className="h-6 w-6 mr-3" />
+            <Button onClick={() => setShowCreate(true)} className="shadow-lg h-10 px-4 py-2 text-base">
+              <Plus className="h-5 w-5 mr-2" />
               Create Organisation
             </Button>
           </div>
@@ -346,8 +346,8 @@ export default function OrganisationsPage() {
                     : "Be the first to create an organisation."}
                 </p>
                 {!searchQuery && (
-                  <Button onClick={() => setShowCreate(true)} size="lg" className="px-10 py-4 text-lg shadow-lg h-auto">
-                    <Plus className="h-6 w-6 mr-3" />
+                  <Button onClick={() => setShowCreate(true)} className="shadow-lg h-10 px-4 py-2 text-base">
+                    <Plus className="h-5 w-5 mr-2" />
                     Create Your First Organisation
                   </Button>
                 )}
