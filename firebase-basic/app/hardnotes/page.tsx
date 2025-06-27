@@ -632,7 +632,7 @@ export default function NotePage() {
                 <Label className="mt-4">Permissions</Label>
                 <RadioGroup
                   value={permission}
-                  onValueChange={(value) =>
+                  onValueChange={(value: string) =>
                     setPermission(value as "read" | "write")
                   }
                   className="flex space-x-4 mt-2"
