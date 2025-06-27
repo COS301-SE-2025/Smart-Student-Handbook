@@ -37,6 +37,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup , RadioGroupItem } from "@/components/ui/radio-group"
 
 type Note = {
   ownerId: string;
@@ -70,15 +72,12 @@ export default function NotePage() {
   const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
 
   const functions = getFunctions(app);
-  const shareNote = httpsCallable(functions, "shareNote");
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
-  const [showCollaboratorsDialog , setShowCollaboratorsDialog] = useState(false) ; 
-
-  const [isOpen, setIsOpen] = useState(false);
-  const [userId, setUserId] = useState("");
+  const [showCollaboratorsDialog, setShowCollaboratorsDialog] = useState(false);
+  const [permission , setPermission] = useState<"read" | "write">("read") ; 
   const [open, setOpen] = useState(false);
   const [collaboratorId, setCollaboratorId] = useState("");
 
@@ -564,9 +563,8 @@ export default function NotePage() {
         return (
           <div key={node.id} className="mb-1">
             <div
-              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${
-                isSelected ? "bg-muted" : ""
-              }`}
+              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${isSelected ? "bg-muted" : ""
+                }`}
               style={{ marginLeft: depth * 20 }}
             >
               <Button
@@ -649,18 +647,16 @@ export default function NotePage() {
         return (
           <div
             key={node.id}
-            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${
-              isSelected ? "bg-blue-50 border border-blue-200" : ""
-            }`}
+            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${isSelected ? "bg-blue-50 border border-blue-200" : ""
+              }`}
             style={{ marginLeft: (depth + 1) * 20 }}
             onClick={() => handleSelectNote(node)}
           >
             <FileText className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
 
             <span
-              className={`flex-1 text-sm truncate ${
-                isSelected ? "font-medium text-blue-700" : ""
-              }`}
+              className={`flex-1 text-sm truncate ${isSelected ? "font-medium text-blue-700" : ""
+                }`}
             >
               {node.name}
             </span>
@@ -694,7 +690,6 @@ export default function NotePage() {
             >
               <Share2 className="h-3 w-3" />
             </Button>
-
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogContent
                 className="sm:max-w-md"
@@ -710,6 +705,24 @@ export default function NotePage() {
                   onChange={(e) => setCollaboratorId(e.target.value)}
                 />
 
+                <Label className="mt-4">Permissions</Label>
+                <RadioGroup
+                  value={permission}
+                  onValueChange={(value) =>
+                    setPermission(value as "read" | "write")
+                  }
+                  className="flex space-x-4 mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="read" id="read" />
+                    <Label htmlFor="read">Read</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="write" id="write" />
+                    <Label htmlFor="write">Write</Label>
+                  </div>
+                </RadioGroup>
+
                 <DialogFooter className="mt-4">
                   <Button
                     variant="ghost"
@@ -721,7 +734,7 @@ export default function NotePage() {
                     Cancel
                   </Button>
                   <Button
-                    onClick={(e) => handleShare(e, node.id)}
+                    onClick={(e) => handleShare(e, node.id, permission)}
                     disabled={!collaboratorId.trim()}
                   >
                     Share
@@ -752,7 +765,7 @@ export default function NotePage() {
                 </DialogHeader>
 
                 {selectedNote &&
-                Object.keys(selectedNote.collaborators || {}).length > 0 ? (
+                  Object.keys(selectedNote.collaborators || {}).length > 0 ? (
                   <ul className="space-y-2">
                     {Object.entries(selectedNote.collaborators).map(
                       ([uid, isActive]) =>
@@ -788,12 +801,12 @@ export default function NotePage() {
                                   setSelectedNote((prev) =>
                                     prev
                                       ? {
-                                          ...prev,
-                                          collaborators: {
-                                            ...prev.collaborators,
-                                            [uid]: false,
-                                          },
-                                        }
+                                        ...prev,
+                                        collaborators: {
+                                          ...prev.collaborators,
+                                          [uid]: false,
+                                        },
+                                      }
                                       : null
                                   );
                                 } catch (err) {
@@ -819,7 +832,7 @@ export default function NotePage() {
               </DialogContent>
             </Dialog>
 
-            
+
           </div>
         );
       }
