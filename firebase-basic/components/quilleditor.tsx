@@ -82,7 +82,7 @@ export default function QuillEditor({
       theme="snow"
       modules={readOnly ? { toolbar: false } : modules}
       formats={formats}
-      className="h-full w-[600px] [&_.ql-container]:h-full [&_.ql-editor]:h-full [&_.ql-editor]:overflow-y-auto"
+      className="w-full [&_.ql-container]:max-h-[600px] [&_.ql-container]:overflow-y-auto"
     />
   );
 }
