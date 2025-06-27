@@ -27,6 +27,27 @@ export default function FriendsPage() {
   const auth = getAuth()
   const user = auth.currentUser
 
+  const [searchName, setSearchName] = useState("");
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+
+  const handleSearch = async () => {
+    const snap = await get(ref(db, "users"));
+    if (snap.exists()) {
+      const users = snap.val();
+      const matches: UserProfile[] = [];
+
+      for (const uid in users) {
+        const settings = users[uid]?.UserSettings;
+        const fullName = `${settings?.name ?? ""} ${settings?.surname ?? ""}`.toLowerCase();
+        if (fullName.includes(searchName.toLowerCase())) {
+          matches.push({ uid, ...settings });
+        }
+      }
+
+      setSearchResults(matches);
+    }
+  };
+
   useEffect(() => {
     if (!user) return
     const uid = user.uid

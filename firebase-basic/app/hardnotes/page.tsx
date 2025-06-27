@@ -321,6 +321,27 @@ export default function NotePage() {
     await set(ref(db, userPath), flatTree);
   }
 
+  const [searchName, setSearchName] = useState("");
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+
+  const handleSearch = async () => {
+    const snap = await get(ref(db, "users"));
+    if (snap.exists()) {
+      const users = snap.val();
+      const matches: UserProfile[] = [];
+
+      for (const uid in users) {
+        const settings = users[uid]?.UserSettings;
+        const fullName = `${settings?.name ?? ""} ${settings?.surname ?? ""}`.toLowerCase();
+        if (fullName.includes(searchName.toLowerCase())) {
+          matches.push({ uid, ...settings });
+        }
+      }
+
+      setSearchResults(matches);
+    }
+  };
+
   const handleSelectNote = (note: Note) => {
     setSelectedNote(note);
     setSelectedFolderId(null);
@@ -612,11 +633,37 @@ export default function NotePage() {
                   <DialogTitle>Share Note</DialogTitle>
                 </DialogHeader>
 
-                <Input
-                  placeholder="Enter collaborator's User ID"
-                  value={collaboratorId}
-                  onChange={(e) => setCollaboratorId(e.target.value)}
-                />
+                <Label>Search by name</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    placeholder="Enter name or surname"
+                    value={searchName}
+                    onChange={(e) => setSearchName(e.target.value)}
+                  />
+                  <Button onClick={handleSearch}>Search</Button>
+                </div>
+
+                {searchResults.length > 0 && (
+                  <div className="mt-2 space-y-1 max-h-40 overflow-y-auto border rounded p-2">
+                    {searchResults.map((user) => (
+                      <Button
+                        key={user.uid}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full flex items-center justify-start gap-2"
+                        onClick={() => {
+                          setCollaboratorId(user.uid);
+                          setSearchResults([]);
+                          setSearchName(`${user.name ?? ""} ${user.surname ?? ""}`);
+                        }}
+                      >
+                        <UserIcon className="h-4 w-4" />
+                        <span>{user.name ?? "Unnamed"} {user.surname ?? ""}</span>
+                        <span className="ml-auto text-xs text-muted-foreground"></span>
+                      </Button>
+                    ))}
+                  </div>
+                )}
 
                 <Label className="mt-4">Permissions</Label>
                 <RadioGroup
