@@ -36,7 +36,7 @@ const createNote = async (orgId: string, userId: string): Promise<Note> => {
 
 const deleteNote = async (orgId: string, noteId: string): Promise<void> => {
   const noteRef = ref(db, `organizations/${orgId}/notes/${noteId}`);
-  console.log("Deleting Note")
+  console.log("Deleting Note");
   // await remove(noteRef);
 };
 
@@ -50,23 +50,24 @@ type Note = {
 
 type NotesSplitViewProps = {
   notes: Note[];
+  orgID: any;
 };
 
-export default function NotesSplitView({ notes }: NotesSplitViewProps) {
+export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
   const [stateNotes, setStateNotes] = useState<Note[]>(notes);
-
-  useEffect(() => {
-    setStateNotes(notes);
-  }, [notes]);
 
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
     stateNotes[0]?.id ?? null
   );
 
+  useEffect(() => {
+    setStateNotes(notes);
+  }, [notes]);
+
   const selectedNote = stateNotes.find((n) => n.id === selectedNoteId);
 
-  const orgId = "org789";
-  const userId = "user123";
+  const orgId = orgID;
+  const userId = "user123"; // User from Firebase
 
   const handleCreate = async () => {
     const newNote = await createNote(orgId, userId);

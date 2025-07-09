@@ -46,7 +46,7 @@ export default function OrgNotesPage() {
     <>
       <div className="p-4">
         <h1 className="text-2xl font-bold mb-4">Organisation Notes</h1>
-        <NotesGrid notes={notes} />
+        <NotesGrid notes={notes} orgID={orgId} />
       </div>
     </>
   );
