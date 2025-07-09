@@ -1,3 +1,4 @@
+// SmartHeader.tsx
 "use client"
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -19,16 +20,24 @@ import {
   User,
   Settings,
   LogOut,
-  BarChart3,
-  Calendar,
-  BookOpen,
-  Edit3,
   GraduationCap,
-  Users,
 } from "lucide-react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { useState, useEffect, useCallback } from "react"
+
+// Dynamic notifications imports
+import { httpsCallable } from "firebase/functions"
+import { fns } from "@/lib/firebase"
+import { isSameDay, parseISO } from "date-fns"
+
+interface Notification {
+  id: string
+  title: string
+  type: string
+  time: string
+  description: string
+}
 
 export function SmartHeader() {
   const pathname = usePathname()
@@ -37,51 +46,112 @@ export function SmartHeader() {
   const [user, setUser] = useState<any>(null)
   const [searchValue, setSearchValue] = useState("")
 
-  // Today's academic notifications
-  const [notifications] = useState([
-    {
-      id: 1,
-      title: "COS301 Software Engineering",
-      type: "lecture",
-      time: "10:00 AM",
-      description: "Design Patterns lecture in Room 2-14",
-    },
-    {
-      id: 2,
-      title: "Database Assignment Due",
-      type: "assignment",
-      time: "11:59 PM",
-      description: "Submit ER diagram and SQL queries",
-    },
-    {
-      id: 3,
-      title: "Study Group: Machine Learning",
-      type: "study",
-      time: "2:00 PM",
-      description: "Library study room B-12",
-    },
-  ])
+  // Notifications state
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loadingNotifications, setLoadingNotifications] = useState(true)
 
-  // Initialize search value from URL params
+  // Active semester
+  const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null)
+
+  // Initialize search from URL
   useEffect(() => {
-    const searchQuery = searchParams.get("search") || ""
-    setSearchValue(searchQuery)
+    const q = searchParams.get("search") || ""
+    setSearchValue(q)
   }, [searchParams])
 
+  // Auth listener
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
-      // Simulate user for development
-      setUser({
-        displayName: "Test User",
-        email: "testuser@example.com",
-      })
+      setUser({ displayName: "Test User", email: "testuser@example.com" })
+    }
+    const unsub = auth.onAuthStateChanged((u) => setUser(u))
+    return () => unsub()
+  }, [])
+
+  // Fetch active semester
+  useEffect(() => {
+    let mounted = true
+    async function fetchActive() {
+      try {
+        const res = await httpsCallable(fns, "getSemesters")({})
+        const sems: any[] = Array.isArray(res.data) ? res.data : []
+        const active = sems.find((s) => s.isActive)
+        if (mounted) setActiveSemesterId(active?.id || null)
+      } catch (e) {
+        console.error("Error fetching semesters", e)
+      }
+    }
+    fetchActive()
+    return () => { mounted = false }
+  }, [])
+
+  // Load today's events and lectures
+  useEffect(() => {
+    let mounted = true
+    setLoadingNotifications(true)
+
+    if (!activeSemesterId) {
+      setNotifications([])
+      setLoadingNotifications(false)
+      return
     }
 
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setUser(user)
-    })
-    return () => unsubscribe()
-  }, [])
+    const today = new Date()
+    async function load() {
+      try {
+        const [evRes, lecRes] = await Promise.all([
+          httpsCallable(fns, "getEvents")({ semesterId: activeSemesterId }),
+          httpsCallable(fns, "getLectures")({ semesterId: activeSemesterId }),
+        ])
+        const events = Array.isArray(evRes.data) ? evRes.data : []
+        const lectures = Array.isArray(lecRes.data) ? lecRes.data : []
+
+        // format events: parseISO + locale time with AM/PM
+        const todaysEvents = events
+          .filter((e) => e.date && isSameDay(parseISO(e.date), today))
+          .map((e) => ({
+            id: e.id,
+            title: e.title,
+            type: e.type,
+            time: parseISO(e.date).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            description: e.description,
+          }))
+
+        // format lectures: assume timeSlot is "HH:mm"
+        const day = today.getDay()
+        const todaysLectures = lectures
+          .filter((l) => l.dayOfWeek === day)
+          .map((l) => {
+            // build a Date object at today with slot
+            const [h, m] = l.timeSlot.split(":").map(Number)
+            const dt = new Date(today)
+            dt.setHours(h, m)
+            return {
+              id: l.id,
+              title: l.subject,
+              type: "lecture",
+              time: dt.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              description: l.room,
+            }
+          })
+
+        if (mounted) setNotifications([...todaysEvents, ...todaysLectures])
+      } catch (e) {
+        console.error("Error loading notifications", e)
+      } finally {
+        if (mounted) setLoadingNotifications(false)
+      }
+    }
+
+    load()
+    return () => { mounted = false }
+  }, [activeSemesterId])
 
   const handleSignOut = async () => {
     try {
@@ -91,54 +161,40 @@ export function SmartHeader() {
       }
       await signOut(auth)
       router.push("/")
-    } catch (error) {
-      console.error("Error signing out:", error)
+    } catch (e) {
+      console.error("Error signing out:", e)
     }
   }
 
-  // Handle search input changes
   const handleSearchChange = useCallback(
-    (value: string) => {
-      setSearchValue(value)
-
-      // Update URL search params for pages that support search
-      const searchablePages = ["/organisations"]
-      if (searchablePages.includes(pathname)) {
-        const params = new URLSearchParams(searchParams.toString())
-        if (value.trim()) {
-          params.set("search", value.trim())
-        } else {
-          params.delete("search")
-        }
-
-        // Update URL without causing a page reload
-        const newUrl = `${pathname}${params.toString() ? `?${params.toString()}` : ""}`
-        router.replace(newUrl, { scroll: false })
+    (v: string) => {
+      setSearchValue(v)
+      const pages = ["/organisations"]
+      if (pages.includes(pathname)) {
+        const p = new URLSearchParams(searchParams.toString())
+        if (v.trim()) p.set("search", v.trim())
+        else p.delete("search")
+        router.replace(`${pathname}${p.toString() ? `?${p.toString()}` : ""}`, {
+          scroll: false,
+        })
       }
     },
-    [pathname, router, searchParams],
+    [pathname, router, searchParams]
   )
 
-  const getPageInfo = () => {
+  const pageInfo = (() => {
     switch (pathname) {
       case "/dashboard":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/calendar":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/notes":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/organisations":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/hardnotes":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/profile":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
+        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" /> }
       default:
         return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" /> }
     }
-  }
-
-  const pageInfo = getPageInfo()
+  })()
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -153,7 +209,6 @@ export function SmartHeader() {
     }
   }
 
-  // Get appropriate placeholder text based on current page
   const getSearchPlaceholder = () => {
     switch (pathname) {
       case "/organisations":
@@ -170,7 +225,8 @@ export function SmartHeader() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="flex h-full items-center justify-between px-4">
-        {/* Left: Sidebar trigger and page title */}
+
+        {/* Left: Sidebar trigger + title */}
         <div className="flex items-center gap-3">
           <SidebarTrigger className="h-8 w-8" />
           <div className="flex items-center gap-2">
@@ -192,14 +248,15 @@ export function SmartHeader() {
           </div>
         </div>
 
-        {/* Right: Notifications and user */}
+        {/* Right: Notifications & user menu */}
         <div className="flex items-center gap-1">
+
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="relative h-8 w-8">
                 <Bell className="h-4 w-4" />
-                {notifications.length > 0 && (
+                {!loadingNotifications && notifications.length > 0 && (
                   <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 text-[10px] bg-destructive">
                     {notifications.length}
                   </Badge>
@@ -208,29 +265,48 @@ export function SmartHeader() {
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-80 mr-2" align="end">
               <div className="p-3">
-                <h4 className="font-medium mb-3 text-sm">Today's Schedule</h4>
-                <div className="space-y-2">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className="flex items-start gap-3 p-2 hover:bg-muted rounded-md cursor-pointer"
-                    >
-                      <div className="mt-2">{getNotificationIcon(notification.type)}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm font-medium truncate">{notification.title}</p>
-                          <span className="text-xs text-muted-foreground ml-2">{notification.time}</span>
+                <h4 className="font-medium mb-3 text-sm">
+                  {loadingNotifications ? "Loading…" : "Today's Schedule"}
+                </h4>
+                {loadingNotifications ? (
+                  <div className="animate-pulse space-y-2">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-4 bg-muted rounded" />
+                    ))}
+                  </div>
+                ) : notifications.length ? (
+                  <div className="space-y-2">
+                    {notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className="flex items-start gap-3 p-2 hover:bg-muted rounded-md cursor-pointer"
+                      >
+                        {getNotificationIcon(n.type)}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1 space-x-2">
+                            <p className="text-sm font-medium truncate">{n.title}</p>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {n.type}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {n.time}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {n.description}
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">{notification.description}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No events for today</p>
+                )}
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* User menu */}
+          {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -271,6 +347,7 @@ export function SmartHeader() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
         </div>
       </div>
     </header>
