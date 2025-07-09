@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,8 +10,9 @@ const QuillEditor = dynamic(() => import("@/components/quilleditor"), {
   ssr: false,
 });
 
-import { ref, set, remove } from 'firebase/database';
-import { db } from '@/lib/firebase';
+import { ref, set, remove } from "firebase/database";
+import { db } from "@/lib/firebase";
+import { stat } from "fs";
 
 function generateId() {
   return Math.random().toString(36).substring(2, 10);
@@ -28,17 +29,16 @@ const createNote = async (orgId: string, userId: string): Promise<Note> => {
     type: "note",
   };
 
-  const noteRef = ref(db, `organizations/${orgId}/notes/${id}`);
-  await set(noteRef, newNote);
+  console.log("Note Posted");
 
   return newNote;
 };
 
 const deleteNote = async (orgId: string, noteId: string): Promise<void> => {
   const noteRef = ref(db, `organizations/${orgId}/notes/${noteId}`);
-  await remove(noteRef);
+  console.log("Deleting Note")
+  // await remove(noteRef);
 };
-
 
 type Note = {
   ownerId: string;
@@ -53,18 +53,24 @@ type NotesSplitViewProps = {
 };
 
 export default function NotesSplitView({ notes }: NotesSplitViewProps) {
+  const [stateNotes, setStateNotes] = useState<Note[]>(notes);
+
+  useEffect(() => {
+    setStateNotes(notes);
+  }, [notes]);
+
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
-    notes[0]?.id ?? null
+    stateNotes[0]?.id ?? null
   );
 
-  const selectedNote = notes.find((n) => n.id === selectedNoteId);
+  const selectedNote = stateNotes.find((n) => n.id === selectedNoteId);
 
-  const orgId = "org789"; 
+  const orgId = "org789";
   const userId = "user123";
 
   const handleCreate = async () => {
     const newNote = await createNote(orgId, userId);
-    setNotes((prev: any) => [newNote, ...prev]);
+    setStateNotes((prev: any) => [newNote, ...prev]);
     setSelectedNoteId(newNote.id);
   };
 
@@ -72,7 +78,9 @@ export default function NotesSplitView({ notes }: NotesSplitViewProps) {
     if (!confirm("Are you sure you want to delete this note?")) return;
 
     await deleteNote(orgId, noteId);
-    setNotes((prev: any[]) => prev.filter((n: { id: string; }) => n.id !== noteId));
+    setStateNotes((prev: any[]) =>
+      prev.filter((n: { id: string }) => n.id !== noteId)
+    );
 
     if (selectedNoteId === noteId) setSelectedNoteId(null);
   };
@@ -118,7 +126,6 @@ export default function NotesSplitView({ notes }: NotesSplitViewProps) {
         </div>
       </div>
 
-      {/* RIGHT: Notes List + Create/Delete */}
       <div className="w-72 border rounded-xl shadow bg-white dark:bg-neutral-900 flex flex-col">
         <div className="flex items-center justify-between p-2 border-b">
           <h3 className="text-sm font-medium">Your Notes</h3>
@@ -129,7 +136,7 @@ export default function NotesSplitView({ notes }: NotesSplitViewProps) {
 
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-2">
-            {notes.map((note) => (
+            {stateNotes.map((note) => (
               <Card
                 key={note.id}
                 className={`cursor-pointer border ${
