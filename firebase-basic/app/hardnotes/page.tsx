@@ -64,14 +64,14 @@ type Folder = {
   };
 };
 
+type FileNode = Note | Folder;
+
 type UserProfile = {
   uid: string
   name: string
   surname: string
   profilePicture: string
 }
-
-type FileNode = Note | Folder;
 
 const generateId = () => Math.random().toString(36).slice(2, 9);
 

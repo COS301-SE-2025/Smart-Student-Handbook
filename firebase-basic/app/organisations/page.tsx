@@ -466,7 +466,7 @@ export default function OrganisationsPage() {
 
                     <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-black/30">
                       {o.joined && !isLeaving ? (
-                        <Link href={`/organisations/${o.id}/notes`}>
+                        <Link href={`/orgNotes?orgId=${o.id}&userId=${userId}`}>
                           <Button size="lg" className="shadow-md" disabled={isJoining || isLeaving}>
                             View Notes
                           </Button>
