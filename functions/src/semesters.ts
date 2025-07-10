@@ -1,108 +1,139 @@
-import { onCall, CallableRequest, HttpsError } from "firebase-functions/v2/https";
-import { getDatabase } from "firebase-admin/database";
+/**
+ * semesters.ts
+ * Cloud Functions for CRUD operations on a user’s semesters.
+ */
 
-// Assuming you already initialized firebase-admin in another file—if not,
-// do it at the top of this module or in a shared `firebaseAdmin.ts`.
-const db = getDatabase();
+import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https'
+import { getDatabase } from 'firebase-admin/database'
 
+const db = getDatabase()
+
+/** Shape of the payloads accepted by semester callables */
 interface SemPayload {
   semester?: {
-    id?: string;
-    name?: string;
-    startDate?: string;
-    endDate?: string;
-  };
-  semesterId?: string;
+    id?: string
+    name?: string
+    startDate?: string
+    endDate?: string
+  }
+  semesterId?: string
 }
 
-/** GET semesters */
+/**
+ * getSemesters – list all semesters that belong to the current user
+ *
+ * @returns array of semester objects
+ */
 export const getSemesters = onCall(async (req: CallableRequest<{}>) => {
-  const uid = req.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Login required");
+  const uid = req.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Login required')
 
-  const snap = await db.ref(`users/${uid}/semesters`).get();
-  return snap.exists() ? Object.values(snap.val()!) : [];
-});
+  const snap = await db.ref(`users/${uid}/semesters`).get()
+  return snap.exists() ? Object.values(snap.val()!) : []
+})
 
-/** ADD semester */
+/**
+ * addSemester – create a new semester
+ *
+ * Required fields: name, startDate, endDate
+ *
+ * @returns the newly created semester object
+ */
 export const addSemester = onCall(
-  async (req: CallableRequest<Pick<SemPayload, "semester">>) => {
-    const uid = req.auth?.uid;
-    const sem = req.data.semester;
-    if (!uid) throw new HttpsError("unauthenticated", "Login required");
+  async (req: CallableRequest<Pick<SemPayload, 'semester'>>) => {
+    const uid = req.auth?.uid
+    const sem = req.data.semester
+
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
     if (!sem?.name || !sem.startDate || !sem.endDate) {
-      throw new HttpsError("invalid-argument", "Missing semester fields");
+      throw new HttpsError('invalid-argument', 'Missing semester fields')
     }
 
-    const ref = db.ref(`users/${uid}/semesters`).push();
+    const ref = db.ref(`users/${uid}/semesters`).push()
     const newSem = {
       id: ref.key!,
       name: sem.name.trim(),
       startDate: sem.startDate,
       endDate: sem.endDate,
       isActive: false,
-    };
-    await ref.set(newSem);
-    return newSem;
-  }
-);
+    }
 
-/** UPDATE semester */
+    await ref.set(newSem)
+    return newSem
+  }
+)
+
+/**
+ * updateSemester – update name or dates of an existing semester
+ *
+ * @returns the updated semester object
+ */
 export const updateSemester = onCall(
-  async (req: CallableRequest<Pick<SemPayload, "semester">>) => {
-    const uid = req.auth?.uid;
-    const sem = req.data.semester;
-    if (!uid) throw new HttpsError("unauthenticated", "Login required");
-    if (!sem?.id) throw new HttpsError("invalid-argument", "Missing semester id");
+  async (req: CallableRequest<Pick<SemPayload, 'semester'>>) => {
+    const uid = req.auth?.uid
+    const sem = req.data.semester
 
-    const updates: Record<string, unknown> = {};
-    if (sem.name)      updates.name      = sem.name.trim();
-    if (sem.startDate) updates.startDate = sem.startDate;
-    if (sem.endDate)   updates.endDate   = sem.endDate;
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!sem?.id) throw new HttpsError('invalid-argument', 'Missing semester id')
+
+    const updates: Record<string, unknown> = {}
+    if (sem.name) updates.name = sem.name.trim()
+    if (sem.startDate) updates.startDate = sem.startDate
+    if (sem.endDate) updates.endDate = sem.endDate
     if (Object.keys(updates).length === 0) {
-      throw new HttpsError("invalid-argument", "Nothing to update");
+      throw new HttpsError('invalid-argument', 'Nothing to update')
     }
 
-    const ref = db.ref(`users/${uid}/semesters/${sem.id}`);
-    const snap = await ref.get();
-    if (!snap.exists()) throw new HttpsError("not-found", "Semester not found");
+    const ref = db.ref(`users/${uid}/semesters/${sem.id}`)
+    const snap = await ref.get()
+    if (!snap.exists()) throw new HttpsError('not-found', 'Semester not found')
 
-    await ref.update(updates);
-    return (await ref.get()).val();
+    await ref.update(updates)
+    return (await ref.get()).val()
   }
-);
+)
 
-/** SET active semester */
+/**
+ * setActiveSemester – mark one semester as active, all others inactive
+ *
+ * @returns { success: true } on completion
+ */
 export const setActiveSemester = onCall(
-  async (req: CallableRequest<Pick<SemPayload, "semesterId">>) => {
-    const uid = req.auth?.uid;
-    const semesterId = req.data.semesterId;
-    if (!uid) throw new HttpsError("unauthenticated", "Login required");
-    if (!semesterId) throw new HttpsError("invalid-argument", "Missing semesterId");
+  async (req: CallableRequest<Pick<SemPayload, 'semesterId'>>) => {
+    const uid = req.auth?.uid
+    const semesterId = req.data.semesterId
 
-    const ref = db.ref(`users/${uid}/semesters`);
-    const snap = await ref.get();
-    if (!snap.exists()) return { success: false };
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!semesterId) throw new HttpsError('invalid-argument', 'Missing semesterId')
 
-    const all = snap.val() as Record<string, any>;
-    const batch: Record<string, boolean> = {};
+    const ref = db.ref(`users/${uid}/semesters`)
+    const snap = await ref.get()
+    if (!snap.exists()) return { success: false }
+
+    const all = snap.val() as Record<string, any>
+    const batch: Record<string, boolean> = {}
     for (const id of Object.keys(all)) {
-      batch[`${id}/isActive`] = id === semesterId;
+      batch[`${id}/isActive`] = id === semesterId
     }
-    await ref.update(batch);
-    return { success: true };
+    await ref.update(batch)
+    return { success: true }
   }
-);
+)
 
-/** DELETE semester */
+/**
+ * deleteSemester – permanently remove a semester
+ *
+ * @returns { success: true } on completion
+ */
 export const deleteSemester = onCall(
-  async (req: CallableRequest<Pick<SemPayload, "semesterId">>) => {
-    const uid = req.auth?.uid;
-    const semesterId = req.data.semesterId;
-    if (!uid) throw new HttpsError("unauthenticated", "Login required");
-    if (!semesterId) throw new HttpsError("invalid-argument", "Missing semesterId");
+  async (req: CallableRequest<Pick<SemPayload, 'semesterId'>>) => {
+    const uid = req.auth?.uid
+    const semesterId = req.data.semesterId
 
-    await db.ref(`users/${uid}/semesters/${semesterId}`).remove();
-    return { success: true };
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!semesterId) throw new HttpsError('invalid-argument', 'Missing semesterId')
+
+    await db.ref(`users/${uid}/semesters/${semesterId}`).remove()
+    return { success: true }
   }
-);
+)
