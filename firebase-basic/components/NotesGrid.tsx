@@ -16,6 +16,7 @@ import { stat } from "fs";
 
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
+import { auth } from "firebase-admin";
 
 const functions = getFunctions(app);
 
@@ -77,9 +78,18 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
   }, [notes]);
 
   const selectedNote = stateNotes.find((n) => n.id === selectedNoteId);
+  const editableNote = selectedNote ? { ...selectedNote } : null;
+
+  useEffect(() => {
+    if (selectedNote) {
+      console.log("Selected Note Name:", selectedNote.name);
+      console.log("Selected Note Content:", selectedNote.content);
+      console.log("State Notes:", stateNotes);
+    }
+  }, [selectedNote]);
 
   const orgId = orgID;
-  const userId = "user123"; // User from Firebase
+  const userId = "user987";
 
   const handleCreate = async () => {
     const newNote = await createNote(orgId, userId);
@@ -96,6 +106,14 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
     );
 
     if (selectedNoteId === noteId) setSelectedNoteId(null);
+  };
+
+  const handleNoteChange = (noteId: string, updatedFields: Partial<Note>) => {
+    setStateNotes((prevNotes) =>
+      prevNotes.map((note) =>
+        note.id === noteId ? { ...note, ...updatedFields } : note
+      )
+    );
   };
 
   return (
@@ -118,10 +136,10 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
             <div className="h-[calc(100%-3rem)] overflow-y-auto">
               <QuillEditor
                 value={selectedNote.content}
-                readOnly={false}
-                onChange={(value: string) => {
-                  selectedNote.content = value;
-                }}
+                readOnly={true}
+                onChange={(newContent) =>
+                  handleNoteChange(selectedNote.id, { content: newContent })
+                }
               />
             </div>
           </>
@@ -152,11 +170,10 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
             {stateNotes.map((note) => (
               <Card
                 key={note.id}
-                className={`cursor-pointer border ${
-                  selectedNoteId === note.id
-                    ? "border-blue-500 shadow"
-                    : "hover:shadow-sm"
-                }`}
+                className={`cursor-pointer border ${selectedNoteId === note.id
+                  ? "border-blue-500 shadow"
+                  : "hover:shadow-sm"
+                  }`}
                 onClick={() => setSelectedNoteId(note.id)}
               >
                 <CardHeader className="flex flex-row justify-between items-center">
