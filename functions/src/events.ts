@@ -7,7 +7,6 @@ interface EventPayload {
   eventId?: string;
 }
 
-/** GET events for a semester */
 export const getEvents = onCall(
   async (req: CallableRequest<Pick<EventPayload, "semesterId">>) => {
     const uid = req.auth?.uid;

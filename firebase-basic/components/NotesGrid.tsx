@@ -14,6 +14,11 @@ import { ref, set, remove } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { stat } from "fs";
 
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "@/lib/firebase";
+
+const functions = getFunctions(app);
+
 function generateId() {
   return Math.random().toString(36).substring(2, 10);
 }
@@ -29,15 +34,22 @@ const createNote = async (orgId: string, userId: string): Promise<Note> => {
     type: "note",
   };
 
-  console.log("Note Posted");
+  const path = `organizations/${orgId}/notes/${id}`;
+  const callCreateNote = httpsCallable(functions, "createNoteAtPath");
+  await callCreateNote({ path, note: newNote });
 
+  console.log("Note Posted");
   return newNote;
 };
 
 const deleteNote = async (orgId: string, noteId: string): Promise<void> => {
-  const noteRef = ref(db, `organizations/${orgId}/notes/${noteId}`);
+  const path = `organizations/${orgId}/notes/${noteId}`;
+
+  const callDeleteNote = httpsCallable(functions, "deleteNoteAtPath");
+  await callDeleteNote({ path });
+
   console.log("Deleting Note");
-  // await remove(noteRef);
+
 };
 
 type Note = {
