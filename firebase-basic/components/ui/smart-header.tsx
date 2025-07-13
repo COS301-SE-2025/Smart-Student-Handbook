@@ -14,27 +14,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Search,
-  Bell,
-  User,
-  Settings,
-  LogOut,
-  GraduationCap,
-  X,
-} from "lucide-react"
+import { Search, Bell, User, Settings, LogOut, GraduationCap, X } from "lucide-react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { useState, useEffect, useCallback } from "react"
-
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
-import {
-  getDatabase,
-  ref as dbRef,
-  onValue,
-  remove as dbRemove,
-} from "firebase/database"
+import { getDatabase, ref as dbRef, onValue, remove as dbRemove } from "firebase/database"
 import { isSameDay, parseISO } from "date-fns"
 
 interface Notification {
@@ -49,7 +35,6 @@ export function SmartHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
-
   const [user, setUser] = useState<any>(null)
   const [searchValue, setSearchValue] = useState("")
 
@@ -57,11 +42,48 @@ export function SmartHeader() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loadingNotifications, setLoadingNotifications] = useState(true)
 
-  // “Added to group” notifications
-  const [addedNotifications, setAddedNotifications] = useState<Notification[]>([])
+  // Organisation-related notifications (invites & new public orgs)
+  const [orgNotifications, setOrgNotifications] = useState<Notification[]>([])
 
   // Active semester ID
   const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null)
+
+  // Format notification title to remove quotes and improve readability
+  const formatNotificationTitle = (title: string, type: string) => {
+    const formattedTitle = title.replace(/["'"]/g, "")
+    if (type === "new_public_org") {
+      const match = formattedTitle.match(/A new organisation (.+?) has been/i)
+      if (match) {
+        const orgName = match[1]
+        return `New organization: ${orgName}`
+      }
+    }
+    if (type === "added_to_group") {
+      const match = formattedTitle.match(/You were added to "(.+)"/)
+      if (match) {
+        return `Added to: ${match[1]}`
+      }
+    }
+    return formattedTitle
+  }
+
+  // Get notification type display name
+  const getNotificationTypeDisplay = (type: string) => {
+    switch (type) {
+      case "lecture":
+        return "LECTURE"
+      case "assignment":
+        return "ASSIGNMENT"
+      case "study":
+        return "STUDY"
+      case "added_to_group":
+        return "INVITE"
+      case "new_public_org":
+        return "NEW ORG"
+      default:
+        return type.replace("_", " ").toUpperCase()
+    }
+  }
 
   // Dismiss a notification permanently
   const dismissNotification = useCallback(
@@ -70,7 +92,7 @@ export function SmartHeader() {
       const db = getDatabase()
       dbRemove(dbRef(db, `users/${user.uid}/notifications/${id}`))
     },
-    [user]
+    [user],
   )
 
   // Initialize search from URL
@@ -81,13 +103,17 @@ export function SmartHeader() {
   // Auth listener
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
-      setUser({ uid: "dev", displayName: "Test User", email: "test@example.com" })
+      setUser({
+        uid: "dev",
+        displayName: "Test User",
+        email: "test@example.com",
+      })
     }
     const unsub = auth.onAuthStateChanged((u) => setUser(u))
     return () => unsub()
   }, [])
 
-  // Listen for “added_to_group” notifications
+  // Listen for both "added_to_group" and "new_public_org"
   useEffect(() => {
     if (!user?.uid) return
     const db = getDatabase()
@@ -95,23 +121,27 @@ export function SmartHeader() {
     const off = onValue(notifRef, (snap) => {
       const raw = snap.val() as Record<string, any> | null
       if (!raw) {
-        setAddedNotifications([])
+        setOrgNotifications([])
         return
       }
-      const arr = Object.values(raw)
-      const filtered = arr
-        .filter((n: any) => n.type === "added_to_group")
-        .map((n: any) => ({
-          id: n.id,
-          title: n.message,
-          type: n.type,
-          time: new Date(n.timestamp).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          description: "",
-        }))
-      setAddedNotifications(filtered)
+      const filtered: Notification[] = []
+      snap.forEach(childSnap => {
+        const n = childSnap.val() as any
+        const key = childSnap.key!
+        if (n.type === "added_to_group" || n.type === "new_public_org") {
+          filtered.push({
+            id: key,
+            title: n.message,
+            type: n.type,
+            time: new Date(n.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            description: "",
+          })
+        }
+      })
+      setOrgNotifications(filtered)
     })
     return () => off()
   }, [user])
@@ -127,17 +157,21 @@ export function SmartHeader() {
       if (mounted) setActiveSemesterId(active?.id || null)
     }
     fetchSem()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
   }, [user])
 
-  // Load calendar events, lectures, and added-to-group notices
+  // Load calendar events, lectures, and org notifications
   useEffect(() => {
     let mounted = true
     setLoadingNotifications(true)
 
     if (!activeSemesterId) {
-      setNotifications([])
-      setLoadingNotifications(false)
+      if (mounted) {
+        setNotifications(orgNotifications)
+        setLoadingNotifications(false)
+      }
       return
     }
 
@@ -183,18 +217,15 @@ export function SmartHeader() {
         })
 
       if (mounted) {
-        setNotifications([
-          ...todaysEvents,
-          ...todaysLectures,
-          ...addedNotifications,
-        ])
+        setNotifications([...todaysEvents, ...todaysLectures, ...orgNotifications])
       }
       if (mounted) setLoadingNotifications(false)
     }
-
     loadAll()
-    return () => { mounted = false }
-  }, [activeSemesterId, addedNotifications])
+    return () => {
+      mounted = false
+    }
+  }, [activeSemesterId, orgNotifications])
 
   // Sign out
   const handleSignOut = async () => {
@@ -219,13 +250,12 @@ export function SmartHeader() {
         const p = new URLSearchParams(searchParams.toString())
         if (v.trim()) p.set("search", v.trim())
         else p.delete("search")
-        router.replace(
-          `${pathname}${p.toString() ? `?${p.toString()}` : ""}`,
-          { scroll: false }
-        )
+        router.replace(`${pathname}${p.toString() ? `?${p.toString()}` : ""}`, {
+          scroll: false,
+        })
       }
     },
-    [pathname, router, searchParams]
+    [pathname, router, searchParams],
   )
 
   // Page info
@@ -253,15 +283,17 @@ export function SmartHeader() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "lecture":
-        return <div className="w-2 h-2 rounded-full bg-blue-500" />
+        return <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
       case "assignment":
-        return <div className="w-2 h-2 rounded-full bg-red-500" />
+        return <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
       case "study":
-        return <div className="w-2 h-2 rounded-full bg-green-500" />
+        return <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
       case "added_to_group":
-        return <div className="w-2 h-2 rounded-full bg-purple-500" />
+        return <div className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
+      case "new_public_org":
+        return <div className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" />
       default:
-        return <div className="w-2 h-2 rounded-full bg-muted-foreground" />
+        return <div className="w-2 h-2 rounded-full bg-muted-foreground flex-shrink-0" />
     }
   }
 
@@ -318,12 +350,10 @@ export function SmartHeader() {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-80 mr-2" align="end">
+            <DropdownMenuContent className="w-96 mr-2" align="end">
               <div className="p-3">
                 <h4 className="font-medium mb-3 text-sm">
-                  {loadingNotifications
-                    ? "Loading…"
-                    : "Today's Schedule & Updates"}
+                  {loadingNotifications ? "Loading…" : "Today's Schedule & Updates"}
                 </h4>
                 {loadingNotifications ? (
                   <div className="animate-pulse space-y-2">
@@ -332,44 +362,45 @@ export function SmartHeader() {
                     ))}
                   </div>
                 ) : notifications.length ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
                     {notifications.map((n) => (
                       <div
                         key={n.id}
-                        className="flex items-start justify-between gap-3 p-2 hover:bg-muted rounded-md"
+                        className="flex items-start gap-3 p-3 hover:bg-muted rounded-md border border-border/50"
                       >
-                        <div className="flex items-start gap-2">
-                          {getNotificationIcon(n.type)}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="text-sm font-medium truncate">
-                                {n.title}
-                              </p>
-                              <Badge variant="secondary" className="text-[10px]">
-                                {n.type.replace("_", " ").toUpperCase()}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {n.time}
-                              </span>
-                            </div>
-                            {n.description && (
-                              <p className="text-xs text-muted-foreground">
-                                {n.description}
-                              </p>
-                            )}
+                        <div className="mt-1">{getNotificationIcon(n.type)}</div>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium leading-tight">
+                              {formatNotificationTitle(n.title, n.type)}
+                            </p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 hover:bg-destructive/10"
+                              onClick={() => dismissNotification(n.id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
                           </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
+                              {getNotificationTypeDisplay(n.type)}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">{n.time}</span>
+                          </div>
+                          {n.description && (
+                            <p className="text-xs text-muted-foreground leading-relaxed">{n.description}</p>
+                          )}
                         </div>
-                        <X
-                          className="h-4 w-4 text-muted-foreground cursor-pointer"
-                          onClick={() => dismissNotification(n.id)}
-                        />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No notifications
-                  </p>
+                  <div className="text-center py-6">
+                    <Bell className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">No notifications today</p>
+                  </div>
                 )}
               </div>
             </DropdownMenuContent>
@@ -396,12 +427,8 @@ export function SmartHeader() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col space-y-1">
-                  {user?.displayName && (
-                    <p className="text-sm font-medium">{user.displayName}</p>
-                  )}
-                  {user?.email && (
-                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                  )}
+                  {user?.displayName && <p className="text-sm font-medium">{user.displayName}</p>}
+                  {user?.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
                 </div>
               </div>
               <DropdownMenuSeparator />
