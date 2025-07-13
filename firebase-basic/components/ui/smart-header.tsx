@@ -1,4 +1,3 @@
-// SmartHeader.tsx
 "use client"
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -21,7 +20,7 @@ import { useState, useEffect, useCallback } from "react"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
 import { getDatabase, ref as dbRef, onValue, remove as dbRemove } from "firebase/database"
-import { isSameDay, parseISO } from "date-fns"
+import { isSameDay, parseISO, format } from "date-fns"
 
 interface Notification {
   id: string
@@ -47,6 +46,32 @@ export function SmartHeader() {
 
   // Active semester ID
   const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null)
+
+  // Dismissed calendar notifications for today
+  const [dismissedCalendarNotifications, setDismissedCalendarNotifications] = useState<Set<string>>(new Set())
+
+  // Get today's date key for localStorage
+  const getTodayKey = () => format(new Date(), "yyyy-MM-dd")
+
+  // Load dismissed notifications from localStorage
+  useEffect(() => {
+    const todayKey = getTodayKey()
+    const dismissed = localStorage.getItem(`dismissed-notifications-${todayKey}`)
+    if (dismissed) {
+      try {
+        const dismissedIds = JSON.parse(dismissed)
+        setDismissedCalendarNotifications(new Set(dismissedIds))
+      } catch (e) {
+        console.error("Error parsing dismissed notifications:", e)
+      }
+    }
+  }, [])
+
+  // Save dismissed notifications to localStorage
+  const saveDismissedNotifications = (dismissedIds: Set<string>) => {
+    const todayKey = getTodayKey()
+    localStorage.setItem(`dismissed-notifications-${todayKey}`, JSON.stringify([...dismissedIds]))
+  }
 
   // Format notification title to remove quotes and improve readability
   const formatNotificationTitle = (title: string, type: string) => {
@@ -85,14 +110,23 @@ export function SmartHeader() {
     }
   }
 
-  // Dismiss a notification permanently
+  // Dismiss a notification
   const dismissNotification = useCallback(
-    (id: string) => {
-      if (!user?.uid) return
-      const db = getDatabase()
-      dbRemove(dbRef(db, `users/${user.uid}/notifications/${id}`))
+    (id: string, type: string) => {
+      if (type === "added_to_group" || type === "new_public_org") {
+        // For organization notifications, remove from Firebase
+        if (!user?.uid) return
+        const db = getDatabase()
+        dbRemove(dbRef(db, `users/${user.uid}/notifications/${id}`))
+      } else {
+        // For calendar notifications (events and lectures), add to dismissed list
+        const newDismissed = new Set(dismissedCalendarNotifications)
+        newDismissed.add(id)
+        setDismissedCalendarNotifications(newDismissed)
+        saveDismissedNotifications(newDismissed)
+      }
     },
-    [user],
+    [user, dismissedCalendarNotifications],
   )
 
   // Initialize search from URL
@@ -125,7 +159,7 @@ export function SmartHeader() {
         return
       }
       const filtered: Notification[] = []
-      snap.forEach(childSnap => {
+      snap.forEach((childSnap) => {
         const n = childSnap.val() as any
         const key = childSnap.key!
         if (n.type === "added_to_group" || n.type === "new_public_org") {
@@ -166,7 +200,6 @@ export function SmartHeader() {
   useEffect(() => {
     let mounted = true
     setLoadingNotifications(true)
-
     if (!activeSemesterId) {
       if (mounted) {
         setNotifications(orgNotifications)
@@ -181,6 +214,7 @@ export function SmartHeader() {
         httpsCallable(fns, "getEvents")({ semesterId: activeSemesterId }),
         httpsCallable(fns, "getLectures")({ semesterId: activeSemesterId }),
       ])
+
       const events = Array.isArray(evRes.data) ? evRes.data : []
       const lectures = Array.isArray(lecRes.data) ? lecRes.data : []
 
@@ -196,6 +230,7 @@ export function SmartHeader() {
           }),
           description: e.description,
         }))
+        .filter((e) => !dismissedCalendarNotifications.has(e.id)) // Filter out dismissed events
 
       const day = today.getDay()
       const todaysLectures: Notification[] = lectures
@@ -215,6 +250,7 @@ export function SmartHeader() {
             description: l.room,
           }
         })
+        .filter((l) => !dismissedCalendarNotifications.has(l.id)) // Filter out dismissed lectures
 
       if (mounted) {
         setNotifications([...todaysEvents, ...todaysLectures, ...orgNotifications])
@@ -225,7 +261,7 @@ export function SmartHeader() {
     return () => {
       mounted = false
     }
-  }, [activeSemesterId, orgNotifications])
+  }, [activeSemesterId, orgNotifications, dismissedCalendarNotifications])
 
   // Sign out
   const handleSignOut = async () => {
@@ -378,7 +414,7 @@ export function SmartHeader() {
                               variant="ghost"
                               size="sm"
                               className="h-6 w-6 p-0 hover:bg-destructive/10"
-                              onClick={() => dismissNotification(n.id)}
+                              onClick={() => dismissNotification(n.id, n.type)}
                             >
                               <X className="h-3 w-3" />
                             </Button>
