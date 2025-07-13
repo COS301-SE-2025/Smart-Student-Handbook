@@ -90,37 +90,55 @@ export const createOrganization = onCall(
     }
     await refOrg.set(newOrg)
 
-    // Index private org under each invited user
+    // ──────────────────────────────────────────────────────────────────────────
+    // Notify invited users of private org
+    // ──────────────────────────────────────────────────────────────────────────
     if (newOrg.isPrivate) {
-      const memberIds = Object.keys(members)
       await Promise.all(
-        memberIds.map(memberId =>
-          db
-            .ref(`users/${memberId}/privateOrganizations/${id}`)
-            .set({ role: members[memberId] })
-        )
+        invited
+          .filter(i => i && i !== uid)
+          .map(async memberId => {
+            // index under their privateOrganizations
+            await db
+              .ref(`users/${memberId}/privateOrganizations/${id}`)
+              .set({ role: 'Member' })
+
+            // push an "added_to_group" notification
+            const notifRef = db.ref(`users/${memberId}/notifications`).push()
+            await notifRef.set({
+              id: notifRef.key,
+              type: 'added_to_group',
+              orgId: newOrg.id,
+              fromUserId: uid,
+              timestamp: Date.now(),
+              message: `You were added to "${newOrg.name}"`,
+            })
+          })
       )
     }
 
-    // Notify all users of a new public org, except the creator
+    // ──────────────────────────────────────────────────────────────────────────
+    // Notify everyone (except creator) of new public org
+    // ──────────────────────────────────────────────────────────────────────────
     if (!newOrg.isPrivate) {
       const usersSnap = await db.ref('users').get()
       if (usersSnap.exists()) {
-        const allUserIds = Object.keys(usersSnap.val() as any)
-          .filter(u => u !== newOrg.ownerId)  // skip the creator
+        const allUserIds = Object.keys(usersSnap.val() as any).filter(
+          u => u !== uid
+        )
         await Promise.all(
-          allUserIds.map(userId =>
-            db
-              .ref(`users/${userId}/notifications`)
-              .push()
-              .set({
-                id: db.ref().push().key,
-                type: 'new_public_org',
-                orgId: newOrg.id,
-                timestamp: Date.now(),
-                message: `A new organisation "${newOrg.name}" has been created.`,
-              })
-          )
+          allUserIds.map(userId => {
+            const notifRef = db.ref(
+              `users/${userId}/notifications`
+            ).push()
+            return notifRef.set({
+              id: notifRef.key,
+              type: 'new_public_org',
+              orgId: newOrg.id,
+              timestamp: Date.now(),
+              message: `A new organisation "${newOrg.name}" has been created.`,
+            })
+          })
         )
       }
     }
@@ -217,6 +235,7 @@ export const leaveOrganization = onCall(
       throw new HttpsError('permission-denied', 'Not a member')
     }
 
+    // sole member → delete
     if (memberIds.length === 1 && memberIds[0] === uid) {
       if (org.isPrivate) {
         await db.ref(`users/${uid}/privateOrganizations/${orgId}`).remove()
@@ -225,16 +244,21 @@ export const leaveOrganization = onCall(
       return { success: true, deleted: true }
     }
 
+    // owner leaves → transfer
     if (org.ownerId === uid) {
       const others = memberIds.filter(id => id !== uid).sort()
       const newOwner = others[0]
       await db.ref(`organizations/${orgId}/ownerId`).set(newOwner)
-      await db.ref(`organizations/${orgId}/members/${newOwner}`).set('Admin')
+      await db
+        .ref(`organizations/${orgId}/members/${newOwner}`)
+        .set('Admin')
     }
 
     await db.ref(`organizations/${orgId}/members/${uid}`).remove()
     if (org.isPrivate) {
-      await db.ref(`users/${uid}/privateOrganizations/${orgId}`).remove()
+      await db
+        .ref(`users/${uid}/privateOrganizations/${orgId}`)
+        .remove()
     }
 
     return { success: true, transferred: org.ownerId === uid }
@@ -261,13 +285,18 @@ export const addMember = onCall(
       throw new HttpsError('permission-denied', 'Admin only')
     }
 
-    await db.ref(`organizations/${orgId}/members/${userId}`).set('Member')
+    // add to org.members
+    await db
+      .ref(`organizations/${orgId}/members/${userId}`)
+      .set('Member')
+    // index under user
     if (org.isPrivate) {
       await db
         .ref(`users/${userId}/privateOrganizations/${orgId}`)
         .set({ role: 'Member' })
     }
 
+    // push notification
     const notifRef = db.ref(`users/${userId}/notifications`).push()
     await notifRef.set({
       id: notifRef.key,
@@ -302,9 +331,13 @@ export const removeMember = onCall(
       throw new HttpsError('permission-denied', 'Cannot remove the owner')
     }
 
-    await db.ref(`organizations/${orgId}/members/${userId}`).remove()
+    await db
+      .ref(`organizations/${orgId}/members/${userId}`)
+      .remove()
     if (org.isPrivate) {
-      await db.ref(`users/${userId}/privateOrganizations/${orgId}`).remove()
+      await db
+        .ref(`users/${userId}/privateOrganizations/${orgId}`)
+        .remove()
     }
 
     return { success: true }
@@ -333,7 +366,9 @@ export const deleteOrganization = onCall(
 
     for (const m of Object.keys(org.members || {})) {
       if (org.isPrivate) {
-        await db.ref(`users/${m}/privateOrganizations/${orgId}`).remove()
+        await db
+          .ref(`users/${m}/privateOrganizations/${orgId}`)
+          .remove()
       }
     }
     await db.ref(`organizations/${orgId}`).remove()
