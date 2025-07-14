@@ -20,6 +20,9 @@ import { auth } from "firebase-admin";
 
 const functions = getFunctions(app);
 
+const callCreateNote = httpsCallable(functions, "createNoteAtPath");
+const callDeleteNote = httpsCallable(functions, "deleteNoteAtPath");
+
 function generateId() {
   return Math.random().toString(36).substring(2, 10);
 }
@@ -36,7 +39,6 @@ const createNote = async (orgId: string, userId: string): Promise<Note> => {
   };
 
   const path = `organizations/${orgId}/notes/${id}`;
-  const callCreateNote = httpsCallable(functions, "createNoteAtPath");
   await callCreateNote({ path, note: newNote });
 
   console.log("Note Posted");
@@ -46,11 +48,9 @@ const createNote = async (orgId: string, userId: string): Promise<Note> => {
 const deleteNote = async (orgId: string, noteId: string): Promise<void> => {
   const path = `organizations/${orgId}/notes/${noteId}`;
 
-  const callDeleteNote = httpsCallable(functions, "deleteNoteAtPath");
   await callDeleteNote({ path });
 
   console.log("Deleting Note");
-
 };
 
 type Note = {
@@ -73,15 +73,27 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
     stateNotes[0]?.id ?? null
   );
 
-  useEffect(() => {
-    setStateNotes(notes);
-  }, [notes]);
-
   const selectedNote = stateNotes.find((n) => n.id === selectedNoteId);
   const editableNote = selectedNote ? { ...selectedNote } : null;
 
   const orgId = orgID;
   const userId = "user987";
+
+  useEffect(() => {
+    setStateNotes(notes);
+  }, [notes]);
+
+  useEffect(() => {
+    if (!selectedNote?.id) return;
+
+    const timeout = setTimeout(() => {
+      const path = `organizations/${orgId}/notes/${selectedNote.id}`;
+      callCreateNote({ path, note: { content: selectedNote.content } }); // Updates the note at the path
+      console.log("Note content auto-saved");
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [selectedNote?.id, selectedNote?.content]);
 
   const handleCreate = async () => {
     const newNote = await createNote(orgId, userId);
@@ -131,7 +143,7 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
                 value={selectedNote.content}
                 readOnly={false}
                 onChange={(newContent) =>
-                  handleNoteChange(selectedNote.id, {content : newContent})
+                  handleNoteChange(selectedNote.id, { content: newContent })
                 }
               />
             </div>
@@ -163,10 +175,11 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
             {stateNotes.map((note) => (
               <Card
                 key={note.id}
-                className={`cursor-pointer border ${selectedNoteId === note.id
-                  ? "border-blue-500 shadow"
-                  : "hover:shadow-sm"
-                  }`}
+                className={`cursor-pointer border ${
+                  selectedNoteId === note.id
+                    ? "border-blue-500 shadow"
+                    : "hover:shadow-sm"
+                }`}
                 onClick={() => setSelectedNoteId(note.id)}
               >
                 <CardHeader className="flex flex-row justify-between items-center">
