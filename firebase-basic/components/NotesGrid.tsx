@@ -80,14 +80,6 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
   const selectedNote = stateNotes.find((n) => n.id === selectedNoteId);
   const editableNote = selectedNote ? { ...selectedNote } : null;
 
-  useEffect(() => {
-    if (selectedNote) {
-      console.log("Selected Note Name:", selectedNote.name);
-      console.log("Selected Note Content:", selectedNote.content);
-      console.log("State Notes:", stateNotes);
-    }
-  }, [selectedNote]);
-
   const orgId = orgID;
   const userId = "user987";
 
@@ -135,10 +127,11 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
             </div>
             <div className="h-[calc(100%-3rem)] overflow-y-auto">
               <QuillEditor
+                key={selectedNote.id}
                 value={selectedNote.content}
-                readOnly={true}
+                readOnly={false}
                 onChange={(newContent) =>
-                  handleNoteChange(selectedNote.id, { content: newContent })
+                  handleNoteChange(selectedNote.id, {content : newContent})
                 }
               />
             </div>
