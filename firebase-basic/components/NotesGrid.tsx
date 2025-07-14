@@ -23,6 +23,11 @@ const functions = getFunctions(app);
 const callCreateNote = httpsCallable(functions, "createNoteAtPath");
 const callDeleteNote = httpsCallable(functions, "deleteNoteAtPath");
 
+export async function callUpdateNote(path: string, note: Partial<Note>) {
+  const fn = httpsCallable(functions, "updateNoteAtPath");
+  await fn({ path, note });
+}
+
 function generateId() {
   return Math.random().toString(36).substring(2, 10);
 }
@@ -49,8 +54,8 @@ const deleteNote = async (orgId: string, noteId: string): Promise<void> => {
   const path = `organizations/${orgId}/notes/${noteId}`;
 
   await callDeleteNote({ path });
-
   console.log("Deleting Note");
+  
 };
 
 type Note = {
@@ -88,12 +93,15 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
 
     const timeout = setTimeout(() => {
       const path = `organizations/${orgId}/notes/${selectedNote.id}`;
-      callCreateNote({ path, note: { content: selectedNote.content } }); // Updates the note at the path
-      console.log("Note content auto-saved");
+      callUpdateNote(path, {
+        content: selectedNote.content,
+        name: selectedNote.name,
+      });
+      console.log("Note auto-saved (name + content)");
     }, 1000);
 
     return () => clearTimeout(timeout);
-  }, [selectedNote?.id, selectedNote?.content]);
+  }, [selectedNote?.id, selectedNote?.content, selectedNote?.name]);
 
   const handleCreate = async () => {
     const newNote = await createNote(orgId, userId);
@@ -126,9 +134,13 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
         {selectedNote ? (
           <>
             <div className="flex justify-between items-center mb-3">
-              <h2 className="text-xl font-semibold truncate">
-                {selectedNote.name}
-              </h2>
+              <input
+                className="text-xl font-semibold bg-transparent border-none focus:outline-none w-full truncate"
+                value={selectedNote.name}
+                onChange={(e) =>
+                  handleNoteChange(selectedNote.id, { name: e.target.value })
+                }
+              />
               <Button
                 variant="ghost"
                 size="sm"
@@ -137,6 +149,7 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
                 Deselect
               </Button>
             </div>
+
             <div className="h-[calc(100%-3rem)] overflow-y-auto">
               <QuillEditor
                 key={selectedNote.id}
