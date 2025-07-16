@@ -13,22 +13,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Search,
-  Bell,
-  User,
-  Settings,
-  LogOut,
-  BarChart3,
-  Calendar,
-  BookOpen,
-  Edit3,
-  GraduationCap,
-  Users,
-} from "lucide-react"
+import { Search, Bell, User, Settings, LogOut, GraduationCap, X } from "lucide-react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { useState, useEffect, useCallback } from "react"
+import { httpsCallable } from "firebase/functions"
+import { fns } from "@/lib/firebase"
+import { getDatabase, ref as dbRef, onValue, remove as dbRemove } from "firebase/database"
+import { isSameDay, parseISO, format } from "date-fns"
+
+interface Notification {
+  id: string
+  title: string
+  type: string
+  time: string
+  description: string
+}
 
 export function SmartHeader() {
   const pathname = usePathname()
@@ -37,52 +37,233 @@ export function SmartHeader() {
   const [user, setUser] = useState<any>(null)
   const [searchValue, setSearchValue] = useState("")
 
-  // Today's academic notifications
-  const [notifications] = useState([
-    {
-      id: 1,
-      title: "COS301 Software Engineering",
-      type: "lecture",
-      time: "10:00 AM",
-      description: "Design Patterns lecture in Room 2-14",
-    },
-    {
-      id: 2,
-      title: "Database Assignment Due",
-      type: "assignment",
-      time: "11:59 PM",
-      description: "Submit ER diagram and SQL queries",
-    },
-    {
-      id: 3,
-      title: "Study Group: Machine Learning",
-      type: "study",
-      time: "2:00 PM",
-      description: "Library study room B-12",
-    },
-  ])
+  // Calendar & lecture notifications
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loadingNotifications, setLoadingNotifications] = useState(true)
 
-  // Initialize search value from URL params
-  useEffect(() => {
-    const searchQuery = searchParams.get("search") || ""
-    setSearchValue(searchQuery)
-  }, [searchParams])
+  // Organisation-related notifications (invites & new public orgs)
+  const [orgNotifications, setOrgNotifications] = useState<Notification[]>([])
 
+  // Active semester ID
+  const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null)
+
+  // Dismissed calendar notifications for today
+  const [dismissedCalendarNotifications, setDismissedCalendarNotifications] = useState<Set<string>>(new Set())
+
+  // Get today's date key for localStorage
+  const getTodayKey = () => format(new Date(), "yyyy-MM-dd")
+
+  // Load dismissed notifications from localStorage
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      // Simulate user for development
-      setUser({
-        displayName: "Test User",
-        email: "testuser@example.com",
-      })
+    const todayKey = getTodayKey()
+    const dismissed = localStorage.getItem(`dismissed-notifications-${todayKey}`)
+    if (dismissed) {
+      try {
+        const dismissedIds = JSON.parse(dismissed)
+        setDismissedCalendarNotifications(new Set(dismissedIds))
+      } catch (e) {
+        console.error("Error parsing dismissed notifications:", e)
+      }
     }
-
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setUser(user)
-    })
-    return () => unsubscribe()
   }, [])
 
+  // Save dismissed notifications to localStorage
+  const saveDismissedNotifications = (dismissedIds: Set<string>) => {
+    const todayKey = getTodayKey()
+    localStorage.setItem(`dismissed-notifications-${todayKey}`, JSON.stringify([...dismissedIds]))
+  }
+
+  // Format notification title to remove quotes and improve readability
+  const formatNotificationTitle = (title: string, type: string) => {
+    const formattedTitle = title.replace(/["'"]/g, "")
+    if (type === "new_public_org") {
+      const match = formattedTitle.match(/A new organisation (.+?) has been/i)
+      if (match) {
+        const orgName = match[1]
+        return `New organization: ${orgName}`
+      }
+    }
+    if (type === "added_to_group") {
+      const match = formattedTitle.match(/You were added to "(.+)"/)
+      if (match) {
+        return `Added to: ${match[1]}`
+      }
+    }
+    return formattedTitle
+  }
+
+  // Get notification type display name
+  const getNotificationTypeDisplay = (type: string) => {
+    switch (type) {
+      case "lecture":
+        return "LECTURE"
+      case "assignment":
+        return "ASSIGNMENT"
+      case "study":
+        return "STUDY"
+      case "added_to_group":
+        return "INVITE"
+      case "new_public_org":
+        return "NEW ORG"
+      default:
+        return type.replace("_", " ").toUpperCase()
+    }
+  }
+
+  // Dismiss a notification
+  const dismissNotification = useCallback(
+    (id: string, type: string) => {
+      if (type === "added_to_group" || type === "new_public_org") {
+        // For organization notifications, remove from Firebase
+        if (!user?.uid) return
+        const db = getDatabase()
+        dbRemove(dbRef(db, `users/${user.uid}/notifications/${id}`))
+      } else {
+        // For calendar notifications (events and lectures), add to dismissed list
+        const newDismissed = new Set(dismissedCalendarNotifications)
+        newDismissed.add(id)
+        setDismissedCalendarNotifications(newDismissed)
+        saveDismissedNotifications(newDismissed)
+      }
+    },
+    [user, dismissedCalendarNotifications],
+  )
+
+  // Initialize search from URL
+  useEffect(() => {
+    setSearchValue(searchParams.get("search") || "")
+  }, [searchParams])
+
+  // Auth listener
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      setUser({
+        uid: "dev",
+        displayName: "Test User",
+        email: "test@example.com",
+      })
+    }
+    const unsub = auth.onAuthStateChanged((u) => setUser(u))
+    return () => unsub()
+  }, [])
+
+  // Listen for both "added_to_group" and "new_public_org"
+  useEffect(() => {
+    if (!user?.uid) return
+    const db = getDatabase()
+    const notifRef = dbRef(db, `users/${user.uid}/notifications`)
+    const off = onValue(notifRef, (snap) => {
+      const raw = snap.val() as Record<string, any> | null
+      if (!raw) {
+        setOrgNotifications([])
+        return
+      }
+      const filtered: Notification[] = []
+      snap.forEach((childSnap) => {
+        const n = childSnap.val() as any
+        const key = childSnap.key!
+        if (n.type === "added_to_group" || n.type === "new_public_org") {
+          filtered.push({
+            id: key,
+            title: n.message,
+            type: n.type,
+            time: new Date(n.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            description: "",
+          })
+        }
+      })
+      setOrgNotifications(filtered)
+    })
+    return () => off()
+  }, [user])
+
+  // Fetch active semester
+  useEffect(() => {
+    let mounted = true
+    async function fetchSem() {
+      if (!user?.uid) return
+      const res = await httpsCallable(fns, "getSemesters")({})
+      const sems: any[] = Array.isArray(res.data) ? res.data : []
+      const active = sems.find((s) => s.isActive)
+      if (mounted) setActiveSemesterId(active?.id || null)
+    }
+    fetchSem()
+    return () => {
+      mounted = false
+    }
+  }, [user])
+
+  // Load calendar events, lectures, and org notifications
+  useEffect(() => {
+    let mounted = true
+    setLoadingNotifications(true)
+    if (!activeSemesterId) {
+      if (mounted) {
+        setNotifications(orgNotifications)
+        setLoadingNotifications(false)
+      }
+      return
+    }
+
+    const today = new Date()
+    async function loadAll() {
+      const [evRes, lecRes] = await Promise.all([
+        httpsCallable(fns, "getEvents")({ semesterId: activeSemesterId }),
+        httpsCallable(fns, "getLectures")({ semesterId: activeSemesterId }),
+      ])
+
+      const events = Array.isArray(evRes.data) ? evRes.data : []
+      const lectures = Array.isArray(lecRes.data) ? lecRes.data : []
+
+      const todaysEvents: Notification[] = events
+        .filter((e: any) => e.date && isSameDay(parseISO(e.date), today))
+        .map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          type: e.type,
+          time: parseISO(e.date).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          description: e.description,
+        }))
+        .filter((e) => !dismissedCalendarNotifications.has(e.id)) // Filter out dismissed events
+
+      const day = today.getDay()
+      const todaysLectures: Notification[] = lectures
+        .filter((l: any) => l.dayOfWeek === day)
+        .map((l: any) => {
+          const [h, m] = l.timeSlot.split(":").map(Number)
+          const dt = new Date(today)
+          dt.setHours(h, m)
+          return {
+            id: l.id,
+            title: l.subject,
+            type: "lecture",
+            time: dt.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            description: l.room,
+          }
+        })
+        .filter((l) => !dismissedCalendarNotifications.has(l.id)) // Filter out dismissed lectures
+
+      if (mounted) {
+        setNotifications([...todaysEvents, ...todaysLectures, ...orgNotifications])
+      }
+      if (mounted) setLoadingNotifications(false)
+    }
+    loadAll()
+    return () => {
+      mounted = false
+    }
+  }, [activeSemesterId, orgNotifications, dismissedCalendarNotifications])
+
+  // Sign out
   const handleSignOut = async () => {
     try {
       if (process.env.NODE_ENV === "development") {
@@ -91,69 +272,68 @@ export function SmartHeader() {
       }
       await signOut(auth)
       router.push("/")
-    } catch (error) {
-      console.error("Error signing out:", error)
+    } catch (e) {
+      console.error("Error signing out:", e)
     }
   }
 
-  // Handle search input changes
+  // Search handler
   const handleSearchChange = useCallback(
-    (value: string) => {
-      setSearchValue(value)
-
-      // Update URL search params for pages that support search
-      const searchablePages = ["/organisations"]
-      if (searchablePages.includes(pathname)) {
-        const params = new URLSearchParams(searchParams.toString())
-        if (value.trim()) {
-          params.set("search", value.trim())
-        } else {
-          params.delete("search")
-        }
-
-        // Update URL without causing a page reload
-        const newUrl = `${pathname}${params.toString() ? `?${params.toString()}` : ""}`
-        router.replace(newUrl, { scroll: false })
+    (v: string) => {
+      setSearchValue(v)
+      const pages = ["/organisations"]
+      if (pages.includes(pathname)) {
+        const p = new URLSearchParams(searchParams.toString())
+        if (v.trim()) p.set("search", v.trim())
+        else p.delete("search")
+        router.replace(`${pathname}${p.toString() ? `?${p.toString()}` : ""}`, {
+          scroll: false,
+        })
       }
     },
     [pathname, router, searchParams],
   )
 
-  const getPageInfo = () => {
+  // Page info
+  const pageInfo = (() => {
     switch (pathname) {
       case "/dashboard":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/calendar":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/notes":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/organisations":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/hardnotes":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
       case "/profile":
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" />  }
+        return {
+          title: "Smart Student Handbook",
+          icon: <GraduationCap className="h-4 w-4" />,
+        }
       default:
-        return { title: "Smart Student Handbook", icon: <GraduationCap className="h-4 w-4" /> }
+        return {
+          title: "Smart Student Handbook",
+          icon: <GraduationCap className="h-4 w-4" />,
+        }
     }
-  }
+  })()
 
-  const pageInfo = getPageInfo()
-
+  // Notification icon based on type
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "lecture":
-        return <div className="w-2 h-2 rounded-full bg-blue-500" />
+        return <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
       case "assignment":
-        return <div className="w-2 h-2 rounded-full bg-red-500" />
+        return <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
       case "study":
-        return <div className="w-2 h-2 rounded-full bg-green-500" />
+        return <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+      case "added_to_group":
+        return <div className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
+      case "new_public_org":
+        return <div className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" />
       default:
-        return <div className="w-2 h-2 rounded-full bg-muted-foreground" />
+        return <div className="w-2 h-2 rounded-full bg-muted-foreground flex-shrink-0" />
     }
   }
 
-  // Get appropriate placeholder text based on current page
+  // Search placeholder
   const getSearchPlaceholder = () => {
     switch (pathname) {
       case "/organisations":
@@ -168,9 +348,9 @@ export function SmartHeader() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-background/95 backdrop-blur border-b border-border">
       <div className="flex h-full items-center justify-between px-4">
-        {/* Left: Sidebar trigger and page title */}
+        {/* Left: Sidebar + Title */}
         <div className="flex items-center gap-3">
           <SidebarTrigger className="h-8 w-8" />
           <div className="flex items-center gap-2">
@@ -192,52 +372,84 @@ export function SmartHeader() {
           </div>
         </div>
 
-        {/* Right: Notifications and user */}
+        {/* Right: Notifications & User */}
         <div className="flex items-center gap-1">
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="relative h-8 w-8">
                 <Bell className="h-4 w-4" />
-                {notifications.length > 0 && (
+                {!loadingNotifications && notifications.length > 0 && (
                   <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 text-[10px] bg-destructive">
                     {notifications.length}
                   </Badge>
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-80 mr-2" align="end">
+            <DropdownMenuContent className="w-96 mr-2" align="end">
               <div className="p-3">
-                <h4 className="font-medium mb-3 text-sm">Today's Schedule</h4>
-                <div className="space-y-2">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className="flex items-start gap-3 p-2 hover:bg-muted rounded-md cursor-pointer"
-                    >
-                      <div className="mt-2">{getNotificationIcon(notification.type)}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm font-medium truncate">{notification.title}</p>
-                          <span className="text-xs text-muted-foreground ml-2">{notification.time}</span>
+                <h4 className="font-medium mb-3 text-sm">
+                  {loadingNotifications ? "Loading…" : "Today's Schedule & Updates"}
+                </h4>
+                {loadingNotifications ? (
+                  <div className="animate-pulse space-y-2">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-4 bg-muted rounded" />
+                    ))}
+                  </div>
+                ) : notifications.length ? (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className="flex items-start gap-3 p-3 hover:bg-muted rounded-md border border-border/50"
+                      >
+                        <div className="mt-1">{getNotificationIcon(n.type)}</div>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium leading-tight">
+                              {formatNotificationTitle(n.title, n.type)}
+                            </p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 hover:bg-destructive/10"
+                              onClick={() => dismissNotification(n.id, n.type)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
+                              {getNotificationTypeDisplay(n.type)}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">{n.time}</span>
+                          </div>
+                          {n.description && (
+                            <p className="text-xs text-muted-foreground leading-relaxed">{n.description}</p>
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground">{notification.description}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <Bell className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">No notifications today</p>
+                  </div>
+                )}
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* User menu */}
+          {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-7 w-7">
                   <AvatarImage src={user?.photoURL || ""} alt={user?.displayName || "User"} />
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    {user?.displayName?.charAt(0) || user?.email?.charAt(0) || "U"}
+                    {user?.displayName?.[0] || user?.email?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -247,7 +459,7 @@ export function SmartHeader() {
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user?.photoURL || ""} alt={user?.displayName || "User"} />
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    {user?.displayName?.charAt(0) || user?.email?.charAt(0) || "U"}
+                    {user?.displayName?.[0] || user?.email?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col space-y-1">
@@ -265,7 +477,7 @@ export function SmartHeader() {
                 <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-destructive focus:text-destructive">
+              <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-destructive">
                 <LogOut className="h-4 w-4" />
                 <span>Sign out</span>
               </DropdownMenuItem>

@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "studenthandbook-a215a"
-  }
+    "default": "studenthandbook-a215a",
+    "prod": "studenthandbook-a215a"
+  },
+  "targets": {},
+  "etags": {}
 }
