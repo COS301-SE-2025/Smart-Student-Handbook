@@ -696,7 +696,7 @@ export default function NotePage() {
                     Cancel
                   </Button>
                   <Button
-                    onClick={(e) => handleShare(e, selectedNote?.id, permission)}
+                    onClick={(e) => handleShare(e, selectedNote!.id, permission)}
                     disabled={!collaboratorId.trim()}
                   >
                     Share
