@@ -16,6 +16,7 @@ import {
   User,
   UserIcon,
 } from "lucide-react";
+import { ChevronLeft, ChevronRight as ChevronRightToggle } from "lucide-react";
 import Link from "next/link";
 import QuillEditor from "@/components/quilleditor";
 import "react-quill/dist/quill.snow.css";
@@ -76,6 +77,7 @@ type FileNode = Note | Folder;
 const generateId = () => Math.random().toString(36).slice(2, 9);
 
 export default function NotePage() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [testTree, setTree] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
@@ -789,28 +791,28 @@ export default function NotePage() {
         title="Notes Editor"
         description="Browse, organize, and edit your personal and shared notes all in one place."
       />
-      <div className="h-[calc(100vh-3.5rem)] flex bg-background overflow-hidden">
-        <div className="w-80 border-r border-border bg-card/30 flex flex-col">
-          <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
 
-            <div className="flex gap-2">
-              <Button
-                onClick={addFolder}
-                size="sm"
-                variant="outline"
-                className="flex-1 gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Folder
-              </Button>
-              <Button onClick={addNote} size="sm" className="flex-1 gap-2">
-                <Plus className="h-4 w-4" />
-                Note
-              </Button>
+      <div className="relative h-[calc(100vh-3.5rem)] flex bg-background">
+
+        {/* Sidebar */}
+        <div className={`
+            ${isSidebarOpen ? "w-80 border-r" : "w-0"} 
+            border-border bg-card/30 flex flex-col 
+            transition-all duration-200 overflow-hidden
+          `}>
+          <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
+              {/* Left: Folder & Note */}
+              <div className="flex gap-2">
+                <Button onClick={addFolder} size="sm" variant="outline" className="flex-1 gap-2">
+                  <Plus className="h-4 w-4" /> Folder
+                </Button>
+                <Button onClick={addNote} size="sm" className="flex-1 gap-2">
+                  <Plus className="h-4 w-4" /> Note
+                </Button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
+         <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-1">
               {testTree.length > 0 ? (
                 renderTree(testTree)
@@ -834,6 +836,25 @@ export default function NotePage() {
           </div>
         </div>
 
+        {/** toggle button**/}
+        <button
+          onClick={() => setIsSidebarOpen(v => !v)}
+          title={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          className={`
+            absolute top-4 
+            ${isSidebarOpen ? "left-80" : "left-0"}   /* 80 = 20rem */
+            ml-1                                      /* tiny gap */
+            p-1 bg-transparent rounded hover:bg-muted/10 transition
+            z-20
+          `}
+        >
+          {isSidebarOpen 
+            ? <ChevronLeft className="h-5 w-5 text-muted-foreground"/>
+            : <ChevronRight className="h-5 w-5 text-muted-foreground"/>}
+        </button>
+        
+
+        {/* Main content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedNote ? (
             <>
