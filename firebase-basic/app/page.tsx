@@ -239,11 +239,15 @@ export default function Home() {
           <p className="text-gray-700">
             Join thousands of students already using Smart Student Handbook to enhance their academic journey.
           </p>
-          <Link href="/signup">
-            <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg font-semibold">
+          
+            <Button 
+              size="lg" 
+              className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg font-semibold"
+              onClick={() => window.open("/user-manual.pdf", "_blank")} 
+            >
               User Guide
             </Button>
-          </Link>
+          
         </div>
       </section>
 
