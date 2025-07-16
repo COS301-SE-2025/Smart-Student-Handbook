@@ -17,6 +17,7 @@ import { stat } from "fs";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
 import { auth } from "firebase-admin";
+import { summarizeNote } from "@/lib/gemini";
 
 const functions = getFunctions(app);
 
@@ -55,7 +56,6 @@ const deleteNote = async (orgId: string, noteId: string): Promise<void> => {
 
   await callDeleteNote({ path });
   console.log("Deleting Note");
-  
 };
 
 type Note = {
@@ -128,6 +128,20 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
     );
   };
 
+  const [summary, setSummary] = useState<string | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
+  const handleSummarize = async () => {
+    if (!selectedNote?.content) return;
+
+    console.log(selectedNote.content) ; 
+
+    setLoadingSummary(true);
+    const result = await summarizeNote(selectedNote.content);
+    setSummary(result);
+    setLoadingSummary(false);
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)] p-4 gap-4">
       <div className="flex-[2] border rounded-xl p-4 bg-white dark:bg-neutral-900 shadow overflow-hidden">
@@ -170,9 +184,16 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
 
       <div className="w-80 border rounded-xl p-4 bg-white dark:bg-neutral-900 shadow flex flex-col">
         <h3 className="text-lg font-medium mb-2">Summary</h3>
-        <div className="text-sm text-muted-foreground">
-          Coming soon: summary & references
-        </div>
+        <Button onClick={handleSummarize} disabled={loadingSummary}>
+          {loadingSummary ? "Summarizing..." : "Generate Summary"}
+        </Button>
+
+        {summary && (
+          <div className="mt-4 p-4 border rounded-lg bg-neutral-100 dark:bg-neutral-800 text-sm whitespace-pre-wrap">
+            <strong>Summary:</strong>
+            <div className="mt-2">{summary}</div>
+          </div>
+        )}
       </div>
 
       <div className="w-72 border rounded-xl shadow bg-white dark:bg-neutral-900 flex flex-col">
