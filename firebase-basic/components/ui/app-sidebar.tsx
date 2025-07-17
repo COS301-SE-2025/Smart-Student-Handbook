@@ -25,17 +25,17 @@ const items = [
     description: "Overview & insights",
   },
   {
-    title: "Note Editor",
+    title: "Library",
     url: "/hardnotes",
     icon: Edit3,
     description: "Create & edit notes",
   },
-  {
-    title: "Library",
-    url: "/notes",
-    icon: BookOpen,
-    description: "Browse all notes",
-  },
+  // {
+  //   title: "Library",
+  //   url: "/notes",
+  //   icon: BookOpen,
+  //   description: "Browse all notes",
+  // },
   {
     title: "Calendar",
     url: "/calendar",
@@ -55,11 +55,17 @@ const items = [
     description: "Friends and Requests",
   },
    {
-    title: "My Organisations",
+    title: "Organisations",
     url: "/organisations",
     icon: Building2,
     description: "Manage your organisations",
   },
+    {
+    title: "Help & Support",
+    url: "/notes",
+    icon: BookOpen,
+    description: "",
+   },
 ]
 
 export function AppSidebar() {
