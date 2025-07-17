@@ -282,7 +282,7 @@ export default function OrganisationsPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b bg-background">
-        <div className="p-8">
+        <div className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-8">
             <div className="flex-1 space-y-4">
               <h1 className="text-5xl font-bold tracking-tight">Organisations</h1>
@@ -298,24 +298,22 @@ export default function OrganisationsPage() {
                 </div>
               )}
             </div>
-            <Button onClick={() => setShowCreate(true)} className="shadow-lg h-10 px-4 py-2 text-base">
+            <Button size="lg" onClick={() => setShowCreate(true)} className="shadow-lg">
               <Plus className="h-5 w-5 mr-2" />
               Create Organisation
             </Button>
           </div>
 
           {/* Filter Tabs */}
-          <div className="flex justify-center">
-            <div className="inline-flex gap-2 p-2 bg-muted/50 rounded-2xl border">
+          <div className="overflow-x-auto py-4">
+            <div className="inline-flex gap-2 p-2 bg-muted/50 rounded-2xl">
               {(["all", "joined", "public", "private"] as const).map(f => (
                 <Button
                   key={f}
                   variant={filter === f ? "default" : "ghost"}
                   size="lg"
                   onClick={() => setFilter(f)}
-                  className={`px-8 py-3 text-base font-medium min-w-[120px] rounded-xl transition-all ${
-                    filter === f ? "shadow-sm" : "hover:bg-background/80"
-                  }`}
+                  className={`min-w-[100px]`}
                 >
                   {f.charAt(0).toUpperCase() + f.slice(1)}
                   <Badge variant="secondary" className="ml-2 text-xs">
@@ -334,7 +332,7 @@ export default function OrganisationsPage() {
       </div>
 
       {/* Organisations Grid */}
-      <div className="p-8">
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
         {orgs.length === 0 ? (
           <div className="flex items-center justify-center min-h-[500px]">
             <div className="text-center py-20 px-8 max-w-2xl mx-auto">
@@ -354,7 +352,7 @@ export default function OrganisationsPage() {
                   : "Be the first to create an organisation."}
               </p>
               {!searchQuery && (
-                <Button onClick={() => setShowCreate(true)} className="shadow-lg h-10 px-4 py-2 text-base">
+                <Button size="sm" onClick={() => setShowCreate(true)} className="shadow-sm">
                   <Plus className="h-5 w-5 mr-2" />
                   Create Your First Organisation
                 </Button>
@@ -362,7 +360,7 @@ export default function OrganisationsPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {orgs.map(o => {
               const isFav = !!favorites[o.id]
               const memberCount = Object.keys(o.members).length
@@ -379,10 +377,9 @@ export default function OrganisationsPage() {
               return (
                 <div
                   key={o.id}
-                  className={`border-2 rounded-2xl p-8 hover:shadow-xl transition-all ${gradientClass} relative min-h-[360px] group hover:scale-[1.02] ${
-                    isJoining || isLeaving ? "opacity-75" : ""
-                  }`}
+                  className={`bg-white border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-all relative min-h-[360px] group hover:scale-[1.02] ${isJoining || isLeaving ? "opacity-75" : ""}`}
                 >
+                  {/* favorite heart button */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -392,11 +389,12 @@ export default function OrganisationsPage() {
                   >
                     <Heart
                       className={`h-5 w-5 transition-colors ${
-                        isFav ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500"
+                        isFav ? "fill-red-500 text-red-500" : "text-gray-400"
                       }`}
                     />
                   </Button>
 
+                  {/* avatar + title */}    
                   <div className="flex items-start gap-4 mb-6">
                     <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-black">
                       <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-black">
@@ -461,11 +459,15 @@ export default function OrganisationsPage() {
                       </Badge>
                     )}
                   </div>
-
-                  <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-black/30">
+                  
+                  {/* action buttons */}
+                  <div className="mt-4 pt-4 border-t border-white/30 dark:border-black/30 flex flex-col sm:flex-row sm:items-center gap-2">
                     {o.joined && !isLeaving ? (
                       <Link href={`/organisations/${o.id}/notes`}>
-                        <Button size="lg" className="shadow-md" disabled={isJoining || isLeaving}>
+                        <Button 
+                          size="sm" 
+                          className="shadow-md" 
+                          disabled={isJoining || isLeaving}>
                           View Notes
                         </Button>
                       </Link>
@@ -473,9 +475,9 @@ export default function OrganisationsPage() {
                       !o.isPrivate &&
                       !o.joined && (
                         <Button
-                          size="lg"
+                          size="sm"
                           onClick={() => handleJoin(o.id)}
-                          className="shadow-md"
+                          className="shadow-md w-full sm:w-auto"
                           disabled={isJoining || isLeaving}
                         >
                           {isJoining ? (
@@ -490,7 +492,7 @@ export default function OrganisationsPage() {
                     )}
                     {o.joined && !isLeaving && (
                       <Button
-                        size="lg"
+                        size="sm"
                         variant="outline"
                         onClick={() => handleLeave(o.id)}
                         disabled={isJoining || isLeaving}
