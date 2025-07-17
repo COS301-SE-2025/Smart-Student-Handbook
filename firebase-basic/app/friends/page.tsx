@@ -200,7 +200,7 @@ export default function FriendsPage() {
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="destructive"
                             onClick={() => handleReject(req.uid)}
                             className="h-8 px-3"
                           >
@@ -238,7 +238,7 @@ export default function FriendsPage() {
                             {req.name} {req.surname}
                           </span>
                         </Link>
-                        <Button size="sm" variant="outline" onClick={() => handleCancel(req.uid)} className="h-8 px-3">
+                        <Button size="sm" variant="destructive" onClick={() => handleCancel(req.uid)} className="h-8 px-3">
                           <X className="h-3 w-3 mr-1" />
                           Cancel
                         </Button>
