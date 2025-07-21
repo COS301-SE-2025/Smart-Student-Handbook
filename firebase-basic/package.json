@@ -2,12 +2,14 @@
   "name": "firebase-basic",
   "version": "0.1.0",
   "private": true,
+
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
+
   "dependencies": {
     "@firebase/app": "^0.13.1",
     "@firebase/auth": "^1.10.7",
@@ -55,6 +57,7 @@
     "tailwind-merge": "^3.3.0",
     "toast": "^0.5.4"
   },
+
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",

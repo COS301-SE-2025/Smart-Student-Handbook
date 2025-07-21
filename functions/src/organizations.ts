@@ -3,6 +3,7 @@
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https'
 import { db } from './firebaseAdmin'
 
+/** Input when creating or editing */
 interface OrgInput {
   name?: string
   description?: string
@@ -11,12 +12,14 @@ interface OrgInput {
   invitedUserIds?: string[]
 }
 
+/** Payload shapes for each callable */
 interface OrgPayload {
   orgId?: string
   userId?: string
   organization?: OrgInput
 }
 
+/** Stored organization shape */
 interface Org {
   id: string
   ownerId: string
@@ -28,58 +31,96 @@ interface Org {
   createdAt: number
 }
 
-async function loadOrg(orgId: string): Promise<Org> {
-  const snap = await db.ref(`organizations/${orgId}`).get()
-  if (!snap.exists()) {
-    throw new HttpsError('not-found', 'Organization not found')
-  }
-  return snap.val() as Org
+/** Helper for private-org index path */
+const privIdx = (uid: string, orgId: string) =>
+  `users/${uid}/privateOrganizations/${orgId}`
+
+/** Wrap any thrown error into an HttpsError */
+function wrap<T>(fn: () => Promise<T>): Promise<T> {
+  return fn().catch(err => {
+    if (err instanceof HttpsError) throw err
+    throw new HttpsError('internal', (err as Error).message)
+  })
 }
 
-/* -------------------------------------------------------------------------- */
-/*                               create org (1)                               */
-/* -------------------------------------------------------------------------- */
-export const createOrganization = onCall(
-  async (req: CallableRequest<Pick<OrgPayload, 'organization'>>) => {
+/** GET all public orgs */
+export const getPublicOrganizations = onCall((req) =>
+  wrap(async () => {
+    const snap = await db
+      .ref('organizations')
+      .orderByChild('isPrivate')
+      .equalTo(false)
+      .get()
+    return snap.exists() ? (Object.values(snap.val()!) as Org[]) : []
+  })
+)
+
+/** GET only the private orgs this user belongs to — efficient + cleans stale */
+export const getUserOrganizations = onCall((req: CallableRequest<{}>) =>
+  wrap(async () => {
+    const uid = req.auth?.uid
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+
+    // 1) read index of private org IDs & roles
+    const idxSnap = await db.ref(`users/${uid}/privateOrganizations`).get()
+    if (!idxSnap.exists()) return []
+
+    const idx = idxSnap.val() as Record<string, { role: 'Admin' | 'Member' }>
+    const orgIds = Object.keys(idx)
+
+    // 2) fetch only those orgs in parallel
+    const snaps = await Promise.all(
+      orgIds.map(orgId => db.ref(`organizations/${orgId}`).get())
+    )
+
+    // 3) build result, cleaning up stale entries
+    return snaps.reduce<(Org & { role: 'Admin' | 'Member' })[]>((acc, snap, i) => {
+      const orgId = orgIds[i]
+      if (snap.exists()) {
+        acc.push({ ...(snap.val() as Org), role: idx[orgId].role })
+      } else {
+        // stale index → remove
+        db.ref(`users/${uid}/privateOrganizations/${orgId}`).remove()
+      }
+      return acc
+    }, [])
+  })
+)
+
+/** CREATE a new org (public or private), prevents duplicates */
+export const createOrganization = onCall((req: CallableRequest<Pick<OrgPayload, 'organization'>>) =>
+  wrap(async () => {
     const uid = req.auth?.uid
     const org = req.data.organization
-
-    if (!uid) {
-      throw new HttpsError('unauthenticated', 'Login required')
-    }
-    if (!org?.name?.trim()) {
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!org?.name?.trim())
       throw new HttpsError('invalid-argument', 'Organization name is required')
-    }
 
-    // Prevent duplicate names
-    const dupSnap = await db
+    // duplicate-name check
+    const dup = await db
       .ref('organizations')
       .orderByChild('name')
       .equalTo(org.name.trim())
       .get()
-    if (dupSnap.exists()) {
+    if (dup.exists())
       throw new HttpsError(
         'already-exists',
         'An organization with that name already exists.'
       )
-    }
 
-    // Build members map
-    const invited = Array.isArray(org.invitedUserIds) ? org.invitedUserIds : []
+    const invited = Array.isArray(org.invitedUserIds)
+      ? org.invitedUserIds.filter(id => id && id !== uid)
+      : []
+
+    // build members map
     const members: Record<string, 'Admin' | 'Member'> = { [uid]: 'Admin' }
-    if (org.isPrivate) {
-      invited.forEach(i => {
-        if (i && i !== uid) {
-          members[i] = 'Member'
-        }
-      })
-    }
+    if (org.isPrivate) invited.forEach(id => (members[id] = 'Member'))
 
-    // Push new org under /organizations
+    // write org
     const refOrg = db.ref('organizations').push()
-    const id = refOrg.key!
-    const newOrg: Org = {
-      id,
+    const orgId = refOrg.key!
+    const dataOrg: Org = {
+      id: orgId,
       ownerId: uid,
       name: org.name.trim(),
       description: org.description || '',
@@ -88,218 +129,174 @@ export const createOrganization = onCall(
       members,
       createdAt: Date.now(),
     }
-    await refOrg.set(newOrg)
+    await refOrg.set(dataOrg)
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // Notify invited users of private org
-    // ──────────────────────────────────────────────────────────────────────────
-    if (newOrg.isPrivate) {
+    if (dataOrg.isPrivate) {
+      // index owner
+      await db.ref(privIdx(uid, orgId)).set({ role: 'Admin' })
+      // index & notify invited
       await Promise.all(
-        invited
-          .filter(i => i && i !== uid)
-          .map(async memberId => {
-            // index under their privateOrganizations
-            await db
-              .ref(`users/${memberId}/privateOrganizations/${id}`)
-              .set({ role: 'Member' })
-
-            // push an "added_to_group" notification
-            const notifRef = db.ref(`users/${memberId}/notifications`).push()
-            await notifRef.set({
-              id: notifRef.key,
-              type: 'added_to_group',
-              orgId: newOrg.id,
-              fromUserId: uid,
-              timestamp: Date.now(),
-              message: `You were added to "${newOrg.name}"`,
-            })
+        invited.map(async memberId => {
+          await db.ref(privIdx(memberId, orgId)).set({ role: 'Member' })
+          const n = db.ref(`users/${memberId}/notifications`).push()
+          await n.set({
+            id: n.key,
+            type: 'added_to_group',
+            orgId,
+            fromUserId: uid,
+            timestamp: Date.now(),
+            message: `You were added to "${dataOrg.name}"`,
           })
+        })
       )
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Notify everyone (except creator) of new public org
-    // ──────────────────────────────────────────────────────────────────────────
-    if (!newOrg.isPrivate) {
+    } else {
+      // broadcast new public org
       const usersSnap = await db.ref('users').get()
       if (usersSnap.exists()) {
-        const allUserIds = Object.keys(usersSnap.val() as any).filter(
-          u => u !== uid
-        )
+        const allUids = Object.keys(usersSnap.val() as object).filter(u => u !== uid)
         await Promise.all(
-          allUserIds.map(userId => {
-            const notifRef = db.ref(
-              `users/${userId}/notifications`
-            ).push()
-            return notifRef.set({
-              id: notifRef.key,
+          allUids.map(async other => {
+            const n = db.ref(`users/${other}/notifications`).push()
+            await n.set({
+              id: n.key,
               type: 'new_public_org',
-              orgId: newOrg.id,
+              orgId,
               timestamp: Date.now(),
-              message: `A new organisation "${newOrg.name}" has been created.`,
+              message: `A new organisation "${dataOrg.name}" has been created.`,
             })
           })
         )
       }
     }
 
-    return newOrg
-  }
+    return dataOrg
+  })
 )
 
-/* -------------------------------------------------------------------------- */
-/*                         get public orgs (2)                                */
-/* -------------------------------------------------------------------------- */
-export const getPublicOrganizations = onCall(async () => {
-  const snap = await db
-    .ref('organizations')
-    .orderByChild('isPrivate')
-    .equalTo(false)
-    .get()
-  return snap.exists() ? (Object.values(snap.val()!) as Org[]) : []
-})
+/** UPDATE an org’s metadata (owner/admin only), duplicate-name protected */
+export const updateOrganization = onCall((req: CallableRequest<Pick<OrgPayload, 'orgId' | 'organization'>>) =>
+  wrap(async () => {
+    const uid = req.auth?.uid
+    const { orgId, organization } = req.data
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!orgId || !organization)
+      throw new HttpsError('invalid-argument', 'Missing orgId or organization input')
 
-/* -------------------------------------------------------------------------- */
-/*                    get private orgs for a user (3)                        */
-/* -------------------------------------------------------------------------- */
-export const getUserOrganizations = onCall(async (req: CallableRequest<{}>) => {
-  const uid = req.auth?.uid
-  if (!uid) {
-    throw new HttpsError('unauthenticated', 'Login required')
-  }
+    const orgSnap = await db.ref(`organizations/${orgId}`).get()
+    if (!orgSnap.exists())
+      throw new HttpsError('not-found', 'Organization not found')
+    const org = orgSnap.val() as Org
 
-  const snap = await db.ref(`users/${uid}/privateOrganizations`).get()
-  if (!snap.exists()) {
-    return []
-  }
+    if (org.ownerId !== uid && org.members[uid] !== 'Admin')
+      throw new HttpsError('permission-denied', 'Admin only')
 
-  const idx = snap.val() as Record<string, { role: 'Admin' | 'Member' }>
-  const orgs = await Promise.all(
-    Object.entries(idx).map(async ([orgId, { role }]) => {
-      const org = await loadOrg(orgId)
-      return { ...org, role }
-    })
-  )
-  return orgs
-})
+    const updates: Record<string, any> = {}
+    if (organization.name?.trim() && organization.name.trim() !== org.name) {
+      // duplicate-name check
+      const dup = await db
+        .ref('organizations')
+        .orderByChild('name')
+        .equalTo(organization.name.trim())
+        .get()
+      if (dup.exists()) throw new HttpsError('already-exists', 'Name in use')
+      updates.name = organization.name.trim()
+    }
+    if (organization.description !== undefined)
+      updates.description = organization.description
+    if (organization.image !== undefined) updates.image = organization.image
+    if (typeof organization.isPrivate === 'boolean')
+      updates.isPrivate = organization.isPrivate
 
-/* -------------------------------------------------------------------------- */
-/*                            join org (4) / leave org (5)                   */
-/* -------------------------------------------------------------------------- */
-export const joinOrganization = onCall(
-  async (req: CallableRequest<Pick<OrgPayload, 'orgId'>>) => {
+    if (Object.keys(updates).length === 0)
+      throw new HttpsError('invalid-argument', 'Nothing to update')
+
+    await db.ref(`organizations/${orgId}`).update(updates)
+    return (await db.ref(`organizations/${orgId}`).get()).val()
+  })
+)
+
+/** JOIN a public org (private orgs forbidden) */
+export const joinOrganization = onCall((req: CallableRequest<Pick<OrgPayload, 'orgId'>>) =>
+  wrap(async () => {
     const uid = req.auth?.uid
     const orgId = req.data.orgId
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!orgId) throw new HttpsError('invalid-argument', 'Missing orgId')
 
-    if (!uid) {
-      throw new HttpsError('unauthenticated', 'Login required')
-    }
-    if (!orgId) {
-      throw new HttpsError('invalid-argument', 'Missing orgId')
-    }
-
-    const org = await loadOrg(orgId)
-    if (org.isPrivate) {
-      throw new HttpsError(
-        'permission-denied',
-        'Cannot join a private organization'
-      )
-    }
+    const snap = await db.ref(`organizations/${orgId}`).get()
+    if (!snap.exists())
+      throw new HttpsError('not-found', 'Organization not found')
+    const org = snap.val() as Org
+    if (org.isPrivate)
+      throw new HttpsError('permission-denied', 'Cannot join a private organization')
 
     await db.ref(`organizations/${orgId}/members/${uid}`).set('Member')
     return { success: true }
-  }
+  })
 )
 
-export const leaveOrganization = onCall(
-  async (req: CallableRequest<Pick<OrgPayload, 'orgId'>>) => {
+/** LEAVE an org (handles sole-member delete, owner transfer, stale-index cleanup) */
+export const leaveOrganization = onCall((req: CallableRequest<Pick<OrgPayload, 'orgId'>>) =>
+  wrap(async () => {
     const uid = req.auth?.uid
     const orgId = req.data.orgId
-
-    if (!uid) {
-      throw new HttpsError('unauthenticated', 'Login required')
-    }
-    if (!orgId) {
-      throw new HttpsError('invalid-argument', 'Missing orgId')
-    }
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!orgId) throw new HttpsError('invalid-argument', 'Missing orgId')
 
     const snap = await db.ref(`organizations/${orgId}`).get()
-    if (!snap.exists()) {
+    if (!snap.exists())
       throw new HttpsError('not-found', 'Organization not found')
-    }
-
     const org = snap.val() as Org
-    const memberIds = Object.keys(org.members || {})
-
-    if (!org.members?.[uid]) {
+    if (!org.members[uid])
       throw new HttpsError('permission-denied', 'Not a member')
-    }
 
-    // sole member → delete
-    if (memberIds.length === 1 && memberIds[0] === uid) {
-      if (org.isPrivate) {
-        await db.ref(`users/${uid}/privateOrganizations/${orgId}`).remove()
-      }
+    const memberIds = Object.keys(org.members)
+    // sole member → delete entire org
+    if (memberIds.length === 1) {
+      if (org.isPrivate) await db.ref(privIdx(uid, orgId)).remove()
       await db.ref(`organizations/${orgId}`).remove()
       return { success: true, deleted: true }
     }
 
-    // owner leaves → transfer
+    // transfer ownership if needed
+    let transferred = false
     if (org.ownerId === uid) {
-      const others = memberIds.filter(id => id !== uid).sort()
-      const newOwner = others[0]
-      await db.ref(`organizations/${orgId}/ownerId`).set(newOwner)
-      await db
-        .ref(`organizations/${orgId}/members/${newOwner}`)
-        .set('Admin')
+      const nextOwner = memberIds.filter(m => m !== uid).sort()[0]
+      await db.ref(`organizations/${orgId}/ownerId`).set(nextOwner)
+      await db.ref(`organizations/${orgId}/members/${nextOwner}`).set('Admin')
+      transferred = true
     }
 
+    // remove member + cleanup index
     await db.ref(`organizations/${orgId}/members/${uid}`).remove()
-    if (org.isPrivate) {
-      await db
-        .ref(`users/${uid}/privateOrganizations/${orgId}`)
-        .remove()
-    }
+    if (org.isPrivate) await db.ref(privIdx(uid, orgId)).remove()
 
-    return { success: true, transferred: org.ownerId === uid }
-  }
+    return { success: true, transferred }
+  })
 )
 
-/* -------------------------------------------------------------------------- */
-/*                      add member (6) – send "added_to_group" notice         */
-/* -------------------------------------------------------------------------- */
-export const addMember = onCall(
-  async (req: CallableRequest<Pick<OrgPayload, 'orgId' | 'userId'>>) => {
+/** ADD a member to a private org (Admin only) */
+export const addMember = onCall((req: CallableRequest<Pick<OrgPayload, 'orgId' | 'userId'>>) =>
+  wrap(async () => {
     const uid = req.auth?.uid
     const { orgId, userId } = req.data
-
-    if (!uid) {
-      throw new HttpsError('unauthenticated', 'Login required')
-    }
-    if (!orgId || !userId) {
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!orgId || !userId)
       throw new HttpsError('invalid-argument', 'Missing orgId or userId')
-    }
 
-    const org = await loadOrg(orgId)
-    if (org.ownerId !== uid && org.members[uid] !== 'Admin') {
+    const snap = await db.ref(`organizations/${orgId}`).get()
+    if (!snap.exists())
+      throw new HttpsError('not-found', 'Organization not found')
+    const org = snap.val() as Org
+    if (org.ownerId !== uid && org.members[uid] !== 'Admin')
       throw new HttpsError('permission-denied', 'Admin only')
-    }
 
-    // add to org.members
-    await db
-      .ref(`organizations/${orgId}/members/${userId}`)
-      .set('Member')
-    // index under user
-    if (org.isPrivate) {
-      await db
-        .ref(`users/${userId}/privateOrganizations/${orgId}`)
-        .set({ role: 'Member' })
-    }
+    await db.ref(`organizations/${orgId}/members/${userId}`).set('Member')
+    if (org.isPrivate) await db.ref(privIdx(userId, orgId)).set({ role: 'Member' })
 
-    // push notification
-    const notifRef = db.ref(`users/${userId}/notifications`).push()
-    await notifRef.set({
-      id: notifRef.key,
+    const n = db.ref(`users/${userId}/notifications`).push()
+    await n.set({
+      id: n.key,
       type: 'added_to_group',
       orgId,
       fromUserId: uid,
@@ -308,70 +305,56 @@ export const addMember = onCall(
     })
 
     return { success: true }
-  }
+  })
 )
 
-export const removeMember = onCall(
-  async (req: CallableRequest<Pick<OrgPayload, 'orgId' | 'userId'>>) => {
+/** REMOVE a member (Admin only, cannot remove owner) */
+export const removeMember = onCall((req: CallableRequest<Pick<OrgPayload, 'orgId' | 'userId'>>) =>
+  wrap(async () => {
     const uid = req.auth?.uid
     const { orgId, userId } = req.data
-
-    if (!uid) {
-      throw new HttpsError('unauthenticated', 'Login required')
-    }
-    if (!orgId || !userId) {
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!orgId || !userId)
       throw new HttpsError('invalid-argument', 'Missing orgId or userId')
-    }
 
-    const org = await loadOrg(orgId)
-    if (org.ownerId !== uid && org.members[uid] !== 'Admin') {
+    const snap = await db.ref(`organizations/${orgId}`).get()
+    if (!snap.exists())
+      throw new HttpsError('not-found', 'Organization not found')
+    const org = snap.val() as Org
+    if (org.ownerId !== uid && org.members[uid] !== 'Admin')
       throw new HttpsError('permission-denied', 'Admin only')
-    }
-    if (userId === org.ownerId) {
+    if (userId === org.ownerId)
       throw new HttpsError('permission-denied', 'Cannot remove the owner')
-    }
 
-    await db
-      .ref(`organizations/${orgId}/members/${userId}`)
-      .remove()
-    if (org.isPrivate) {
-      await db
-        .ref(`users/${userId}/privateOrganizations/${orgId}`)
-        .remove()
-    }
+    await db.ref(`organizations/${orgId}/members/${userId}`).remove()
+    if (org.isPrivate) await db.ref(privIdx(userId, orgId)).remove()
 
     return { success: true }
-  }
+  })
 )
 
-/* -------------------------------------------------------------------------- */
-/*                            deleteOrganization                             */
-/* -------------------------------------------------------------------------- */
-export const deleteOrganization = onCall(
-  async (req: CallableRequest<Pick<OrgPayload, 'orgId'>>) => {
+/** DELETE an organization (owner only), cleans up private indexes */
+export const deleteOrganization = onCall((req: CallableRequest<Pick<OrgPayload, 'orgId'>>) =>
+  wrap(async () => {
     const uid = req.auth?.uid
     const orgId = req.data.orgId
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!orgId) throw new HttpsError('invalid-argument', 'Missing orgId')
 
-    if (!uid) {
-      throw new HttpsError('unauthenticated', 'Login required')
-    }
-    if (!orgId) {
-      throw new HttpsError('invalid-argument', 'Missing orgId')
-    }
-
-    const org = await loadOrg(orgId)
-    if (org.ownerId !== uid) {
+    const snap = await db.ref(`organizations/${orgId}`).get()
+    if (!snap.exists())
+      throw new HttpsError('not-found', 'Organization not found')
+    const org = snap.val() as Org
+    if (org.ownerId !== uid)
       throw new HttpsError('permission-denied', 'Only owner can delete')
-    }
 
-    for (const m of Object.keys(org.members || {})) {
-      if (org.isPrivate) {
-        await db
-          .ref(`users/${m}/privateOrganizations/${orgId}`)
-          .remove()
-      }
+    // remove all private indexes
+    if (org.isPrivate) {
+      await Promise.all(
+        Object.keys(org.members).map(m => db.ref(privIdx(m, orgId)).remove())
+      )
     }
     await db.ref(`organizations/${orgId}`).remove()
     return { success: true }
-  }
+  })
 )
