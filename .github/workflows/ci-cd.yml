@@ -26,6 +26,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: firebase-basic/package-lock.json
       - name: Install firebase-basic dependencies
         run: npm ci
       - name: Install functions dependencies
