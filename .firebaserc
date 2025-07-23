@@ -1,5 +1,9 @@
 {
   "projects": {
-    "default": "studenthandbook-a215a"
-  }
+    "default": "studenthandbook-a215a",
+    "production": "studenthandbook-a215a",
+    "staging": "studenthandbook-staging"
+  },
+  "targets": {},
+  "etags": {}
 }

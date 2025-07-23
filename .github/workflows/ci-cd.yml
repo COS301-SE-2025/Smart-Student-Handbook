@@ -1,87 +1,305 @@
+# name: CI / CD
+
+# on:
+#   push:            # every push to main
+#     branches: [main]
+#   pull_request:    # all PRs targeting main
+#     branches: [main]
+
+# jobs:
+#   # -----------------------------------------------------------------
+#   # 1 — Build & Test  (Always runs)
+#   # -----------------------------------------------------------------
+#   build-test:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       # ----- Checkout source -----
+#       - name: Checkout
+#         uses: actions/checkout@v4
+
+#       # ----- Node setup + dependency cache -----
+#       - name: Setup Node 20 LTS
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: '20'
+#           cache: 'npm'
+
+#       - name: Install dependencies
+#         run: npm ci
+
+#       # ----- Quality gates -----
+#       - name: Lint
+#         run: npm run lint
+
+#       - name: Unit tests (Jest)
+#         run: npm test -- --passWithNoTests   # placeholder flag keeps CI green
+
+#       # ----- Build & static export -----
+#       - name: Build site
+#         run: |
+#           npm run build
+#           npm run export               # writes static files into public/
+
+#       # ----- Cypress end-to-end tests -----
+#       - name: Cypress run
+#         uses: cypress-io/github-action@v6
+#         with:
+#           build: npm run build
+#           start: npx next start -p 3000
+#           wait-on: 'http://localhost:3000'
+#           wait-on-timeout: 120
+
+# # -----------------------------------------------------------------
+# # 2 — Deploy to Firebase Hosting  (DISABLED until secrets exist)
+# #    • Needs FIREBASE_SERVICE_ACCOUNT  (JSON key)
+# #    • Needs FIREBASE_PROJECT_ID      (studenthandbook-a215a)
+# # -----------------------------------------------------------------
+# #
+# # deploy:
+# #   needs: build-test
+# #   if: github.ref == 'refs/heads/main'   # runs only on main
+# #   runs-on: ubuntu-latest
+# #
+# #   steps:
+# #     - name: Checkout
+# #       uses: actions/checkout@v4
+# #
+# #     - name: Setup Node 20 LTS
+# #       uses: actions/setup-node@v4
+# #       with:
+# #         node-version: '20'
+# #         cache: 'npm'
+# #
+# #     - name: Install deps (skip postinstall)
+# #       run: npm ci --ignore-scripts
+# #
+# #     # ---- Authenticate to Google Cloud / Firebase ----
+# #     - uses: google-github-actions/auth@v2
+# #       with:
+# #         credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+# #
+# #     # ---- Deploy the static public/ folder ----
+# #     - name: Deploy to Firebase Hosting (live)
+# #       uses: google-github-actions/deploy-firebase@v1
+# #       with:
+# #         project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+# #         channel_id: live           # change to 'preview' for preview URLs
 name: CI / CD
 
 on:
-  push:            # every push to main
-    branches: [main]
-  pull_request:    # all PRs targeting main
-    branches: [main]
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+env:
+  NODE_VERSION: '20'
 
 jobs:
   # -----------------------------------------------------------------
-  # 1 — Build & Test  (Always runs)
+  # 1 — Build & Test (Always runs)
   # -----------------------------------------------------------------
   build-test:
     runs-on: ubuntu-latest
 
     steps:
-      # ----- Checkout source -----
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ----- Node setup + dependency cache -----
-      - name: Setup Node 20 LTS
+      - name: Setup Node ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
+      # Install dependencies for both root and firebase-basic
+      - name: Install root dependencies
         run: npm ci
 
-      # ----- Quality gates -----
-      - name: Lint
+      - name: Install firebase-basic dependencies
+        working-directory: ./firebase-basic
+        run: npm ci
+
+      - name: Install functions dependencies
+        working-directory: ./functions
+        run: npm ci
+
+      # Quality gates
+      - name: Lint firebase-basic
+        working-directory: ./firebase-basic
         run: npm run lint
 
       - name: Unit tests (Jest)
-        run: npm test -- --passWithNoTests   # placeholder flag keeps CI green
+        working-directory: ./firebase-basic
+        run: npm test -- --passWithNoTests --coverage
 
-      # ----- Build & static export -----
-      - name: Build site
+      # Test Firebase Functions
+      - name: Test Firebase Functions
+        working-directory: ./functions
+        run: npm test
+
+      # Build the Next.js app
+      - name: Build Next.js app
+        working-directory: ./firebase-basic
         run: |
           npm run build
-          npm run export               # writes static files into public/
+          npm run export
 
-      # ----- Cypress end-to-end tests -----
+      # Upload build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-files
+          path: |
+            firebase-basic/out/
+            firebase-basic/.next/
+          retention-days: 1
+
+      # Cypress end-to-end tests
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
+          working-directory: ./firebase-basic
           build: npm run build
           start: npx next start -p 3000
           wait-on: 'http://localhost:3000'
           wait-on-timeout: 120
 
-# -----------------------------------------------------------------
-# 2 — Deploy to Firebase Hosting  (DISABLED until secrets exist)
-#    • Needs FIREBASE_SERVICE_ACCOUNT  (JSON key)
-#    • Needs FIREBASE_PROJECT_ID      (studenthandbook-a215a)
-# -----------------------------------------------------------------
-#
-# deploy:
-#   needs: build-test
-#   if: github.ref == 'refs/heads/main'   # runs only on main
-#   runs-on: ubuntu-latest
-#
-#   steps:
-#     - name: Checkout
-#       uses: actions/checkout@v4
-#
-#     - name: Setup Node 20 LTS
-#       uses: actions/setup-node@v4
-#       with:
-#         node-version: '20'
-#         cache: 'npm'
-#
-#     - name: Install deps (skip postinstall)
-#       run: npm ci --ignore-scripts
-#
-#     # ---- Authenticate to Google Cloud / Firebase ----
-#     - uses: google-github-actions/auth@v2
-#       with:
-#         credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-#
-#     # ---- Deploy the static public/ folder ----
-#     - name: Deploy to Firebase Hosting (live)
-#       uses: google-github-actions/deploy-firebase@v1
-#       with:
-#         project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
-#         channel_id: live           # change to 'preview' for preview URLs
+  # -----------------------------------------------------------------
+  # 2 — Deploy to Firebase Staging (dev branch)
+  # -----------------------------------------------------------------
+  deploy-staging:
+    needs: build-test
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: ./
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install firebase-basic dependencies
+        working-directory: ./firebase-basic
+        run: npm ci
+
+      - name: Install functions dependencies
+        working-directory: ./functions
+        run: npm ci
+
+      # Copy built files to public directory
+      - name: Copy built files to public
+        run: |
+          rm -rf public/*
+          cp -r firebase-basic/out/* public/
+
+      # Authenticate to Firebase
+      - name: Authenticate to Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      # Deploy Firebase Functions
+      - name: Deploy Firebase Functions to Staging
+        run: |
+          npm install -g firebase-tools
+          firebase use staging --token ${{ secrets.FIREBASE_TOKEN }}
+          firebase deploy --only functions --token ${{ secrets.FIREBASE_TOKEN }}
+
+      # Deploy to Firebase Hosting (preview channel)
+      - name: Deploy to Firebase Hosting (staging)
+        run: |
+          firebase deploy --only hosting --token ${{ secrets.FIREBASE_TOKEN }}
+
+      # Deploy Database Rules
+      - name: Deploy Database Rules
+        run: |
+          firebase deploy --only database --token ${{ secrets.FIREBASE_TOKEN }}
+
+  # -----------------------------------------------------------------
+  # 3 — Deploy to Firebase Production (main branch)
+  # -----------------------------------------------------------------
+  deploy-production:
+    needs: build-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: ./
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install firebase-basic dependencies
+        working-directory: ./firebase-basic
+        run: npm ci
+
+      - name: Install functions dependencies
+        working-directory: ./functions
+        run: npm ci
+
+      # Copy built files to public directory
+      - name: Copy built files to public
+        run: |
+          rm -rf public/*
+          cp -r firebase-basic/out/* public/
+
+      # Authenticate to Firebase
+      - name: Authenticate to Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      # Deploy Firebase Functions
+      - name: Deploy Firebase Functions to Production
+        run: |
+          npm install -g firebase-tools
+          firebase use production --token ${{ secrets.FIREBASE_TOKEN }}
+          firebase deploy --only functions --token ${{ secrets.FIREBASE_TOKEN }}
+
+      # Deploy to Firebase Hosting
+      - name: Deploy to Firebase Hosting (production)
+        run: |
+          firebase deploy --only hosting --token ${{ secrets.FIREBASE_TOKEN }}
+
+      # Deploy Database Rules
+      - name: Deploy Database Rules
+        run: |
+          firebase deploy --only database --token ${{ secrets.FIREBASE_TOKEN }}
+
+      # Notify deployment success
+      - name: Notify deployment success
+        run: |
+          echo "🚀 Successfully deployed to production!"
+          echo "Visit your app at: https://${{ secrets.FIREBASE_PROJECT_ID }}.web.app"
