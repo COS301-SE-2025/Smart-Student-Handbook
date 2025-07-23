@@ -42,17 +42,12 @@ const items = [
     icon: Calendar,
     description: "Schedule & events",
   },
-  {
-    title: "Settings",
-    url: "/profile",
-    icon: Settings,
-    description: "Account & preferences",
-  },
+  
     {
     title: "Friends",
     url: "/friends",
     icon: Users,
-    description: "Friends and Requests",
+    description: "Friends & requests",
   },
    {
     title: "Organisations",
@@ -64,8 +59,15 @@ const items = [
     title: "Help & Support",
     url: "/notes",
     icon: BookOpen,
-    description: "",
+    description: "User guide & support",
    },
+
+   {
+    title: "Settings",
+    url: "/profile",
+    icon: Settings,
+    description: "Account & preferences",
+  },
 ]
 
 export function AppSidebar() {

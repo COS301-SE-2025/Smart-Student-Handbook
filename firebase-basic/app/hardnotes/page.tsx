@@ -788,7 +788,7 @@ export default function NotePage() {
   return (
     <div className="min-h-screen bg-background">
       <PageHeader
-        title="Notes Editor"
+        title="Library"
         description="Browse, organize, and edit your personal and shared notes all in one place."
       />
 
