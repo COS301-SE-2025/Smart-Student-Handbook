@@ -34,7 +34,7 @@
     ".next/types/**/*.ts",
     "next-env.d.ts",
     "out/types/**/*.ts"
-  ],
+, "jest.setup.js", "__tests__/userSettings.test.tsx", "__tests__/organisationsPage.test.tsx", "__tests__/hardnotesPage.test.tsx", "__tests__/friendsPage.test.tsx"  ],
   "exclude": [
     "node_modules"
   ]
