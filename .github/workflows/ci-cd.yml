@@ -94,9 +94,6 @@ deploy-staging:
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
-        cache-dependency-path: |
-          firebase-basic/package-lock.json
-          functions/package-lock.json
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
@@ -137,9 +134,6 @@ deploy-production:
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
-        cache-dependency-path: |
-          firebase-basic/package-lock.json
-          functions/package-lock.json
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
