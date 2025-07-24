@@ -10,147 +10,147 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-# -----------------------------------------------------------------
-# 1 — Build & Test (Always runs)
-# -----------------------------------------------------------------
-build-test:
-  runs-on: ubuntu-latest
-  defaults:
-    run:
-      working-directory: firebase-basic
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup Node ${{ env.NODE_VERSION }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: firebase-basic/package-lock.json
-    - name: Install firebase-basic dependencies
-      run: npm ci
-    - name: List installed packages
-      run: npm list --depth=0
-    - name: Install functions dependencies
-      working-directory: ../functions
-      run: npm ci
-    - name: Lint firebase-basic
-      run: npm run lint || echo "Linting failed, skipping"
-      continue-on-error: true
-    - name: Unit tests (Jest)
-      run: |
-        npm test -- --passWithNoTests --coverage --ci --watchAll=false --maxWorkers=2
-      env:
-        CI: true
-        NODE_ENV: test
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results
-        path: |
-          firebase-basic/coverage/
-          firebase-basic/test-results.xml
-        retention-days: 7
-    - name: Build Next.js app
-      run: |
-        npm run build
-        npm run export
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-files
-        path: |
-          firebase-basic/out/
-          firebase-basic/.next/
-        retention-days: 1
-    - name: Functions tests
-      working-directory: ../functions
-      run: npm test || echo "Functions tests failed, continuing"
-      continue-on-error: true
-    - name: Cypress run
-      uses: cypress-io/github-action@v6
-      with:
+  # -----------------------------------------------------------------
+  # 1 — Build & Test (Always runs)
+  # -----------------------------------------------------------------
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firebase-basic
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: firebase-basic/package-lock.json
+      - name: Install firebase-basic dependencies
+        run: npm ci
+      - name: List installed packages
+        run: npm list --depth=0
+      - name: Install functions dependencies
+        working-directory: ../functions
+        run: npm ci
+      - name: Lint firebase-basic
+        run: npm run lint || echo "Linting failed, skipping"
+        continue-on-error: true
+      - name: Unit tests (Jest)
+        run: |
+          npm test -- --passWithNoTests --coverage --ci --watchAll=false --maxWorkers=2
+        env:
+          CI: true
+          NODE_ENV: test
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            firebase-basic/coverage/
+            firebase-basic/test-results.xml
+          retention-days: 7
+      - name: Build Next.js app
+        run: |
+          npm run build
+          npm run export
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-files
+          path: |
+            firebase-basic/out/
+            firebase-basic/.next/
+          retention-days: 1
+      - name: Functions tests
+        working-directory: ../functions
+        run: npm test || echo "Functions tests failed, continuing"
+        continue-on-error: true
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./firebase-basic
+          build: npm run build
+          start: npx next start -p 3000
+          wait-on: 'http://localhost:3000'
+          wait-on-timeout: 120
+        continue-on-error: true
+
+  # -----------------------------------------------------------------
+  # 2 — Deploy to Firebase Staging (dev branch)
+  # -----------------------------------------------------------------
+  deploy-staging:
+    needs: build-test
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: ./firebase-basic/
+      - name: Install firebase-basic dependencies
         working-directory: ./firebase-basic
-        build: npm run build
-        start: npx next start -p 3000
-        wait-on: 'http://localhost:3000'
-        wait-on-timeout: 120
-      continue-on-error: true
+        run: npm ci
+      - name: Install functions dependencies
+        working-directory: ./functions
+        run: npm ci
+      - name: Copy built files to public
+        run: |
+          rm -rf public/*
+          cp -r firebase-basic/out/* public/
+      - name: Authenticate to Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+      - name: Deploy to Firebase Staging
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --project staging --force
 
-# -----------------------------------------------------------------
-# 2 — Deploy to Firebase Staging (dev branch)
-# -----------------------------------------------------------------
-deploy-staging:
-  needs: build-test
-  if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
-  runs-on: ubuntu-latest
-  environment: staging
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup Node ${{ env.NODE_VERSION }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-files
-        path: ./firebase-basic/
-    - name: Install firebase-basic dependencies
-      working-directory: ./firebase-basic
-      run: npm ci
-    - name: Install functions dependencies
-      working-directory: ./functions
-      run: npm ci
-    - name: Copy built files to public
-      run: |
-        rm -rf public/*
-        cp -r firebase-basic/out/* public/
-    - name: Authenticate to Firebase
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
-    - name: Deploy to Firebase Staging
-      run: |
-        npm install -g firebase-tools
-        firebase deploy --project staging --force
-
-deploy-production:
-  needs: build-test
-  if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  runs-on: ubuntu-latest
-  environment: production
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup Node ${{ env.NODE_VERSION }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-files
-        path: ./firebase-basic/
-    - name: Install firebase-basic dependencies
-      working-directory: ./firebase-basic
-      run: npm ci
-    - name: Install functions dependencies
-      working-directory: ./functions
-      run: npm ci
-    - name: Copy built files to public
-      run: |
-        rm -rf public/*
-        cp -r firebase-basic/out/* public/
-    - name: Authenticate to Firebase
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
-    - name: Deploy to Firebase Production
-      run: |
-        npm install -g firebase-tools
-        firebase deploy --project production --force
+  deploy-production:
+    needs: build-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: ./firebase-basic/
+      - name: Install firebase-basic dependencies
+        working-directory: ./firebase-basic
+        run: npm ci
+      - name: Install functions dependencies
+        working-directory: ./functions
+        run: npm ci
+      - name: Copy built files to public
+        run: |
+          rm -rf public/*
+          cp -r firebase-basic/out/* public/
+      - name: Authenticate to Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+      - name: Deploy to Firebase Production
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --project production --force
