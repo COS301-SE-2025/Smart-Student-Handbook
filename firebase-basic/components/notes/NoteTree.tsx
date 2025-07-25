@@ -1,15 +1,22 @@
-import { FileNode } from "@/types/note"
-import { FolderItem } from "./FolderItem"
-import { NoteItem } from "./NoteItem"
+import { FileNode } from "@/types/note";
+import { FolderItem } from "./FolderItem";
+import { NoteItem } from "./NoteItem";
 
 interface Props {
-  tree: FileNode[]
-  selectedNoteId?: string
-  onSelect: (id: string) => void
-  onRename: (id: string, newName: string) => void
+  tree: FileNode[];
+  selectedNoteId?: string;
+  onSelect: (id: string) => void;
+  onRename: (id: string, newName: string) => void;
 }
 
-export function NoteTree({ tree, selectedNoteId, onSelect, onRename }: Props) {
+export function NoteTree({
+  tree,
+  selectedNoteId,
+  onSelect,
+  onRename,
+  onDelete,
+  onDropNode,
+}: Props) {
   return (
     <div>
       {tree.map((node) =>
@@ -19,6 +26,8 @@ export function NoteTree({ tree, selectedNoteId, onSelect, onRename }: Props) {
             node={node}
             onSelect={onSelect}
             onRename={onRename}
+            onDelete={onDelete}
+            onDropNode={onDropNode}
           />
         ) : (
           <NoteItem
@@ -27,9 +36,11 @@ export function NoteTree({ tree, selectedNoteId, onSelect, onRename }: Props) {
             selected={selectedNoteId === node.id}
             onSelect={onSelect}
             onRename={onRename}
+            onDelete={onDelete}
+            onDropNode={onDropNode}
           />
         )
       )}
     </div>
-  )
+  );
 }

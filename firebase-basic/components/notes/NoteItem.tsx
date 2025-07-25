@@ -6,9 +6,10 @@ interface Props {
   selected: boolean
   onSelect: (id: string) => void
   onRename: (id: string, newName: string) => void
+  onDelete: (id: string) => void
 }
 
-export function NoteItem({ node, selected, onSelect, onRename }: Props) {
+export function NoteItem({ node, selected, onSelect, onRename, onDelete , onDropNode  }: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [tempName, setTempName] = useState(node.name)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -30,8 +31,19 @@ export function NoteItem({ node, selected, onSelect, onRename }: Props) {
 
   return (
     <div
+      draggable
       onClick={() => onSelect(node.id)}
-      className={`cursor-pointer p-2 rounded ${
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", node.id)
+      }}
+      onDragOver={(e) => e.preventDefault()} // allow drop
+      onDrop={(e) => {
+        e.preventDefault()
+        const draggedId = e.dataTransfer.getData("text/plain")
+        if (onDropNode && draggedId !== node.id) {
+        }
+      }}
+      className={`flex justify-between items-center p-2 rounded ${
         selected ? "bg-blue-100" : "hover:bg-gray-100"
       }`}
     >
@@ -53,6 +65,20 @@ export function NoteItem({ node, selected, onSelect, onRename }: Props) {
       ) : (
         <span onDoubleClick={() => setIsEditing(true)}>📝 {node.name}</span>
       )}
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          if (window.confirm(`Delete note "${node.name}"?`)) {
+            onDelete(node.id)
+          }
+        }}
+        className="ml-2 text-red-500 hover:text-red-700 text-sm"
+        aria-label={`Delete note ${node.name}`}
+        type="button"
+      >
+        ×
+      </button>
     </div>
   )
 }

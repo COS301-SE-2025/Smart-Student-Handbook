@@ -15,7 +15,6 @@ import {
 export default function NotesPage() {
   const [tree, setTree] = useState<FileNode[]>(initialTree);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
 
   const selectedNode = findNodeById(tree, selectedNoteId);
 
@@ -28,9 +27,24 @@ export default function NotesPage() {
     setTree(newTree);
   };
 
-  const handleMove = (draggedId: string, targetId: string) => {
-    const updatedTree = moveNode(tree, draggedId, targetId);
-    setTree(updatedTree);
+  const handleMove = (draggedId: string, targetFolderId: string) => {
+    setTree((prev) => moveNode(prev, draggedId, targetFolderId));
+  };
+
+  const handleDelete = (id: string) => {
+    setTree((prevTree) => {
+      function deleteNode(nodes: FileNode[]): FileNode[] {
+        return nodes
+          .filter((node) => node.id !== id)
+          .map((node) => ({
+            ...node,
+            children: node.children ? deleteNode(node.children) : undefined,
+          }));
+      }
+      return deleteNode(prevTree);
+    });
+
+    if (selectedNoteId === id) setSelectedNoteId(null);
   };
 
   const handleRename = (id: string, newName: string) => {
@@ -60,43 +74,6 @@ export default function NotesPage() {
           <button onClick={() => handleAdd("folder")} className="...">
             + Folder
           </button>
-          <button
-            disabled={!selectedNoteId}
-            onClick={() => {
-              if (
-                selectedNode &&
-                window.confirm(`Delete "${selectedNode.name}"?`)
-              ) {
-                const newTree = deleteNode(tree, selectedNode.id);
-                setTree(newTree);
-                setSelectedNoteId(null);
-              }
-            }}
-            className="..."
-          >
-            🗑 Delete
-          </button>
-          <button
-            disabled={!selectedNoteId}
-            onClick={() => {
-              if (!selectedNode) return;
-              const newName = window.prompt(
-                "Enter new name:",
-                selectedNode.name
-              );
-              if (newName && newName.trim() !== "") {
-                const updatedTree = renameNode(
-                  tree,
-                  selectedNode.id,
-                  newName.trim()
-                );
-                setTree(updatedTree);
-              }
-            }}
-            className="..."
-          >
-            ✏ Rename
-          </button>
         </div>
 
         <NoteTree
@@ -104,6 +81,8 @@ export default function NotesPage() {
           selectedNoteId={selectedNoteId}
           onSelect={setSelectedNoteId}
           onRename={handleRename}
+          onDelete={handleDelete}
+          onDropNode={handleMove}
         />
       </div>
       <div className="flex-1 p-4">
