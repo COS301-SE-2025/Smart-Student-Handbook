@@ -10,6 +10,9 @@ env:
   NODE_VERSION: '20'
 
 jobs:
+  # -----------------------------------------------------------------
+  # 1 — Build & Test (Always runs)
+  # -----------------------------------------------------------------
   build-test:
     runs-on: ubuntu-latest
     steps:
@@ -88,89 +91,102 @@ jobs:
           wait-on-timeout: 120
         continue-on-error: true
 
+  # -----------------------------------------------------------------
+  # 2 — Deploy to Firebase Staging (dev branch)
+  # -----------------------------------------------------------------
+  deploy-staging:
+    needs: build-test
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-# -----------------------------------------------------------------
-# 2 — Deploy to Firebase Staging (dev branch)
-# -----------------------------------------------------------------
-deploy-staging:
-  needs: build-test
-  if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
-  runs-on: ubuntu-latest
-  environment: staging
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup Node ${{ env.NODE_VERSION }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: |
-          firebase-basic/package-lock.json
-          functions/package-lock.json
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-files
-        path: ./firebase-basic/
-    - name: Install firebase-basic dependencies
-      working-directory: ./firebase-basic
-      run: npm ci
-    - name: Install functions dependencies
-      working-directory: ./functions
-      run: npm ci
-    - name: Copy built files to public
-      run: |
-        rm -rf public/*
-        cp -r firebase-basic/out/* public/
-    - name: Authenticate to Firebase
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
-    - name: Deploy to Firebase Staging
-      run: |
-        npm install -g firebase-tools
-        firebase deploy --project staging --force
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            firebase-basic/package-lock.json
+            functions/package-lock.json
 
-# -----------------------------------------------------------------
-# 3 — Deploy to Firebase Production (main branch)
-# -----------------------------------------------------------------
-deploy-production:
-  needs: build-test
-  if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  runs-on: ubuntu-latest
-  environment: production
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup Node ${{ env.NODE_VERSION }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: |
-          firebase-basic/package-lock.json
-          functions/package-lock.json
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-files
-        path: ./firebase-basic/
-    - name: Install firebase-basic dependencies
-      working-directory: ./firebase-basic
-      run: npm ci
-    - name: Install functions dependencies
-      working-directory: ./functions
-      run: npm ci
-    - name: Copy built files to public
-      run: |
-        rm -rf public/*
-        cp -r firebase-basic/out/* public/
-    - name: Authenticate to Firebase
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
-    - name: Deploy to Firebase Production
-      run: |
-        npm install -g firebase-tools
-        firebase deploy --project production --force
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: ./firebase-basic/
+
+      - name: Install firebase-basic dependencies
+        working-directory: ./firebase-basic
+        run: npm ci
+
+      - name: Install functions dependencies
+        working-directory: ./functions
+        run: npm ci
+
+      - name: Copy built files to public
+        run: |
+          rm -rf public/*
+          cp -r firebase-basic/out/* public/
+
+      - name: Authenticate to Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+
+      - name: Deploy to Firebase Staging
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --project staging --force
+
+  # -----------------------------------------------------------------
+  # 3 — Deploy to Firebase Production (main branch)
+  # -----------------------------------------------------------------
+  deploy-production:
+    needs: build-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            firebase-basic/package-lock.json
+            functions/package-lock.json
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: ./firebase-basic/
+
+      - name: Install firebase-basic dependencies
+        working-directory: ./firebase-basic
+        run: npm ci
+
+      - name: Install functions dependencies
+        working-directory: ./functions
+        run: npm ci
+
+      - name: Copy built files to public
+        run: |
+          rm -rf public/*
+          cp -r firebase-basic/out/* public/
+
+      - name: Authenticate to Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+
+      - name: Deploy to Firebase Production
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --project production --force
