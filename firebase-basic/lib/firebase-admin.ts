@@ -1,10 +1,11 @@
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 
-const serviceAccount =
-  process.env.FIREBASE_SERVICE_ACCOUNT
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-    : require('./serviceAccountKey.json'); // Fallback for local only
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is not set');
+}
+
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 const app = getApps().length
   ? getApps()[0]
