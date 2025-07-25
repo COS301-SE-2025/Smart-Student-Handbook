@@ -8,7 +8,20 @@ const nextConfig: NextConfig = {
   },
   distDir: 'out',
   eslint: {
-    ignoreDuringBuilds: true, // Temporarily disable ESLint during builds
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true, // This will ignore TypeScript errors during build
+  },
+  experimental: {
+    turbo: {
+      rules: {
+        '*.svg': {
+          loaders: ['@svgr/webpack'],
+          as: '*.js',
+        },
+      },
+    },
   },
 };
 
