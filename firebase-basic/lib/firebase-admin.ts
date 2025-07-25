@@ -1,6 +1,10 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
-import serviceAccount from "./serviceAccountKey.json"; // This file must also exist!
+
+// Use secret from GitHub Actions or fallback to local file
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+  : require("./serviceAccountKey.json");
 
 const app = getApps().length
   ? getApps()[0]
