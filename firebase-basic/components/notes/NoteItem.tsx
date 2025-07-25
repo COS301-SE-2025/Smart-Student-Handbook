@@ -1,84 +1,91 @@
-import React, { useState, useEffect, useRef } from "react"
-import { FileNode } from "@/types/note"
+import { useDraggable } from "@dnd-kit/core";
+import { useRef, useState } from "react";
+import { FileNode } from "@/types/note";
+import { FileText, Trash2, GripVertical } from "lucide-react";
 
 interface Props {
-  node: FileNode
-  selected: boolean
-  onSelect: (id: string) => void
-  onRename: (id: string, newName: string) => void
-  onDelete: (id: string) => void
+  node: FileNode;
+  onSelect: (id: string) => void;
+  onRename: (id: string, newName: string) => void;
+  onDelete: (id: string) => void;
 }
 
-export function NoteItem({ node, selected, onSelect, onRename, onDelete , onDropNode  }: Props) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [tempName, setTempName] = useState(node.name)
-  const inputRef = useRef<HTMLInputElement>(null)
+export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) {
+  const [isRenaming, setIsRenaming] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
-    }
-  }, [isEditing])
+  // Draggable only on handle
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: node.id,
+  });
 
-  const saveRename = () => {
-    const trimmed = tempName.trim()
-    if (trimmed && trimmed !== node.name) {
-      onRename(node.id, trimmed)
+  const style = transform
+    ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
+    : undefined;
+
+  const handleRename = () => {
+    const newName = inputRef.current?.value.trim();
+    if (newName && newName !== node.name) {
+      onRename(node.id, newName);
     }
-    setIsEditing(false)
-  }
+    setIsRenaming(false);
+  };
 
   return (
     <div
-      draggable
-      onClick={() => onSelect(node.id)}
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", node.id)
-      }}
-      onDragOver={(e) => e.preventDefault()} // allow drop
-      onDrop={(e) => {
-        e.preventDefault()
-        const draggedId = e.dataTransfer.getData("text/plain")
-        if (onDropNode && draggedId !== node.id) {
-        }
-      }}
-      className={`flex justify-between items-center p-2 rounded ${
-        selected ? "bg-blue-100" : "hover:bg-gray-100"
-      }`}
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 px-3 py-1 rounded cursor-pointer group hover:bg-gray-100"
     >
-      {isEditing ? (
+      {/* Drag handle */}
+      <div
+        {...listeners}
+        {...attributes}
+        className="cursor-grab p-1 rounded hover:bg-gray-200"
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+        aria-label="Drag handle"
+        role="button"
+      >
+        <GripVertical className="w-4 h-4 text-gray-500" />
+      </div>
+
+      {/* Note icon */}
+      <FileText className="w-4 h-4 text-blue-500 select-none" />
+
+      {/* Name or renaming input */}
+      {isRenaming ? (
         <input
           ref={inputRef}
-          value={tempName}
-          onChange={(e) => setTempName(e.target.value)}
-          onBlur={saveRename}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") saveRename()
-            else if (e.key === "Escape") {
-              setTempName(node.name)
-              setIsEditing(false)
-            }
-          }}
-          className="w-full px-1 py-0.5 border rounded text-sm"
+          defaultValue={node.name}
+          onBlur={handleRename}
+          onKeyDown={(e) => e.key === "Enter" && handleRename()}
+          autoFocus
+          className="border-b border-gray-300 outline-none text-sm bg-transparent"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
         />
       ) : (
-        <span onDoubleClick={() => setIsEditing(true)}>📝 {node.name}</span>
+        <span
+          className="text-sm select-none"
+          onClick={() => onSelect(node.id)}
+          onDoubleClick={() => setIsRenaming(true)}
+        >
+          {node.name}
+        </span>
       )}
 
+      {/* Delete button */}
       <button
         onClick={(e) => {
-          e.stopPropagation()
-          if (window.confirm(`Delete note "${node.name}"?`)) {
-            onDelete(node.id)
-          }
+          e.stopPropagation();
+          onDelete(node.id);
         }}
-        className="ml-2 text-red-500 hover:text-red-700 text-sm"
+        className="ml-auto opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700"
         aria-label={`Delete note ${node.name}`}
-        type="button"
       >
-        ×
+        <Trash2 className="w-3 h-3" />
       </button>
     </div>
-  )
+  );
 }

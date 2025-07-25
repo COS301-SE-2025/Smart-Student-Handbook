@@ -10,9 +10,6 @@ const QuillEditor = dynamic(() => import("@/components/quilleditor"), {
   ssr: false,
 });
 
-import { ref, set, remove } from "firebase/database";
-import { db } from "@/lib/firebase";
-import { stat } from "fs";
 
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";

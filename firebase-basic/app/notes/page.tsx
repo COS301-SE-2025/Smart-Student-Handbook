@@ -2,15 +2,10 @@
 "use client";
 
 import { useState } from "react";
-import { NoteTree } from "@/components/notes/NoteTree";
+import NoteTree from "@/components/notes/NoteTree";
 import { FileNode } from "@/types/note";
 import { testTree as initialTree } from "@/mock/testTree";
-import {
-  addNode,
-  deleteNode,
-  renameNode,
-  moveNode,
-} from "@/lib/note/treeActions";
+import { addNode, moveNode } from "@/lib/note/treeActions";
 
 export default function NotesPage() {
   const [tree, setTree] = useState<FileNode[]>(initialTree);
@@ -77,8 +72,7 @@ export default function NotesPage() {
         </div>
 
         <NoteTree
-          tree={tree}
-          selectedNoteId={selectedNoteId}
+          treeData={tree}
           onSelect={setSelectedNoteId}
           onRename={handleRename}
           onDelete={handleDelete}

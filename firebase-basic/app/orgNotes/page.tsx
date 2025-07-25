@@ -2,7 +2,7 @@
 import { useSearchParams } from "next/navigation";
 import NotesGrid from "@/components/NotesGrid";
 
-import { get, ref, set } from "firebase/database";
+import { get, ref } from "firebase/database";
 import { db } from "@/lib";
 
 import { useEffect, useState } from "react";
@@ -13,14 +13,6 @@ type Note = {
   name: string;
   content: string;
   type: "note";
-};
-
-const exampleNote: Note = {
-  ownerId: "user123",
-  id: "note567",
-  name: "Example Note Title",
-  content: "This is the content of the example note.",
-  type: "note",
 };
 
 export default function OrgNotesPage() {
