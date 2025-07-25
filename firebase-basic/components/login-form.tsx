@@ -43,7 +43,7 @@ export function LoginForm({
   }
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className={cn("flex flex-col gap-6", className)} {...props}data-testid="login-form-container">
       <Card className="overflow-hidden">
         <CardContent className="grid p-0 md:grid-cols-2">
           <form onSubmit={handleLogin} className="p-6 md:p-8">

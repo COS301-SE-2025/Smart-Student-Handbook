@@ -59,7 +59,7 @@ export function SignupForm(
 
   /* ─── JSX ────────────────────────────────────────────────────── */
   return (
-    <div className={cn('flex flex-col gap-6', className)} {...props}>
+    <div className={cn('flex flex-col gap-6', className)} {...props} data-testid="root-div" >
       <Card className="overflow-hidden w-full max-w-3xl">
         <CardContent className="grid p-0 md:grid-cols-2">
           {/* ── Signup form ── */}
@@ -129,11 +129,12 @@ export function SignupForm(
               </Button>
 
               {/* Error */}
-              {error && (
-                <p className="text-sm text-red-500 text-center">
-                  {error}
-                </p>
-              )}
+              
+        {error && (
+  <p className="text-sm text-red-500 text-center" data-testid="error-message">
+    {error}
+  </p>
+)}
 
               {/* Login link */}
               <p className="text-center text-sm text-muted-foreground">
