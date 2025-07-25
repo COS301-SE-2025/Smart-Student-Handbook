@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "export": "next export",
     "test": "jest --watchAll=false",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --watchAll=false",
