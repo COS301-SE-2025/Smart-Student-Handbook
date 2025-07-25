@@ -1,0 +1,95 @@
+import React, { useState, useEffect, useRef } from "react"
+import { FileNode } from "@/types/note"
+import { NoteItem } from "./NoteItem"
+
+interface Props {
+  node: FileNode
+  onSelect: (id: string) => void
+  onRename: (id: string, newName: string) => void
+}
+
+export function FolderItem({ node, onSelect, onRename }: Props) {
+  const [open, setOpen] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [tempName, setTempName] = useState(node.name)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isEditing])
+
+  const saveRename = () => {
+    const trimmed = tempName.trim()
+    if (trimmed && trimmed !== node.name) {
+      onRename(node.id, trimmed)
+    }
+    setIsEditing(false)
+  }
+
+  return (
+    <div className="ml-2">
+      <div
+        draggable
+        onDragStart={(e) => e.dataTransfer.setData("text/plain", node.id)}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault()
+          const draggedId = e.dataTransfer.getData("text/plain")
+          if (draggedId !== node.id) {
+            // assume onDropNode is handled in parent — can be added similarly
+          }
+        }}
+        className="flex items-center font-bold cursor-pointer select-none"
+      >
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            value={tempName}
+            onChange={(e) => setTempName(e.target.value)}
+            onBlur={saveRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveRename()
+              else if (e.key === "Escape") {
+                setTempName(node.name)
+                setIsEditing(false)
+              }
+            }}
+            className="w-full px-1 py-0.5 border rounded text-sm"
+          />
+        ) : (
+          <span onDoubleClick={() => setIsEditing(true)}>📁 {node.name}</span>
+        )}
+        <button
+          className="ml-auto px-1 text-xs text-gray-500 hover:text-gray-700"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? "Collapse folder" : "Expand folder"}
+          type="button"
+        >
+          {open ? "▼" : "▶"}
+        </button>
+      </div>
+      {open &&
+        node.children?.map((child) =>
+          child.type === "folder" ? (
+            <FolderItem
+              key={child.id}
+              node={child}
+              onSelect={onSelect}
+              onRename={onRename}
+            />
+          ) : (
+            <NoteItem
+              key={child.id}
+              node={child}
+              selected={false}
+              onSelect={onSelect}
+              onRename={onRename}
+            />
+          )
+        )}
+    </div>
+  )
+}
