@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { DndContext, DragEndEvent, DragStartEvent, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDroppable } from "@dnd-kit/core";
 import FolderItem from "./FolderItem";
 import NoteItem from "./NoteItem";
 import { FileNode } from "@/types/note";
+import { FileText, Folder } from "lucide-react";
 
 interface Props {
   treeData: FileNode[];
@@ -23,6 +24,7 @@ export default function NodeTree({
 }: Props) {
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
+  const [activeDragNode, setActiveDragNode] = useState<FileNode | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedFolderIds((prev) => {
@@ -42,6 +44,7 @@ export default function NodeTree({
     }
     return null;
   };
+
 
   const findParentNode = (nodes: FileNode[], childId: string): FileNode | null => {
     for (const node of nodes) {
@@ -85,38 +88,27 @@ export default function NodeTree({
     );
   };
 
-  const handleDragStart = (_event: DragStartEvent) => {
-    setIsDragging(true);
+  const handleDragStart = (event: DragStartEvent) => {
+    const draggedId = event.active.id as string;
+    const draggedNode = findNodeById(treeData, draggedId);
+    if (draggedNode) {
+      setActiveDragNode(draggedNode);
+      setIsDragging(true);
+    }
   };
+
 
   const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    setActiveDragNode(null);
     setIsDragging(false);
 
-    const { active, over } = event;
-    if (!active) return;
-
-    const draggedId = String(active.id);
-    const targetId = over ? String(over.id) : null;
-
-    if (targetId === draggedId) return;
-
-    const draggedNode = findNodeById(treeData, draggedId);
-    const currentParent = findParentNode(treeData, draggedId);
-
-    if (targetId === "root-drop-zone" || !targetId) {
-      onDropNode(draggedId, null);
-      return;
+    if (over && active.id !== over.id) {
+      onDropNode(active.id as string, over.id as string);
     }
-
-    if (!treeData.some((node) => node.id === targetId)) {
-      if (currentParent && !currentParent.parentId) {
-        onDropNode(draggedId, null);
-        return;
-      }
-    }
-
-    onDropNode(draggedId, targetId);
   };
+
 
   return (
     <>
@@ -126,12 +118,23 @@ export default function NodeTree({
             }`}
           style={{ minHeight: 300 }}
         >
-
-          <div>
-            {treeData.map((node) => renderNode(node))}
-          </div>
+          <div>{treeData.map((node) => renderNode(node))}</div>
         </div>
+
+        <DragOverlay dropAnimation={null}>
+          {activeDragNode && (
+            <div className="px-3 py-1 rounded bg-white shadow-md opacity-70 flex items-center gap-2 pointer-events-none">
+              {activeDragNode.type === "folder" ? (
+                <Folder className="w-4 h-4 text-yellow-500" />
+              ) : (
+                <FileText className="w-4 h-4 text-blue-500" />
+              )}
+              <span className="text-sm truncate max-w-[150px]">{activeDragNode.name}</span>
+            </div>
+          )}
+        </DragOverlay>
       </DndContext>
     </>
+
   );
 }

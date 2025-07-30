@@ -15,7 +15,6 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
   const [isRenaming, setIsRenaming] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Draggable only on handle
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: node.id,
   });
@@ -76,7 +75,6 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
         </span>
       )}
 
-      {/* Delete button */}
       <button
         onClick={(e) => {
           e.stopPropagation();
