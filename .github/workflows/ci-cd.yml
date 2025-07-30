@@ -31,6 +31,9 @@ jobs:
           cache-dependency-path: firebase-basic/package-lock.json
       - name: Install firebase-basic dependencies
         run: npm ci
+      - name: Debug functions directory
+        working-directory: ./functions
+        run: ls -la || dir
       - name: Install functions dependencies
         working-directory: ./functions
         run: npm ci
@@ -39,14 +42,22 @@ jobs:
         continue-on-error: true
       - name: Build Next.js app
         run: npm run build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: "dummy"
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "dummy.firebaseapp.com"
+          NEXT_PUBLIC_FIREBASE_DATABASE_URL: "https://dummy-default-rtdb.firebaseio.com/"
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "dummy"
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "dummy.appspot.com"
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "dummy"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "dummy"
       - name: Debug build output
-        run: ls -la firebase-basic/out/ || dir firebase-basic/out/
+        run: ls -la out/ || dir out/
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-files
           path: |
-            firebase-basic/out/
+            out/
           retention-days: 1
 
   # -----------------------------------------------------------------
