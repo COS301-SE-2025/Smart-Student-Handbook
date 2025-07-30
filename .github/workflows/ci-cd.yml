@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Ensure full repository is checked out
       - name: Setup Node ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
@@ -61,7 +61,9 @@ jobs:
           name: build-files
           path: .next/
           if-no-files-found: error
-        retention-days: 7
+          retention-days: 7
+      - name: Debug uploaded artifact
+        run: echo "Artifact upload completed"
 
   # -----------------------------------------------------------------
   # 2 — Deploy to Firebase Staging (dev branch)
@@ -94,7 +96,7 @@ jobs:
         run: npm ci
       - name: Install functions dependencies
         working-directory: ./functions
-        run: ci
+        run: npm ci
       - name: Copy built files to public
         run: |
           rm -rf public/* || true
