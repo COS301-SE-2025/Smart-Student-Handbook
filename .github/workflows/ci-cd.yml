@@ -51,18 +51,17 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "dummy"
           NEXT_PUBLIC_FIREBASE_APP_ID: "dummy"
       - name: Debug build output
-        run: ls -la .next/ || dir .next/
+        run: |
+          echo "Build output directory contents:"
+          ls -la .next/ || dir .next/ || echo "No .next/ directory found"
+          cat .next/build-manifest.json || echo "No build-manifest.json found"
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-files
-          path: |
-            .next/
-            .next/static/
+          path: .next/
           if-no-files-found: error
-          retention-days: 7
-      - name: Debug uploaded artifact
-        run: echo "Artifact upload completed"
+        retention-days: 7
 
   # -----------------------------------------------------------------
   # 2 — Deploy to Firebase Staging (dev branch)
