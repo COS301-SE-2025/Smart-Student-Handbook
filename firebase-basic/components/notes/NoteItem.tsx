@@ -1,7 +1,9 @@
 import { useDraggable } from "@dnd-kit/core";
 import { useRef, useState } from "react";
 import { FileNode } from "@/types/note";
-import { FileText, Trash2, GripVertical } from "lucide-react";
+import { FileText, Trash2, GripVertical, Share2, Users } from "lucide-react";
+import ShareNoteDialog from "../noteitemscomp/ShareNoteDialog";
+import ViewCollaboratorsDialog from "../noteitemscomp/ViewCollaboratorsDialog";
 
 interface Props {
   node: FileNode;
@@ -14,6 +16,36 @@ interface Props {
 export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) {
   const [isRenaming, setIsRenaming] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+
+  // Replace with actual Firebase call later
+  const handleShare = (collaboratorId: string, permission: "read" | "write") => {
+    console.log("Share with:", collaboratorId, "as", permission);
+  };
+
+  // Replace with real Firebase search logic
+  const searchUsers = async (query: string) => {
+    return [
+      { uid: "123", name: "Alice", surname: "Smith" },
+      { uid: "456", name: "Bob", surname: "Jones" },
+    ].filter((u) =>
+      `${u.name} ${u.surname}`.toLowerCase().includes(query.toLowerCase())
+    );
+  };
+
+  // Replace with real data later
+  const mockCollaborators = [
+    { uid: "123", name: "Alice", surname: "Smith", permission: "read" },
+    { uid: "456", name: "Bob", surname: "Jones", permission: "write" },
+  ];
+
+  const handleRemoveCollaborator = (uid: string) => {
+    console.log("Remove collaborator:", uid);
+    // later you will update Firebase here
+  };
+
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: node.id,
@@ -37,7 +69,6 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
       style={style}
       className="flex items-center gap-2 px-3 py-1 rounded cursor-pointer group hover:bg-gray-100"
     >
-      {/* Drag handle */}
       <div
         {...listeners}
         {...attributes}
@@ -50,10 +81,8 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
         <GripVertical className="w-4 h-4 text-gray-500" />
       </div>
 
-      {/* Note icon */}
       <FileText className="w-4 h-4 text-blue-500 select-none" />
 
-      {/* Name or renaming input */}
       {isRenaming ? (
         <input
           ref={inputRef}
@@ -78,13 +107,49 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
       <button
         onClick={(e) => {
           e.stopPropagation();
+          setIsShareOpen(true);
+        }}
+        className="ml-auto opacity-0 group-hover:opacity-100 text-blue-500 hover:text-blue-700"
+        aria-label={`Share note ${node.name}`}
+      >
+        <Share2 className="w-4 h-4" />
+      </button>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsViewOpen(true);
+        }}
+        className="opacity-0 group-hover:opacity-100 text-green-500 hover:text-green-700"
+        aria-label={`View collaborators for note ${node.name}`}
+      >
+        <Users className="w-4 h-4" />
+      </button>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
           onDelete(node.id);
         }}
-        className="ml-auto opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700"
+        className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700"
         aria-label={`Delete note ${node.name}`}
       >
-        <Trash2 className="w-3 h-3" />
+        <Trash2 className="w-4 h-4" />
       </button>
+
+      <ShareNoteDialog
+        open={isShareOpen}
+        setOpen={setIsShareOpen}
+        onShare={handleShare}
+        searchUsers={searchUsers}
+      />
+
+      <ViewCollaboratorsDialog
+        open={isViewOpen}
+        setOpen={setIsViewOpen}
+        collaborators={mockCollaborators}
+        onRemove={handleRemoveCollaborator}
+      />
     </div>
   );
 }
