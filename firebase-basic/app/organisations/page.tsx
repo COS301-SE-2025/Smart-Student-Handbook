@@ -372,19 +372,11 @@ export default function OrganisationsPage() {
               const isJoining = joiningOrgs.has(o.id)
               const isLeaving = leavingOrgs.has(o.id)
 
-              const gradients = [
-                "bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200 dark:from-blue-950/20 dark:to-indigo-950/20 dark:border-blue-800/30",
-                "bg-gradient-to-br from-purple-50 to-pink-100 border-purple-200 dark:from-purple-950/20 dark:to-pink-950/20 dark:border-purple-800/30",
-                "bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 dark:from-green-950/20 dark:to-emerald-950/20 dark:border-green-800/30",
-              ]
-
-              const gradientClass =
-                gradients[Math.abs(o.id.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % gradients.length]
-
+              
               return (
                 <Link href={`/organisations/${o.id}`} key={o.id}>
                   <div
-                    className={`border-2 rounded-2xl p-8 hover:shadow-xl transition-all ${gradientClass} relative min-h-[360px] group hover:scale-[1.02] ${
+                    className={`border-2 bg-white dark:bg-neutral-900 rounded-2xl p-8 hover:shadow-xl transition-all relative min-h-[360px] group hover:scale-[1.02] ${
                       isJoining || isLeaving ? "opacity-75" : ""
                     } cursor-pointer`}
                   >
@@ -537,11 +529,6 @@ export default function OrganisationsPage() {
                           )}
                         </Button>
                       )}
-
-                      {/* View Details indicator */}
-                      <div className="ml-auto flex items-center text-muted-foreground group-hover:text-primary transition-colors">
-                        <ArrowRight className="h-4 w-4" />
-                      </div>
                     </div>
                   </div>
                 </Link>
