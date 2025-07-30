@@ -65,63 +65,6 @@ interface Semester {
   isActive: boolean
 }
 
-interface TimeValidation {
-  isValid: boolean
-  error?: string
-}
-
-// Time validation utility functions
-function validateTimeRange(startTime: string, endTime: string): TimeValidation {
-  // If either time is empty, it's valid (optional times)
-  if (!startTime && !endTime) {
-    return { isValid: true }
-  }
-
-  // If only one time is provided, it's valid
-  if (!startTime || !endTime) {
-    return { isValid: true }
-  }
-
-  // Validate time format (HH:MM)
-  const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
-  if (!timeRegex.test(startTime)) {
-    return { isValid: false, error: "Invalid start time format" }
-  }
-  if (!timeRegex.test(endTime)) {
-    return { isValid: false, error: "Invalid end time format" }
-  }
-
-  // Convert times to minutes for comparison
-  const startMinutes = timeToMinutes(startTime)
-  const endMinutes = timeToMinutes(endTime)
-
-  if (startMinutes >= endMinutes) {
-    return { isValid: false, error: "Start time must be before end time" }
-  }
-
-  return { isValid: true }
-}
-
-function timeToMinutes(time: string): number {
-  const [hours, minutes] = time.split(":").map(Number)
-  return hours * 60 + minutes
-}
-
-function validateSemesterDates(startDate: string, endDate: string): TimeValidation {
-  if (!startDate || !endDate) {
-    return { isValid: true }
-  }
-
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-
-  if (start >= end) {
-    return { isValid: false, error: "Start date must be before end date" }
-  }
-
-  return { isValid: true }
-}
-
 function calculateLectureEndTime(startTime: string, duration: number): string {
   const [hours, minutes] = startTime.split(":").map(Number)
   const startMinutes = hours * 60 + minutes
@@ -176,7 +119,6 @@ function CustomCalendarGrid({
         isCurrentMonth: false,
       })
     }
-
     return days
   }
 
@@ -194,6 +136,7 @@ function CustomCalendarGrid({
 
   const getDateClasses = (date: Date, isCurrentMonth: boolean) => {
     const baseClasses = "h-12 w-full flex items-center justify-center text-sm font-medium rounded-md transition-colors"
+
     if (!isCurrentMonth) {
       return `${baseClasses} text-muted-foreground`
     }
@@ -201,6 +144,7 @@ function CustomCalendarGrid({
     const today = new Date()
     const isToday = date.toDateString() === today.toDateString()
     const isSelected = selectedDate && date.toDateString() === selectedDate.toDateString()
+
     const events = getEventsForDate(date)
     const lectures = getLecturesForDay(date)
     const eventTypes = new Set([...events.map((e) => e.type), ...(lectures.length > 0 ? ["class"] : [])])
@@ -228,15 +172,12 @@ function CustomCalendarGrid({
     if (isSelected) {
       return `${baseClasses} ${interactiveClasses} bg-primary text-primary-foreground border-primary`
     }
-
     if (isToday) {
       return `${baseClasses} ${interactiveClasses} bg-accent text-accent-foreground font-semibold border-2 border-primary ${colorClasses}`
     }
-
     if (colorClasses) {
       return `${baseClasses} ${interactiveClasses} ${colorClasses} font-semibold`
     }
-
     return `${baseClasses} ${interactiveClasses} text-foreground`
   }
 
@@ -253,6 +194,7 @@ function CustomCalendarGrid({
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
+
       <div className="p-4">
         <div className="grid grid-cols-7 gap-1 mb-2">
           {daysOfWeek.map((day) => (
@@ -261,6 +203,7 @@ function CustomCalendarGrid({
             </div>
           ))}
         </div>
+
         <div className="grid grid-cols-7 gap-1">
           {days.map((day, index) => (
             <button
@@ -280,6 +223,7 @@ function CustomCalendarGrid({
 
 function StudentCalendar() {
   const { userId, loading: authLoading } = useUserId()
+
   const [date, setDate] = React.useState<Date>(new Date())
   const [events, setEvents] = React.useState<Event[]>([])
   const [lectureSlots, setLectureSlots] = React.useState<LectureSlot[]>([])
@@ -293,7 +237,6 @@ function StudentCalendar() {
   const [currentTime, setCurrentTime] = React.useState<Date>(new Date())
   const [activeTab, setActiveTab] = React.useState<"calendar" | "timetable">("calendar")
   const [editingSemester, setEditingSemester] = React.useState<Semester | null>(null)
-
   const [newEvent, setNewEvent] = React.useState({
     title: "",
     description: "",
@@ -301,7 +244,6 @@ function StudentCalendar() {
     time: "",
     endTime: "",
   })
-
   const [newLecture, setNewLecture] = React.useState({
     subject: "",
     lecturer: "",
@@ -310,20 +252,14 @@ function StudentCalendar() {
     timeSlot: "",
     duration: 50,
   })
-
   const [newSemester, setNewSemester] = React.useState({
     name: "",
     startDate: "",
     endDate: "",
   })
-
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [initialLoading, setInitialLoading] = React.useState(true)
-
-  // Validation states
-  const [eventTimeValidation, setEventTimeValidation] = React.useState<TimeValidation>({ isValid: true })
-  const [semesterDateValidation, setSemesterDateValidation] = React.useState<TimeValidation>({ isValid: true })
 
   const lectureTimeSlots = [
     { start: "07:30", end: "08:20" },
@@ -338,20 +274,7 @@ function StudentCalendar() {
     { start: "16:30", end: "17:20" },
     { start: "17:30", end: "18:20" },
   ]
-
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-
-  // Validate event times whenever they change
-  React.useEffect(() => {
-    const validation = validateTimeRange(newEvent.time, newEvent.endTime)
-    setEventTimeValidation(validation)
-  }, [newEvent.time, newEvent.endTime])
-
-  // Validate semester dates whenever they change
-  React.useEffect(() => {
-    const validation = validateSemesterDates(newSemester.startDate, newSemester.endDate)
-    setSemesterDateValidation(validation)
-  }, [newSemester.startDate, newSemester.endDate])
 
   React.useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 60_000)
@@ -370,6 +293,7 @@ function StudentCalendar() {
       setLectureSlots([])
       return
     }
+
     try {
       const data = await callFn<{ semesterId: string }, LectureSlot[]>("getLectures", { semesterId: active.id })
       setLectureSlots(data)
@@ -379,40 +303,29 @@ function StudentCalendar() {
     }
   }, [userId, semesters])
 
-  // const fetchEvents = React.useCallback(async () => {
-  //   const active = getActiveSemester()
-  //   if (!userId || !active) {
-  //     setEvents([])
-  //     return
-  //   }
-  //   try {
-  //     const data = await callFn<{ semesterId: string }, any[]>("getEvents", { semesterId: active.id })
-  //     setEvents(data.map((e) => ({ ...e, date: new Date(e.date) })))
-  //   } catch (err: any) {
-  //     console.error("Failed to fetch events:", err)
-  //     setEvents([])
-  //   }
-  // }, [userId, semesters])
-const fetchEvents = React.useCallback(async () => {
-  if (!userId) {
-    setEvents([]);
-    return;
-  }
-  try {
-    // No semesterId: fetch all events (semester and general/personal)
-    const data = await callFn<{}, any[]>("getEvents", {});
-    setEvents(data.map((e) => ({ ...e, date: new Date(e.date) })));
-  } catch (err: any) {
-    console.error("Failed to fetch events:", err);
-    setEvents([]);
-  }
-}, [userId]);
+  const fetchEvents = React.useCallback(async () => {
+    const active = getActiveSemester()
+    if (!userId || !active) {
+      setEvents([])
+      return
+    }
+
+    try {
+      const data = await callFn<{ semesterId: string }, any[]>("getEvents", { semesterId: active.id })
+      setEvents(data.map((e) => ({ ...e, date: new Date(e.date) })))
+    } catch (err: any) {
+      console.error("Failed to fetch events:", err)
+      setEvents([])
+    }
+  }, [userId, semesters])
 
   const fetchSemesters = React.useCallback(async () => {
     if (!userId) return
+
     try {
       const data = await callFn<{}, any[]>("getSemesters", {})
       console.log("Fetched semesters from Firebase:", data)
+
       if (data && data.length > 0) {
         setSemesters(
           data.map((s) => ({
@@ -428,12 +341,15 @@ const fetchEvents = React.useCallback(async () => {
           startDate: "2025-02-10",
           endDate: "2025-06-21",
         }
+
         const addedSemester = await callFn<{ semester: any }, any>("addSemester", {
           semester: defaultSemester,
         })
+
         await callFn<{ semesterId: string }, { success: boolean }>("setActiveSemester", {
           semesterId: addedSemester.id,
         })
+
         setSemesters([
           {
             ...addedSemester,
@@ -456,6 +372,7 @@ const fetchEvents = React.useCallback(async () => {
         setInitialLoading(false)
         return
       }
+
       setInitialLoading(true)
       try {
         await fetchSemesters()
@@ -465,27 +382,30 @@ const fetchEvents = React.useCallback(async () => {
         setInitialLoading(false)
       }
     }
+
     initializeData()
   }, [userId, fetchSemesters])
 
   React.useEffect(() => {
     if (!userId || semesters.length === 0) return
+
     fetchLectures()
     fetchEvents()
   }, [userId, semesters, fetchLectures, fetchEvents])
 
   const handleAddLecture = async () => {
     setError(null)
+
     const semesterForDate = getSemesterForDate(timetableDate)
     if (!semesterForDate) {
       const errorMsg = `No semester covers ${format(timetableDate, "MMM d, yyyy")}. Please add a semester that includes this date.`
       setError(errorMsg)
+
       setTimeout(() => {
         setError(null)
       }, 8000)
       return
     }
-
     if (!newLecture.subject || !newLecture.timeSlot || !userId) return
 
     setLoading(true)
@@ -494,6 +414,7 @@ const fetchEvents = React.useCallback(async () => {
         semesterId: semesterForDate.id,
         lecture: newLecture,
       })
+
       setLectureSlots((prev) => [...prev, res])
       setNewLecture({
         subject: "",
@@ -524,49 +445,46 @@ const fetchEvents = React.useCallback(async () => {
     setLoading(false)
   }
 
- const handleAddEvent = async () => {
-  if (!selectedDate) return;
-  setError(null);
+  const handleAddEvent = async () => {
+    if (!selectedDate) return
+    setError(null)
 
-  // Check time validation before proceeding
-  if (!eventTimeValidation.isValid) {
-    setError(eventTimeValidation.error || "Invalid time range");
-    return;
-  }
+    const semesterForDate = getSemesterForDate(selectedDate)
+    if (!semesterForDate) {
+      const errorMsg = `No semester covers ${format(selectedDate, "MMM d, yyyy")}. Please add a semester that includes this date.`
+      setError(errorMsg)
 
-  const semesterForDate = getSemesterForDate(selectedDate);
-
-  if (!newEvent.title || !userId) return;
-
-  setLoading(true);
-  try {
-    // Build event object
-    const eventToAdd: any = {
-      ...newEvent,
-      date: selectedDate.toISOString(),
-    };
-    if (semesterForDate?.id) {
-      eventToAdd.semesterId = semesterForDate.id;
+      setTimeout(() => {
+        setError(null)
+      }, 8000)
+      return
     }
-    // Call function with only { event }
-    const payload = { event: eventToAdd };
+    if (!newEvent.title || !userId) return
 
-    const res = await callFn<typeof payload, Event>("addEvent", payload);
-    setEvents((prev) => [...prev, { ...res, date: new Date(res.date) }]);
-    setNewEvent({
-      title: "",
-      description: "",
-      type: "reminder",
-      time: "",
-      endTime: "",
-    });
-    setIsDialogOpen(false);
-    setError(null);
-  } catch (err: any) {
-    setError(err.message ?? "Failed to add event");
+    setLoading(true)
+    try {
+      const payload = {
+        semesterId: semesterForDate.id,
+        event: { ...newEvent, date: selectedDate.toISOString() },
+      }
+
+      const res = await callFn<typeof payload, Event>("addEvent", payload)
+
+      setEvents((prev) => [...prev, { ...res, date: new Date(res.date) }])
+      setNewEvent({
+        title: "",
+        description: "",
+        type: "reminder",
+        time: "",
+        endTime: "",
+      })
+      setIsDialogOpen(false)
+      setError(null)
+    } catch (err: any) {
+      setError(err.message ?? "Failed to add event")
+    }
+    setLoading(false)
   }
-  setLoading(false);
-};
 
   const handleDeleteEvent = async (id: string) => {
     if (!userId) return
@@ -586,6 +504,7 @@ const fetchEvents = React.useCallback(async () => {
   const getLecturesForDay = (d: Date) => {
     const semesterForDate = getSemesterForDate(d)
     if (!semesterForDate) return []
+
     const dayOfWeek = d.getDay()
     const filtered = lectureSlots.filter((l) => l.dayOfWeek === dayOfWeek && l.semesterId === semesterForDate.id)
     return filtered
@@ -615,15 +534,18 @@ const fetchEvents = React.useCallback(async () => {
 
   const handleTimeSlotClick = (slotStart: string) => {
     setError(null)
+
     const semesterForDate = getSemesterForDate(timetableDate)
     if (!semesterForDate) {
       const errorMsg = `No semester covers ${format(timetableDate, "MMM d, yyyy")}. Please add a semester that includes this date in Manage Semesters.`
       setError(errorMsg)
+
       setTimeout(() => {
         setError(null)
       }, 8000)
       return
     }
+
     setSelectedTimeSlot(slotStart)
     setNewLecture({ ...newLecture, timeSlot: slotStart, dayOfWeek: timetableDate.getDay() })
     setIsLectureDialogOpen(true)
@@ -631,12 +553,6 @@ const fetchEvents = React.useCallback(async () => {
 
   const handleAddSemester = async () => {
     if (!newSemester.name || !newSemester.startDate || !newSemester.endDate || !userId) return
-
-    // Check date validation before proceeding
-    if (!semesterDateValidation.isValid) {
-      setError(semesterDateValidation.error || "Invalid date range")
-      return
-    }
 
     setLoading(true)
     try {
@@ -647,6 +563,7 @@ const fetchEvents = React.useCallback(async () => {
           endDate: newSemester.endDate,
         },
       })
+
       setSemesters((prev) => [
         ...prev,
         {
@@ -675,12 +592,6 @@ const fetchEvents = React.useCallback(async () => {
   const handleUpdateSemester = async () => {
     if (!editingSemester || !newSemester.name || !newSemester.startDate || !newSemester.endDate || !userId) return
 
-    // Check date validation before proceeding
-    if (!semesterDateValidation.isValid) {
-      setError(semesterDateValidation.error || "Invalid date range")
-      return
-    }
-
     setLoading(true)
     try {
       const semesterData = {
@@ -689,9 +600,11 @@ const fetchEvents = React.useCallback(async () => {
         startDate: newSemester.startDate,
         endDate: newSemester.endDate,
       }
+
       const response = await callFn<{ semester: any }, { success: boolean; semester: any }>("updateSemester", {
         semester: semesterData,
       })
+
       setSemesters((prev) =>
         prev.map((s) =>
           s.id === editingSemester.id
@@ -704,6 +617,7 @@ const fetchEvents = React.useCallback(async () => {
             : s,
         ),
       )
+
       setEditingSemester(null)
       setNewSemester({ name: "", startDate: "", endDate: "" })
       setError(null)
@@ -715,6 +629,7 @@ const fetchEvents = React.useCallback(async () => {
 
   const handleDeleteSemester = async (id: string) => {
     if (!userId) return
+
     setLoading(true)
     try {
       await callFn<{ semesterId: string }, { success: boolean }>("deleteSemester", { semesterId: id })
@@ -728,9 +643,11 @@ const fetchEvents = React.useCallback(async () => {
 
   const handleActivateSemester = async (id: string) => {
     if (!userId) return
+
     setLoading(true)
     try {
       await callFn<{ semesterId: string }, { success: boolean }>("setActiveSemester", { semesterId: id })
+
       setSemesters((prev) => prev.map((s) => ({ ...s, isActive: s.id === id })))
       setError(null)
     } catch (err: any) {
@@ -811,6 +728,7 @@ const fetchEvents = React.useCallback(async () => {
                 getEventsForDate={getEventsForDate}
                 getLecturesForDay={getLecturesForDay}
               />
+
               <Card>
                 <CardContent className="p-4">
                   <h4 className="font-medium mb-3 text-sm text-foreground">Event Types</h4>
@@ -841,6 +759,7 @@ const fetchEvents = React.useCallback(async () => {
                 </CardContent>
               </Card>
             </div>
+
             <Sidebar
               date={date}
               getEventsForDate={getEventsForDate}
@@ -890,11 +809,13 @@ const fetchEvents = React.useCallback(async () => {
                     const lecturesForDay = getLecturesForDay(timetableDate)
                     const lecturesAtTime = lecturesForDay.filter((l) => l.timeSlot === slot.start)
                     const currentSlot = isCurrentLectureSlot(slot.start)
+
                     const isCoveredByEarlierLecture = lecturesForDay.some((lecture) => {
                       const lectureStartIndex = lectureTimeSlots.findIndex((s) => s.start === lecture.timeSlot)
                       const currentSlotIndex = slotIndex
                       const slotsNeeded = Math.ceil(lecture.duration / 50)
                       const lectureEndIndex = lectureStartIndex + slotsNeeded - 1
+
                       return lectureStartIndex < currentSlotIndex && currentSlotIndex <= lectureEndIndex
                     })
 
@@ -928,7 +849,6 @@ const fetchEvents = React.useCallback(async () => {
           newEvent={newEvent}
           setNewEvent={setNewEvent}
           handleAddEvent={handleAddEvent}
-          timeValidation={eventTimeValidation}
         />
 
         <LectureDialog
@@ -955,7 +875,6 @@ const fetchEvents = React.useCallback(async () => {
           handleEditSemester={handleEditSemester}
           handleDeleteSemester={handleDeleteSemester}
           handleActivateSemester={handleActivateSemester}
-          dateValidation={semesterDateValidation}
         />
       </div>
     </div>
@@ -1015,6 +934,7 @@ function Sidebar({
                     handleDelete={() => handleDeleteLecture(lec.id)}
                   />
                 ))}
+
                 {getEventsForDate(date).map((evt) => (
                   <EventChip
                     key={evt.id}
@@ -1107,6 +1027,7 @@ function LectureChip({
   handleDelete: () => void
 }) {
   const endTime = calculateLectureEndTime(lecture.timeSlot, lecture.duration)
+
   return (
     <div className="p-3 border rounded-lg bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
       <div className="flex items-start justify-between">
@@ -1189,6 +1110,7 @@ function LectureToday({
   lectureTimeSlots,
 }: { lecture: LectureSlot; lectureTimeSlots: { start: string; end: string }[] }) {
   const endTime = calculateLectureEndTime(lecture.timeSlot, lecture.duration)
+
   return (
     <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
       <div className="font-medium text-sm truncate text-foreground">{lecture.subject}</div>
@@ -1217,6 +1139,7 @@ function TimeSlotRow({
   lectureTimeSlots: { start: string; end: string }[]
 }) {
   const baseHeight = 60
+
   return (
     <div
       className={`flex items-start gap-4 border-l-4 cursor-pointer hover:bg-muted/50 transition-colors rounded-r-lg p-3 ${
@@ -1238,6 +1161,7 @@ function TimeSlotRow({
               const endTime = calculateLectureEndTime(lec.timeSlot, lec.duration)
               const slotsNeeded = Math.ceil(lec.duration / 50)
               const spanningHeight = slotsNeeded * baseHeight + (slotsNeeded - 1) * 4
+
               return (
                 <div
                   key={lec.id}
@@ -1250,6 +1174,7 @@ function TimeSlotRow({
                     className="absolute left-0 top-0 w-1 bg-green-500 rounded-r"
                     style={{ height: `${spanningHeight}px` }}
                   />
+
                   <BookOpen className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-1" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -1329,26 +1254,17 @@ function InputBlock({
   type = "text",
   value,
   onChange,
-  error,
 }: {
   label: string
   id: string
   type?: string
   value: string | number
   onChange: (v: string) => void
-  error?: string
 }) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={error ? "border-destructive focus-visible:ring-destructive" : ""}
-      />
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      <Input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   )
 }
@@ -1407,7 +1323,6 @@ function EventDialog({
   newEvent,
   setNewEvent,
   handleAddEvent,
-  timeValidation,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
@@ -1429,10 +1344,7 @@ function EventDialog({
     }>
   >
   handleAddEvent: () => void
-  timeValidation: TimeValidation
 }) {
-  const isFormValid = newEvent.title && timeValidation.isValid
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -1462,7 +1374,6 @@ function EventDialog({
               type="time"
               value={newEvent.time}
               onChange={(v) => setNewEvent({ ...newEvent, time: v })}
-              error={!timeValidation.isValid && newEvent.time ? timeValidation.error : undefined}
             />
             <InputBlock
               label="End Time"
@@ -1470,15 +1381,8 @@ function EventDialog({
               type="time"
               value={newEvent.endTime}
               onChange={(v) => setNewEvent({ ...newEvent, endTime: v })}
-              error={!timeValidation.isValid && newEvent.endTime ? timeValidation.error : undefined}
             />
           </div>
-          {!timeValidation.isValid && (newEvent.time || newEvent.endTime) && (
-            <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-              <p className="text-sm text-destructive">{timeValidation.error}</p>
-            </div>
-          )}
           <TextareaBlock
             label="Description (Optional)"
             id="evt-desc"
@@ -1490,7 +1394,7 @@ function EventDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleAddEvent} disabled={!isFormValid}>
+          <Button onClick={handleAddEvent} disabled={!newEvent.title}>
             Add Event
           </Button>
         </DialogFooter>
@@ -1651,7 +1555,6 @@ function SemesterDialog({
   handleEditSemester,
   handleDeleteSemester,
   handleActivateSemester,
-  dateValidation,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
@@ -1665,10 +1568,7 @@ function SemesterDialog({
   handleEditSemester: (semester: Semester) => void
   handleDeleteSemester: (id: string) => void
   handleActivateSemester: (id: string) => void
-  dateValidation: TimeValidation
 }) {
-  const isFormValid = newSemester.name && newSemester.startDate && newSemester.endDate && dateValidation.isValid
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -1712,6 +1612,7 @@ function SemesterDialog({
               </div>
             ))}
           </div>
+
           <div className="border-t border-border pt-4 space-y-4">
             <h4 className="font-medium text-foreground">{editingSemester ? "Edit Semester" : "Add New Semester"}</h4>
             <InputBlock
@@ -1727,7 +1628,6 @@ function SemesterDialog({
                 type="date"
                 value={newSemester.startDate}
                 onChange={(v) => setNewSemester({ ...newSemester, startDate: v })}
-                error={!dateValidation.isValid && newSemester.startDate ? dateValidation.error : undefined}
               />
               <InputBlock
                 label="End Date"
@@ -1735,19 +1635,12 @@ function SemesterDialog({
                 type="date"
                 value={newSemester.endDate}
                 onChange={(v) => setNewSemester({ ...newSemester, endDate: v })}
-                error={!dateValidation.isValid && newSemester.endDate ? dateValidation.error : undefined}
               />
             </div>
-            {!dateValidation.isValid && (newSemester.startDate || newSemester.endDate) && (
-              <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-                <p className="text-sm text-destructive">{dateValidation.error}</p>
-              </div>
-            )}
             <div className="flex gap-2">
               <Button
                 onClick={editingSemester ? handleUpdateSemester : handleAddSemester}
-                disabled={!isFormValid}
+                disabled={!newSemester.name || !newSemester.startDate || !newSemester.endDate}
                 className="flex-1"
               >
                 {editingSemester ? "Update Semester" : "Add Semester"}

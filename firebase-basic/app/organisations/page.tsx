@@ -1,22 +1,29 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { httpsCallableFromURL } from "firebase/functions"
+import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
 import { getDatabase, ref, get, set, remove } from "firebase/database"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Heart, Users, Lock, Globe, Plus, Crown, UserCheck, SearchX, Loader2, ArrowRight } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Heart,
+  Users,
+  Lock,
+  Globe,
+  Plus,
+  Crown,
+  UserCheck,
+  SearchX,
+  Loader2,
+} from "lucide-react"
 import { CreateOrganizationModal } from "@/components/ui/create-organization-modal"
 import { useUserId } from "@/hooks/useUserId"
 import { toast } from "sonner"
 
-/* -------------------------------------------------------------------------- */
-/*                                  Types                                     */
-/* -------------------------------------------------------------------------- */
 interface Org {
   id: string
   ownerId: string
@@ -44,9 +51,6 @@ interface CreateOrgInput {
   invitedUserIds: string[]
 }
 
-/* -------------------------------------------------------------------------- */
-/*                               Component                                    */
-/* -------------------------------------------------------------------------- */
 export default function OrganisationsPage() {
   const { userId, loading: authLoading } = useUserId()
   const searchParams = useSearchParams()
@@ -55,75 +59,52 @@ export default function OrganisationsPage() {
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState<Filter>("all")
   const [showCreate, setShowCreate] = useState(false)
+
   const [joiningOrgs, setJoiningOrgs] = useState<Set<string>>(new Set())
   const [leavingOrgs, setLeavingOrgs] = useState<Set<string>>(new Set())
 
   const searchQuery = searchParams.get("search") || ""
 
-  /* ---- callables -------------------------------------------------------- */
   const getPublicOrgs = useMemo(
-    () => httpsCallableFromURL<{}, Org[]>(fns, "https://getpublicorganizations-omrwo3ykaa-uc.a.run.app"),
-    [],
+    () => httpsCallable<{}, Org[]>(fns, "getPublicOrganizations"),
+    []
   )
-
   const getPrivateOrgs = useMemo(
-    () => httpsCallableFromURL<{}, Org[]>(fns, "https://getuserorganizations-omrwo3ykaa-uc.a.run.app"),
-    [],
+    () => httpsCallable<{}, Org[]>(fns, "getUserOrganizations"),
+    []
   )
-
   const joinOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(fns, "https://joinorganization-omrwo3ykaa-uc.a.run.app"),
-    [],
+    () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "joinOrganization"),
+    []
   )
-
   const leaveOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(
-        fns,
-        "https://leaveorganization-omrwo3ykaa-uc.a.run.app",
-      ),
-    [],
+    () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "leaveOrganization"),
+    []
   )
-
   const createOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ organization: CreateOrgInput }, Org>(
-        fns,
-        "https://createorganization-omrwo3ykaa-uc.a.run.app",
-      ),
-    [],
+    () => httpsCallable<{ organization: CreateOrgInput }, Org>(fns, "createOrganization"),
+    []
   )
 
   const db = getDatabase()
 
-  /* ---------------------------------------------------------------------- */
-  /*                         Fetch + merge lists                            */
-  /* ---------------------------------------------------------------------- */
   const fetchOrgs = useCallback(async () => {
     if (!userId) return
     setLoading(true)
     try {
-      const [pubRes, privRes] = await Promise.all([getPublicOrgs({}), getPrivateOrgs({})])
-
-      /* ---- favourites --------------------------------------------------- */
+      const [pubRes, privRes] = await Promise.all([
+        getPublicOrgs({}),
+        getPrivateOrgs({}),
+      ])
       const favSnap = await get(ref(db, `userFavorites/${userId}`))
       const favObj = (favSnap.val() as Record<string, boolean>) || {}
 
-      /* ---- build combined list ----------------------------------------- */
-      const publicList = pubRes.data.map((o) => ({
-        ...o,
-        joined: !!o.members?.[userId],
-        role: o.members?.[userId] as "Admin" | "Member" | undefined,
-      }))
-
-      const privateList = privRes.data.map((o) => ({
-        ...o,
-        joined: true,
-      }))
+      const publicList = pubRes.data.map(o => ({ ...o, joined: false }))
+      const privateList = privRes.data.map(o => ({ ...o, joined: true }))
 
       const map = new Map<string, Org & { joined: boolean }>()
-      ;[...publicList, ...privateList].forEach((o) => map.set(o.id, o))
+      publicList.forEach(o => map.set(o.id, o))
+      privateList.forEach(o => map.set(o.id, o))
 
       setOrgsData(Array.from(map.values()))
       setFavorites(favObj)
@@ -139,58 +120,56 @@ export default function OrganisationsPage() {
     fetchOrgs()
   }, [fetchOrgs])
 
-  /* ---------------------------------------------------------------------- */
-  /*                         Helpers (join / leave)                         */
-  /* ---------------------------------------------------------------------- */
   const handleToggleFav = async (orgId: string) => {
     if (!userId) return
-    const next = !favorites[orgId]
-    setFavorites((prev) => ({ ...prev, [orgId]: next }))
+
+    const newFavState = !favorites[orgId]
+    setFavorites(prev => ({ ...prev, [orgId]: newFavState }))
+
     try {
       const favRef = ref(db, `userFavorites/${userId}/${orgId}`)
-      next ? await set(favRef, true) : await remove(favRef)
+      if (newFavState) await set(favRef, true)
+      else await remove(favRef)
     } catch (e) {
+      console.error("Failed to update favorite:", e)
       toast.error("Failed to update favorite.")
-      setFavorites((prev) => ({ ...prev, [orgId]: !next }))
+      setFavorites(prev => ({ ...prev, [orgId]: !newFavState }))
     }
   }
 
   const handleJoin = async (orgId: string) => {
     if (!userId || joiningOrgs.has(orgId)) return
-    setJoiningOrgs((prev) => new Set(prev).add(orgId))
-    setOrgsData((prev) =>
-      prev.map((o) =>
-        o.id === orgId
-          ? {
-              ...o,
-              joined: true,
-              role: "Member",
-              members: { ...o.members, [userId]: "Member" },
-            }
-          : o,
-      ),
+
+    setJoiningOrgs(prev => new Set(prev).add(orgId))
+    setOrgsData(prev =>
+      prev.map(org =>
+        org.id === orgId
+          ? { ...org, joined: true, role: "Member", members: { ...org.members, [userId]: "Member" } }
+          : org
+      )
     )
 
     try {
       await joinOrg({ orgId })
       toast.success("Successfully joined organization.")
     } catch (e: any) {
+      console.error("Failed to join organization:", e)
       toast.error(e.message || "Failed to join organization.")
-      setOrgsData((prev) =>
-        prev.map((o) =>
-          o.id === orgId
+      setOrgsData(prev =>
+        prev.map(org =>
+          org.id === orgId
             ? {
-                ...o,
+                ...org,
                 joined: false,
                 role: undefined,
-                members: Object.fromEntries(Object.entries(o.members).filter(([id]) => id !== userId)),
+                members: Object.fromEntries(Object.entries(org.members).filter(([id]) => id !== userId)),
               }
-            : o,
-        ),
+            : org
+        )
       )
     } finally {
-      setJoiningOrgs((p) => {
-        const s = new Set(p)
+      setJoiningOrgs(prev => {
+        const s = new Set(prev)
         s.delete(orgId)
         return s
       })
@@ -199,55 +178,79 @@ export default function OrganisationsPage() {
 
   const handleLeave = async (orgId: string) => {
     if (!userId || leavingOrgs.has(orgId)) return
-    setLeavingOrgs((prev) => new Set(prev).add(orgId))
-    const original = orgsData.find((o) => o.id === orgId)
 
-    setOrgsData((prev) =>
-      prev.map((o) =>
-        o.id === orgId
+    setLeavingOrgs(prev => new Set(prev).add(orgId))
+    const originalOrg = orgsData.find(o => o.id === orgId)
+
+    setOrgsData(prev =>
+      prev.map(org =>
+        org.id === orgId
           ? {
-              ...o,
+              ...org,
               joined: false,
               role: undefined,
-              members: Object.fromEntries(Object.entries(o.members).filter(([id]) => id !== userId)),
+              members: Object.fromEntries(Object.entries(org.members).filter(([id]) => id !== userId)),
             }
-          : o,
-      ),
+          : org
+      )
     )
-
-    setFavorites((p) => {
-      const { [orgId]: _, ...rest } = p
+    setFavorites(prev => {
+      const { [orgId]: _, ...rest } = prev
       return rest
     })
 
     try {
-      const res = await leaveOrg({ orgId })
-      if (original?.isPrivate) {
-        setOrgsData((prev) => prev.filter((o) => o.id !== orgId))
-      }
-      if (res.data.transferred) console.log("Ownership transferred")
+      const result = await leaveOrg({ orgId })
+      if (originalOrg?.isPrivate) setOrgsData(prev => prev.filter(o => o.id !== orgId))
+      if (result.data.transferred) console.log("Ownership transferred")
       toast.success("Successfully left organization.")
     } catch (e: any) {
+      console.error("Failed to leave organization:", e)
       toast.error(e.message || "Failed to leave organization.")
-      if (original) {
-        setOrgsData((prev) => prev.map((o) => (o.id === orgId ? { ...original, joined: true } : o)))
-        setFavorites((p) => ({ ...p, [orgId]: true }))
+      if (originalOrg) {
+        setOrgsData(prev =>
+          prev.map(o => (o.id === orgId ? { ...originalOrg, joined: true } : o))
+        )
+        setFavorites(prev => ({ ...prev, [orgId]: true }))
       }
     } finally {
-      setLeavingOrgs((p) => {
-        const s = new Set(p)
+      setLeavingOrgs(prev => {
+        const s = new Set(prev)
         s.delete(orgId)
         return s
       })
     }
   }
 
-  /* ---------------------------------------------------------------------- */
-  /*                  Filter + sort list for render                         */
-  /* ---------------------------------------------------------------------- */
+  const handleCreate = async (data: {
+    name: string
+    description: string
+    isPrivate: boolean
+    selectedFriends: string[]
+    organizationImage?: string
+  }) => {
+    try {
+      await createOrg({
+        organization: {
+          name: data.name,
+          description: data.description,
+          isPrivate: data.isPrivate,
+          image: data.organizationImage,
+          invitedUserIds: data.selectedFriends,
+        },
+      })
+      toast.success("Organization created.")
+      setShowCreate(false)
+      await fetchOrgs()
+    } catch (e) {
+      console.error("Create org error:", e)
+      throw e
+    }
+  }
+
   const orgs = useMemo(() => {
     return orgsData
-      .filter((o) => {
+      .filter(o => {
         const matches =
           o.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           o.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -264,9 +267,6 @@ export default function OrganisationsPage() {
       })
   }, [orgsData, searchQuery, filter, favorites])
 
-  /* ---------------------------------------------------------------------- */
-  /*                             JSX                                         */
-  /* ---------------------------------------------------------------------- */
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -287,8 +287,7 @@ export default function OrganisationsPage() {
             <div className="flex-1 space-y-4">
               <h1 className="text-5xl font-bold tracking-tight">Organisations</h1>
               <p className="text-muted-foreground text-xl max-w-3xl leading-relaxed">
-                Discover and join study groups to collaborate with other students. Create your own organization or
-                browse existing ones.
+                Discover and join study groups to collaborate with other students. Create your own organization or browse existing ones.
               </p>
               {searchQuery && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 w-fit">
@@ -306,9 +305,9 @@ export default function OrganisationsPage() {
           </div>
 
           {/* Filter Tabs */}
-          <div className="flex justify-center">
+          <div className="overflow-x-auto py-4">
             <div className="inline-flex gap-2 p-2 bg-muted/50 rounded-2xl">
-              {(["all", "joined", "public", "private"] as const).map((f) => (
+              {(["all", "joined", "public", "private"] as const).map(f => (
                 <Button
                   key={f}
                   variant={filter === f ? "default" : "ghost"}
@@ -318,14 +317,12 @@ export default function OrganisationsPage() {
                 >
                   {f.charAt(0).toUpperCase() + f.slice(1)}
                   <Badge variant="secondary" className="ml-2 text-xs">
-                    {
-                      {
-                        all: orgsData.length,
-                        joined: orgsData.filter((o) => o.joined).length,
-                        public: orgsData.filter((o) => !o.isPrivate).length,
-                        private: orgsData.filter((o) => o.isPrivate && o.joined).length,
-                      }[f]
-                    }
+                    {{
+                      all: orgsData.length,
+                      joined: orgsData.filter(o => o.joined).length,
+                      public: orgsData.filter(o => !o.isPrivate).length,
+                      private: orgsData.filter(o => o.isPrivate && o.joined).length,
+                    }[f]}
                   </Badge>
                 </Button>
               ))}
@@ -363,26 +360,21 @@ export default function OrganisationsPage() {
             </div>
           </div>
         ) : (
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {orgs.map(o => {
-
               const isFav = !!favorites[o.id]
               const memberCount = Object.keys(o.members).length
               const isJoining = joiningOrgs.has(o.id)
               const isLeaving = leavingOrgs.has(o.id)
-
               const gradients = [
                 "bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200 dark:from-blue-950/20 dark:to-indigo-950/20 dark:border-blue-800/30",
                 "bg-gradient-to-br from-purple-50 to-pink-100 border-purple-200 dark:from-purple-950/20 dark:to-pink-950/20 dark:border-purple-800/30",
                 "bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 dark:from-green-950/20 dark:to-emerald-950/20 dark:border-green-800/30",
               ]
-
               const gradientClass =
                 gradients[Math.abs(o.id.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % gradients.length]
 
               return (
-
                 <div
                   key={o.id}
                   className={`bg-white border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-all relative min-h-[360px] group hover:scale-[1.02] ${isJoining || isLeaving ? "opacity-75" : ""}`}
@@ -434,6 +426,7 @@ export default function OrganisationsPage() {
                         </Badge>
                       </div>
                     </div>
+                  </div>
 
                   <p className="text-muted-foreground leading-relaxed line-clamp-3 min-h-[72px]">
                     {o.description || "No description provided for this organization."}
@@ -477,46 +470,24 @@ export default function OrganisationsPage() {
                           disabled={isJoining || isLeaving}>
                           View Notes
                         </Button>
-                      ) : (
-                        !o.isPrivate &&
-                        !o.joined && (
-                          <Button
-                            size="lg"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleJoin(o.id)
-                            }}
-                            className="shadow-md"
-                            disabled={isJoining || isLeaving}
-                          >
-                            {isJoining ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Joining...
-                              </>
-                            ) : (
-                              "Join Organisation"
-                            )}
-                          </Button>
-                        )
-                      )}
-                      {o.joined && !isLeaving && (
+                      </Link>
+                    ) : (
+                      !o.isPrivate &&
+                      !o.joined && (
                         <Button
                           size="sm"
                           onClick={() => handleJoin(o.id)}
                           className="shadow-md w-full sm:w-auto"
                           disabled={isJoining || isLeaving}
                         >
-                          {isLeaving ? (
+                          {isJoining ? (
                             <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Leaving...
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Joining...
                             </>
                           ) : (
-                            "Leave"
+                            "Join Organisation"
                           )}
                         </Button>
-
-                      {/* View Details indicator */}
                       )
                     )}
                     {o.joined && !isLeaving && (
@@ -536,34 +507,17 @@ export default function OrganisationsPage() {
                       </Button>
                     )}
                   </div>
-                </Link>
+                </div>
               )
             })}
           </div>
         )}
       </div>
 
-      {/* create-modal */}
       <CreateOrganizationModal
         open={showCreate}
         onOpenChange={setShowCreate}
-        onCreateOrganization={async (data) => {
-          try {
-            await createOrg({
-              organization: {
-                name: data.name,
-                description: data.description,
-                isPrivate: data.isPrivate,
-                invitedUserIds: data.selectedFriends,
-              },
-            })
-            toast.success("Organization created.")
-            setShowCreate(false)
-            fetchOrgs()
-          } catch (e) {
-            toast.error("Failed to create organization.")
-          }
-        }}
+        onCreateOrganization={handleCreate}
       />
     </div>
   )
