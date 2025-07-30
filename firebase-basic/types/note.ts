@@ -30,3 +30,9 @@ export type Folder = {
   };
   parentId: string ; 
 };
+
+export type User = {
+  uid: string;
+  name?: string;
+  surname?: string;
+};

@@ -4,6 +4,9 @@ import { FileNode } from "@/types/note";
 import { FileText, Trash2, GripVertical, Share2, Users } from "lucide-react";
 import ShareNoteDialog from "../noteitemscomp/ShareNoteDialog";
 import ViewCollaboratorsDialog from "../noteitemscomp/ViewCollaboratorsDialog";
+import { get, ref } from "@firebase/database";
+import { db } from "@/lib";
+import { User } from "@/types/note"
 
 interface Props {
   node: FileNode;
@@ -11,6 +14,24 @@ interface Props {
   onRename: (id: string, newName: string) => void;
   onDelete: (id: string) => void;
   activeDragId?: string;
+}
+
+export async function searchUsersByName(input: string): Promise<User[]> {
+  const snap = await get(ref(db, "users"));
+  if (!snap.exists()) return [];
+
+  const users = snap.val();
+  const matches: User[] = [];
+
+  for (const uid in users) {
+    const settings = users[uid]?.UserSettings;
+    const fullName = `${settings?.name ?? ""} ${settings?.surname ?? ""}`.toLowerCase();
+    if (fullName.includes(input.toLowerCase())) {
+      matches.push({ uid, ...settings });
+    }
+  }
+
+  return matches;
 }
 
 export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) {
@@ -141,7 +162,8 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
         open={isShareOpen}
         setOpen={setIsShareOpen}
         onShare={handleShare}
-        searchUsers={searchUsers}
+        searchUsers={searchUsersByName}
+        noteId="0axoaxm"
       />
 
       <ViewCollaboratorsDialog
@@ -149,6 +171,7 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
         setOpen={setIsViewOpen}
         collaborators={mockCollaborators}
         onRemove={handleRemoveCollaborator}
+        noteId="0axoaxm"
       />
     </div>
   );

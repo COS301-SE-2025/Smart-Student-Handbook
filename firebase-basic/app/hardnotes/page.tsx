@@ -16,7 +16,6 @@ import {
   User,
   UserIcon,
 } from "lucide-react";
-import Link from "next/link";
 import QuillEditor from "@/components/quilleditor";
 import "react-quill/dist/quill.snow.css";
 
