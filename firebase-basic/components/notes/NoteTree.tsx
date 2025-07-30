@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DndContext, DragEndEvent, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragStartEvent, useDroppable } from "@dnd-kit/core";
 import FolderItem from "./FolderItem";
 import NoteItem from "./NoteItem";
 import { FileNode } from "@/types/note";
@@ -22,10 +22,7 @@ export default function NodeTree({
   onDropNode,
 }: Props) {
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set());
-
-  const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({
-    id: "root-drop-zone",
-  });
+  const [isDragging, setIsDragging] = useState(false);
 
   const toggleExpand = (id: string) => {
     setExpandedFolderIds((prev) => {
@@ -35,12 +32,34 @@ export default function NodeTree({
     });
   };
 
+  const findNodeById = (nodes: FileNode[], id: string): FileNode | null => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children) {
+        const found = findNodeById(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const findParentNode = (nodes: FileNode[], childId: string): FileNode | null => {
+    for (const node of nodes) {
+      if (node.children?.some((c) => c.id === childId)) return node;
+      if (node.children) {
+        const found = findParentNode(node.children, childId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
   const renderNode = (node: FileNode) => {
     const isFolder = node.type === "folder";
     const isExpanded = expandedFolderIds.has(node.id);
 
     return (
-      <div key={node.id} className="pl-4">
+      <div key={node.id} className="pl-4 max-w-full overflow-hidden">
         {isFolder ? (
           <>
             <FolderItem
@@ -52,8 +71,7 @@ export default function NodeTree({
               isExpanded={isExpanded}
               onToggleExpand={() => toggleExpand(node.id)}
             />
-            {isExpanded &&
-              node.children?.map((child) => renderNode(child))}
+            {isExpanded && node.children?.map((child) => renderNode(child))}
           </>
         ) : (
           <NoteItem
@@ -67,8 +85,13 @@ export default function NodeTree({
     );
   };
 
-  // Handle drag end
+  const handleDragStart = (_event: DragStartEvent) => {
+    setIsDragging(true);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setIsDragging(false);
+
     const { active, over } = event;
     if (!active) return;
 
@@ -77,23 +100,38 @@ export default function NodeTree({
 
     if (targetId === draggedId) return;
 
-    if (targetId === "root-drop-zone") {
-      // Move to root (parentId = null)
+    const draggedNode = findNodeById(treeData, draggedId);
+    const currentParent = findParentNode(treeData, draggedId);
+
+    if (targetId === "root-drop-zone" || !targetId) {
       onDropNode(draggedId, null);
-    } else if (targetId) {
-      onDropNode(draggedId, targetId);
+      return;
     }
+
+    if (!treeData.some((node) => node.id === targetId)) {
+      if (currentParent && !currentParent.parentId) {
+        onDropNode(draggedId, null);
+        return;
+      }
+    }
+
+    onDropNode(draggedId, targetId);
   };
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
-      <div
-        ref={setRootDropRef}
-        className={`root-drop-zone p-2 ${isRootOver ? "bg-blue-100" : ""}`}
-        style={{ minHeight: 50 }}
-      >
-        {treeData.map((node) => renderNode(node))}
-      </div>
-    </DndContext>
+    <>
+      <DndContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
+        <div
+          className={`dnd-context-container p-4 border rounded ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-white"
+            }`}
+          style={{ minHeight: 300 }}
+        >
+
+          <div>
+            {treeData.map((node) => renderNode(node))}
+          </div>
+        </div>
+      </DndContext>
+    </>
   );
 }

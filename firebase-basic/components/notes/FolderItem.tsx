@@ -19,14 +19,12 @@ export default function FolderItem({
   onSelect,
   onRename,
   onDelete,
-  onDropNode,
   isExpanded,
   onToggleExpand,
 }: Props) {
   const [isRenaming, setIsRenaming] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Draggable only on handle
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: node.id,
   });
@@ -59,7 +57,6 @@ export default function FolderItem({
         isOver && "bg-blue-100"
       )}
     >
-      {/* Drag handle */}
       <div
         {...listeners}
         {...attributes}
@@ -72,7 +69,6 @@ export default function FolderItem({
         <GripVertical className="w-4 h-4 text-gray-500" />
       </div>
 
-      {/* Expand/collapse icon */}
       <ChevronRight
         className={cn(
           "w-3 h-3 transition-transform select-none",
@@ -91,7 +87,6 @@ export default function FolderItem({
         }}
       />
 
-      {/* Name or renaming input */}
       {isRenaming ? (
         <input
           ref={inputRef}
@@ -105,7 +100,9 @@ export default function FolderItem({
         />
       ) : (
         <span
-          className="text-sm select-none"
+          className="text-sm select-none truncate max-w-[100px] inline-block align-middle"
+          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          title={node.name}
           onClick={() => onSelect(node.id)}
           onDoubleClick={() => setIsRenaming(true)}
         >
@@ -113,7 +110,6 @@ export default function FolderItem({
         </span>
       )}
 
-      {/* Delete button */}
       <button
         onClick={(e) => {
           e.stopPropagation();

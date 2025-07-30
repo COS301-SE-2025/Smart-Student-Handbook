@@ -82,6 +82,10 @@ export default function NotePage() {
 
   const functions = getFunctions(app);
 
+  const [collaboratorProfiles, setCollaboratorProfiles] = useState<UserProfile[]>([])
+  const [searchName, setSearchName] = useState("");
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
@@ -292,8 +296,6 @@ export default function NotePage() {
     return result;
   }
 
-  const [collaboratorProfiles, setCollaboratorProfiles] = useState<UserProfile[]>([])
-
   const loadUsers = async (ids: string[], setter: (users: UserProfile[]) => void) => {
     const profiles: UserProfile[] = []
     for (const id of ids) {
@@ -320,9 +322,6 @@ export default function NotePage() {
 
     await set(ref(db, userPath), flatTree);
   }
-
-  const [searchName, setSearchName] = useState("");
-  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
 
   const handleSearch = async () => {
     const snap = await get(ref(db, "users"));
@@ -694,7 +693,7 @@ export default function NotePage() {
                     Cancel
                   </Button>
                   <Button
-                    onClick={(e) => handleShare(e, selectedNote?.id, permission)}
+                    onClick={(e) => handleShare(e, selectedNote.id, permission)}
                     disabled={!collaboratorId.trim()}
                   >
                     Share

@@ -5,11 +5,13 @@ import { v4 as uuid } from "uuid";
 export function addNode(
   tree: FileNode[],
   parentId: string | null,
-  type: "note" | "folder"
+  type: "note" | "folder",
+  id?: string,
+  name?: string
 ): FileNode[] {
   const newNode: FileNode = {
-    id: uuid(),
-    name: type === "note" ? "Untitled Note" : "New Folder",
+    id: id || uuid(),
+    name: name || (type === "note" ? "Untitled Note" : "New Folder"),
     type,
   };
 
@@ -34,6 +36,7 @@ export function addNode(
   insert(clone);
   return clone;
 }
+
 
 export function deleteNode(tree: FileNode[], id: string): FileNode[] {
   const clone = structuredClone(tree);
@@ -75,59 +78,66 @@ export function renameNode(
 export function moveNode(
   tree: FileNode[],
   nodeId: string,
-  targetFolderId: string
+  targetFolderId: string | null
 ): FileNode[] {
-  if (nodeId === targetFolderId) return tree
+  if (nodeId === targetFolderId) return tree;
 
-  const clone = structuredClone(tree)
-  let movingNode: FileNode | null = null
+  const clone = structuredClone(tree);
+  let movingNode: FileNode | null = null;
 
   function removeNode(nodes: FileNode[]): FileNode[] {
     return nodes
       .filter((node) => {
         if (node.id === nodeId) {
-          movingNode = node
-          return false
+          movingNode = node;
+          return false;
         }
-        return true
+        return true;
       })
       .map((node) => ({
         ...node,
         children: node.children ? removeNode(node.children) : undefined,
-      }))
+      }));
   }
 
   function isDescendant(parent: FileNode, childId: string): boolean {
-    if (!parent.children) return false
+    if (!parent.children) return false;
     for (const c of parent.children) {
-      if (c.id === childId) return true
-      if (isDescendant(c, childId)) return true
+      if (c.id === childId) return true;
+      if (isDescendant(c, childId)) return true;
     }
-    return false
+    return false;
   }
 
   function insertNode(nodes: FileNode[]): boolean {
     for (const node of nodes) {
       if (node.id === targetFolderId && node.type === "folder") {
         if (movingNode && isDescendant(movingNode, targetFolderId)) {
-          return false
+          return false;
         }
-        node.children = node.children || []
-        node.children.push(movingNode!)
-        return true
+        node.children = node.children || [];
+        node.children.push({ ...movingNode!, parentId: targetFolderId });
+        return true;
       }
-      if (node.children && insertNode(node.children)) return true
+      if (node.children && insertNode(node.children)) return true;
     }
-    return false
+    return false;
   }
 
-  const cleanedTree = removeNode(clone)
+  const cleanedTree = removeNode(clone);
+
   if (movingNode) {
-    const inserted = insertNode(cleanedTree)
-    if (!inserted) return tree
-    return cleanedTree
+    if (targetFolderId === null) {
+      movingNode.parentId = null;
+      return [...cleanedTree, movingNode];
+    }
+
+    const inserted = insertNode(cleanedTree);
+    if (!inserted) return tree;
+    return cleanedTree;
   }
 
-  return tree
+  return tree;
 }
+
 

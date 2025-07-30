@@ -8,6 +8,7 @@ interface Props {
   onSelect: (id: string) => void;
   onRename: (id: string, newName: string) => void;
   onDelete: (id: string) => void;
+  activeDragId?: string;
 }
 
 export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) {

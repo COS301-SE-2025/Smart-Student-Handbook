@@ -7,3 +7,26 @@ export type FileNode = {
   children?: FileNode[]
 }
 
+export type Note = {
+  ownerId: string;
+  id: string;
+  name: string;
+  content: string;
+  type: "note";
+  collaborators: {
+    [userId: string]: string;
+  };
+  parentId : string ; 
+};
+
+export type Folder = {
+  id: string;
+  name: string;
+  type: "folder";
+  expanded: boolean;
+  children: FileNode[];
+  collaborators: {
+    [userId: string]: string;
+  };
+  parentId: string ; 
+};

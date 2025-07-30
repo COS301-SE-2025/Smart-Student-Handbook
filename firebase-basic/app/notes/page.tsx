@@ -1,32 +1,82 @@
 // app/notes/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import NoteTree from "@/components/notes/NoteTree";
 import { FileNode } from "@/types/note";
-import { testTree as initialTree } from "@/mock/testTree";
 import { addNode, moveNode } from "@/lib/note/treeActions";
+import { buildTreeFromRealtimeDB, createFolderInDB, createNoteInDB, deleteNodeInDB, renameNodeInDB } from "@/lib/DBTree";
+import { getAuth } from "@firebase/auth";
+import { db } from "@/lib";
+import { ref, update } from "@firebase/database";
 
 export default function NotesPage() {
-  const [tree, setTree] = useState<FileNode[]>(initialTree);
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (user) {
+    const userID = user.uid;
+  }
+  else {
+    return;
+  }
+
+  const [tree, setTree] = useState<FileNode[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
-  const selectedNode = findNodeById(tree, selectedNoteId);
+  const handleAdd = async (type: "note" | "folder") => {
+    let newNode;
+    if (type === "folder") {
+      newNode = await createFolderInDB(user.uid, "New Folder", null);
+    } else {
+      newNode = await createNoteInDB(user.uid, "Untitled Note", null);
+    }
 
-  const handleAdd = (type: "note" | "folder") => {
-    const parentId =
-      selectedNode?.type === "folder"
-        ? selectedNode.id
-        : selectedNode?.parentId || null;
-    const newTree = addNode(tree, parentId, type);
+    const newTree = addNode(tree, null, type, newNode.id, newNode.name);
     setTree(newTree);
   };
 
-  const handleMove = (draggedId: string, targetFolderId: string) => {
-    setTree((prev) => moveNode(prev, draggedId, targetFolderId));
+  useEffect(() => {
+    const user = getAuth().currentUser;
+    if (!user) return;
+
+    const fetchTree = async () => {
+      console.log(user.uid)
+      const firebaseTree = await loadTree(user.uid);
+      setTree(firebaseTree);
+    };
+
+    fetchTree();
+  }, []);
+
+
+  const loadTree = async (userID: string): Promise<FileNode[]> => {
+    try {
+      const tree = await buildTreeFromRealtimeDB(userID);
+      console.log(tree)
+      return tree;
+    } catch (error) {
+      console.error("Error loading tree:", error);
+      return [];
+    }
+  };
+  const handleMove = (draggedId: string, targetFolderId: string | null) => {
+    setTree((prev) => {
+      const updatedTree = moveNode(prev, draggedId, targetFolderId);
+
+      const userID = getAuth().currentUser?.uid;
+      if (!userID) return updatedTree;
+
+      const itemRef = ref(db, `users/${userID}/notes/${draggedId}`);
+      update(itemRef, {
+        parentId: targetFolderId ?? null,
+      });
+
+      return updatedTree;
+    });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     setTree((prevTree) => {
       function deleteNode(nodes: FileNode[]): FileNode[] {
         return nodes
@@ -40,9 +90,16 @@ export default function NotesPage() {
     });
 
     if (selectedNoteId === id) setSelectedNoteId(null);
+
+    try {
+      await deleteNodeInDB(user.uid, id);
+    } catch (error) {
+      console.error("Failed to delete node in DB:", error);
+    }
   };
 
-  const handleRename = (id: string, newName: string) => {
+
+  const handleRename = async (id: string, newName: string) => {
     setTree((prevTree) => {
       function rename(nodes: FileNode[]): FileNode[] {
         return nodes.map((node) => {
@@ -57,11 +114,18 @@ export default function NotesPage() {
       }
       return rename(prevTree);
     });
+
+    try {
+      await renameNodeInDB(user.uid, id, newName);
+    } catch (error) {
+      console.error("Failed to rename node in DB:", error);
+    }
   };
+
 
   return (
     <div className="flex h-screen">
-      <div className="w-1/3 border-r p-2 space-y-2">
+      <div className="w-1/4 border-r p-2 space-y-2">
         <div className="flex gap-2">
           <button onClick={() => handleAdd("note")} className="...">
             + Note
@@ -71,13 +135,23 @@ export default function NotesPage() {
           </button>
         </div>
 
-        <NoteTree
-          treeData={tree}
-          onSelect={setSelectedNoteId}
-          onRename={handleRename}
-          onDelete={handleDelete}
-          onDropNode={handleMove}
-        />
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            const draggedId = e.dataTransfer.getData("text/plain")
+            onDropNode(draggedId, null)
+          }}
+          className="drop-root-zone"
+        >
+          <NoteTree
+            treeData={tree}
+            onSelect={setSelectedNoteId}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onDropNode={handleMove}
+          />
+        </div>
+
       </div>
       <div className="flex-1 p-4">
         {selectedNoteId ? (
