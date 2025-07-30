@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensure full repository is checked out
       - name: Setup Node ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
@@ -26,8 +28,11 @@ jobs:
           cache-dependency-path: firebase-basic/package-lock.json
       - name: Install firebase-basic dependencies
         run: npm ci
+      - name: Debug functions directory
+        working-directory: ./functions  # Changed from ../functions
+        run: ls -la || dir
       - name: Install functions dependencies
-        working-directory: ../functions
+        working-directory: ./functions  # Changed from ../functions
         run: npm ci
       - name: Unit tests (Jest)
         run: npm test || echo "Tests completed"
@@ -46,7 +51,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-files
-          path: firebase-basic/.next/
+          path: |
+            firebase-basic/.next/
           retention-days: 1
 
   deploy-staging:
