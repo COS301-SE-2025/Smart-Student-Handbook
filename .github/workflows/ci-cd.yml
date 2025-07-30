@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Ensure full repository is checked out
+          fetch-depth: 0
       - name: Setup Node ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
@@ -41,7 +41,7 @@ jobs:
         run: npm test || echo "Tests completed"
         continue-on-error: true
       - name: Build Next.js app
-        run: npm run build
+        run: npm run build || { echo "Build failed"; exit 1; }
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: "dummy"
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "dummy.firebaseapp.com"
@@ -58,7 +58,11 @@ jobs:
           name: build-files
           path: |
             .next/
-          retention-days: 1
+            .next/static/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Debug uploaded artifact
+        run: echo "Artifact upload completed"
 
   # -----------------------------------------------------------------
   # 2 — Deploy to Firebase Staging (dev branch)
