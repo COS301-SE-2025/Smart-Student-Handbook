@@ -118,7 +118,7 @@ export default function Home() {
                 {isLoginLoading ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Redirecting...</span>
+                    <span></span>
                   </div>
                 ) : (
                   "Login"
@@ -137,7 +137,7 @@ export default function Home() {
                 {isSignupLoading ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Redirecting...</span>
+                    <span></span>
                   </div>
                 ) : (
                   "Sign Up"
@@ -245,7 +245,7 @@ export default function Home() {
               className="bg-black text-white hover:bg-gray-800 px-8 py-3 text-lg font-semibold"
               onClick={() => window.open("/user-manual.pdf", "_blank")} 
             >
-              User Guide
+              User Manual
             </Button>
           
         </div>

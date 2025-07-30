@@ -56,8 +56,8 @@ const items = [
     description: "Manage your organisations",
   },
     {
-    title: "Help & Support",
-    url: "/notes",
+    title: "Help Menu",
+    url: "/help",
     icon: BookOpen,
     description: "User guide & support",
    },
