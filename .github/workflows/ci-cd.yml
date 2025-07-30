@@ -42,11 +42,16 @@ jobs:
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "dummy.appspot.com"
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "dummy"
           NEXT_PUBLIC_FIREBASE_APP_ID: "dummy"
+      - name: Export Next.js app
+        run: npm run export || echo "Export step skipped"
+        continue-on-error: true
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-files
-          path: firebase-basic/.next/
+          path: |
+            firebase-basic/.next/
+            firebase-basic/out/
           retention-days: 1
 
   deploy-staging:
@@ -65,23 +70,26 @@ jobs:
           cache-dependency-path: |
             firebase-basic/package-lock.json
             functions/package-lock.json
-      - name: Install dependencies
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: ./firebase-basic/
+      - name: Install firebase-basic dependencies
         working-directory: ./firebase-basic
         run: npm ci
       - name: Install functions dependencies
         working-directory: ./functions
         run: npm ci
-      - name: Build
-        working-directory: ./firebase-basic
-        run: npm run build
-        env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: "dummy"
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "dummy.firebaseapp.com"
-          NEXT_PUBLIC_FIREBASE_DATABASE_URL: "https://dummy-default-rtdb.firebaseio.com/"
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "dummy"
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "dummy.appspot.com"
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "dummy"
-          NEXT_PUBLIC_FIREBASE_APP_ID: "dummy"
+      - name: Copy built files to public
+        run: |
+          rm -rf public/* || true
+          mkdir -p public
+          if [ -d "firebase-basic/out" ]; then
+            cp -r firebase-basic/out/* public/
+          else
+            echo "No out directory found, skipping copy"
+          fi
       - name: Authenticate to Firebase
         uses: google-github-actions/auth@v2
         with:
@@ -107,23 +115,26 @@ jobs:
           cache-dependency-path: |
             firebase-basic/package-lock.json
             functions/package-lock.json
-      - name: Install dependencies
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: ./firebase-basic/
+      - name: Install firebase-basic dependencies
         working-directory: ./firebase-basic
         run: npm ci
       - name: Install functions dependencies
         working-directory: ./functions
         run: npm ci
-      - name: Build
-        working-directory: ./firebase-basic
-        run: npm run build
-        env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: "dummy"
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "dummy.firebaseapp.com"
-          NEXT_PUBLIC_FIREBASE_DATABASE_URL: "https://dummy-default-rtdb.firebaseio.com/"
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "dummy"
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "dummy.appspot.com"
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "dummy"
-          NEXT_PUBLIC_FIREBASE_APP_ID: "dummy"
+      - name: Copy built files to public
+        run: |
+          rm -rf public/* || true
+          mkdir -p public
+          if [ -d "firebase-basic/out" ]; then
+            cp -r firebase-basic/out/* public/
+          else
+            echo "No out directory found, skipping copy"
+          fi
       - name: Authenticate to Firebase
         uses: google-github-actions/auth@v2
         with:
