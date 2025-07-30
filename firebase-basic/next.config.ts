@@ -1,13 +1,22 @@
-import type { NextConfig } from "next"
+import type { NextConfig } from "next";
 
-/**
- * Configuration for SSR/ISR on Firebase Hosting.
- * (No `output: "export"` — pages are rendered by the cloud function.)
- */
 const nextConfig: NextConfig = {
-  images: { unoptimized: true },
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
-}
+  /* config options here */
 
-export default nextConfig
+};
+module.exports = {
+  // ...other config,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  //output: 'export',
+  images: {
+    unoptimized: true,
+  },
+};
+
+
+export default nextConfig;
