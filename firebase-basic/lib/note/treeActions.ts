@@ -140,4 +140,24 @@ export function moveNode(
   return tree;
 }
 
+export function sortChildren(nodes: FileNode[]): FileNode[] {
+  return [...nodes].sort((a, b) => {
+    if (a.type === "folder" && b.type !== "folder") return -1;
+    if (a.type !== "folder" && b.type === "folder") return 1;
 
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  });
+}
+
+export function sortTree(tree: FileNode[]): FileNode[] {
+  return tree
+    .map(node => ({
+      ...node,
+      children: node.children ? sortTree(sortChildren(node.children)) : undefined,
+    }))
+    .sort((a, b) => {
+      if (a.type === "folder" && b.type !== "folder") return -1;
+      if (a.type !== "folder" && b.type === "folder") return 1;
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    });
+}

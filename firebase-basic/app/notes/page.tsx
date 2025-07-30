@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import NoteTree from "@/components/notes/NoteTree";
 import { FileNode } from "@/types/note";
-import { addNode, moveNode } from "@/lib/note/treeActions";
+import { addNode, moveNode, sortTree } from "@/lib/note/treeActions";
 import { buildTreeFromRealtimeDB, createFolderInDB, createNoteInDB, deleteNodeInDB, renameNodeInDB } from "@/lib/DBTree";
 import { getAuth } from "@firebase/auth";
 import { db } from "@/lib";
@@ -60,6 +60,7 @@ export default function NotesPage() {
       return [];
     }
   };
+
   const handleMove = (draggedId: string, targetFolderId: string | null) => {
     setTree((prev) => {
       const updatedTree = moveNode(prev, draggedId, targetFolderId);
@@ -72,9 +73,36 @@ export default function NotesPage() {
         parentId: targetFolderId ?? null,
       });
 
-      return updatedTree;
+      const sortedTree = sortTree(updatedTree);
+      return sortedTree;
     });
   };
+
+  const handleRename = async (id: string, newName: string) => {
+    setTree((prevTree) => {
+      function rename(nodes: FileNode[]): FileNode[] {
+        return nodes.map((node) => {
+          if (node.id === id) {
+            return { ...node, name: newName };
+          }
+          if (node.children) {
+            return { ...node, children: rename(node.children) };
+          }
+          return node;
+        });
+      }
+      const renamedTree = rename(prevTree);
+
+      return sortTree(renamedTree);
+    });
+
+    try {
+      await renameNodeInDB(user.uid, id, newName);
+    } catch (error) {
+      console.error("Failed to rename node in DB:", error);
+    }
+  };
+
 
   const handleDelete = async (id: string) => {
     setTree((prevTree) => {
@@ -97,31 +125,6 @@ export default function NotesPage() {
       console.error("Failed to delete node in DB:", error);
     }
   };
-
-
-  const handleRename = async (id: string, newName: string) => {
-    setTree((prevTree) => {
-      function rename(nodes: FileNode[]): FileNode[] {
-        return nodes.map((node) => {
-          if (node.id === id) {
-            return { ...node, name: newName };
-          }
-          if (node.children) {
-            return { ...node, children: rename(node.children) };
-          }
-          return node;
-        });
-      }
-      return rename(prevTree);
-    });
-
-    try {
-      await renameNodeInDB(user.uid, id, newName);
-    } catch (error) {
-      console.error("Failed to rename node in DB:", error);
-    }
-  };
-
 
   return (
     <div className="flex h-screen">
