@@ -51,13 +51,13 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "dummy"
           NEXT_PUBLIC_FIREBASE_APP_ID: "dummy"
       - name: Debug build output
-        run: ls -la out/ || dir out/
+        run: ls -la .next/ || dir .next/
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-files
           path: |
-            out/
+            .next/
           retention-days: 1
 
   # -----------------------------------------------------------------
@@ -91,18 +91,18 @@ jobs:
         run: npm ci
       - name: Install functions dependencies
         working-directory: ./functions
-        run: npm ci
+        run: ci
       - name: Copy built files to public
         run: |
           rm -rf public/* || true
           mkdir -p public
-          if [ -d "firebase-basic/out" ]; then
-            cp -r firebase-basic/out/* public/
+          if [ -d "firebase-basic/.next/static" ]; then
+            cp -r firebase-basic/.next/static public/_next/static
             echo "✅ Successfully copied build files to public/"
             ls -la public/
           else
-            echo "❌ No out directory found at firebase-basic/out"
-            ls -la firebase-basic/
+            echo "❌ No .next/static directory found at firebase-basic/.next/static"
+            ls -la firebase-basic/.next/
             exit 1
           fi
       - name: Authenticate to Firebase
@@ -150,13 +150,13 @@ jobs:
         run: |
           rm -rf public/* || true
           mkdir -p public
-          if [ -d "firebase-basic/out" ]; then
-            cp -r firebase-basic/out/* public/
+          if [ -d "firebase-basic/.next/static" ]; then
+            cp -r firebase-basic/.next/static public/_next/static
             echo "✅ Successfully copied build files to public/"
             ls -la public/
           else
-            echo "❌ No out directory found at firebase-basic/out"
-            ls -la firebase-basic/
+            echo "❌ No .next/static directory found at firebase-basic/.next/static"
+            ls -la firebase-basic/.next/
             exit 1
           fi
       - name: Authenticate to Firebase
