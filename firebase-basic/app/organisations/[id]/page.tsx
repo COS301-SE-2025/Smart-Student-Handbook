@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*          Dynamic Organisation Details Page – edits now persist             */
+/*          Organisation Details Page – activity tab removed                 */
 /* -------------------------------------------------------------------------- */
 
 "use client"
@@ -34,7 +34,9 @@ import {
   Trash2,
   FileText,
   Info,
-  Activity,
+  Plus,
+  Search,
+  Check,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -44,6 +46,12 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useUserId } from "@/hooks/useUserId"
 import { toast } from "sonner"
 
@@ -88,14 +96,13 @@ interface OrganizationDetails {
   createdAt: number
   memberDetails: Member[]
   activities: OrgActivity[]
-  noteCount?: number
-  lastActivity?: number
   notes: Note[]
 }
 interface JoinLeaveResult {
   success: boolean
   transferred?: boolean
 }
+type Friend = { id: string; name: string; email: string }
 
 /* -------------------------------------------------------------------------- */
 /*                               Component                                    */
@@ -120,9 +127,13 @@ export default function OrganizationDetailsPage() {
   const [editIsPrivate, setEditIsPrivate] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
 
-  const [deletingMembers, setDeletingMembers] = useState<Set<string>>(
-    new Set(),
-  )
+  /* ---- member deletion & add‑members dialog state ---- */
+  const [deletingMembers, setDeletingMembers] = useState<Set<string>>(new Set())
+  const [showAddDlg, setShowAddDlg] = useState(false)
+  const [friends, setFriends] = useState<Friend[]>([])
+  const [friendQuery, setFriendQuery] = useState("")
+  const [loadingFriends, setLoadingFriends] = useState(false)
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([])
 
   const orgId = params.id as string
   const db = getDatabase()
@@ -168,7 +179,15 @@ export default function OrganizationDetailsPage() {
         { orgId: string; userId: string },
         { success: boolean }
       >(fns, "https://removemember-omrwo3ykaa-uc.a.run.app"),
-    []
+    [],
+  )
+  const addMemberFn = useMemo(
+    () =>
+      httpsCallableFromURL<
+        { orgId: string; userId: string },
+        { success: boolean }
+      >(fns, "https://addmember-omrwo3ykaa-uc.a.run.app"),
+    [],
   )
 
   /* ---------------------------------------------------------------------- */
@@ -185,6 +204,33 @@ export default function OrganizationDetailsPage() {
     }))
 
   /* ---------------------------------------------------------------------- */
+  /*                    Enrich member names if placeholder                   */
+  /* ---------------------------------------------------------------------- */
+  const enrichMemberNames = async (members: Member[]) => {
+    const out: Member[] = []
+    for (const m of members) {
+      if (!m.name.startsWith("User ")) {
+        out.push(m)
+        continue
+      }
+      try {
+        const snap = await get(ref(db, `users/${m.id}/UserSettings`))
+        if (snap.exists()) {
+          const us = snap.val()
+          if (us?.name) {
+            const full =
+              us.name + (us.surname ? ` ${us.surname}` : "")
+            out.push({ ...m, name: full, email: us.email ?? m.email })
+            continue
+          }
+        }
+      } catch {/* ignore */}
+      out.push(m)
+    }
+    return out
+  }
+
+  /* ---------------------------------------------------------------------- */
   /*                           Fetch organisation                           */
   /* ---------------------------------------------------------------------- */
   const fetchOrg = useCallback(async () => {
@@ -193,9 +239,10 @@ export default function OrganizationDetailsPage() {
     setError(null)
     try {
       const { data } = await getOrganizationDetails({ orgId })
-      const mockNotes = generateMockNotes(data.memberDetails)
+      const memberDetails = await enrichMemberNames(data.memberDetails)
+      const mockNotes = generateMockNotes(memberDetails)
 
-      setOrganization({ ...data, notes: mockNotes })
+      setOrganization({ ...data, memberDetails, notes: mockNotes })
       setEditName(data.name)
       setEditDescription(data.description)
       setEditIsPrivate(data.isPrivate)
@@ -210,14 +257,82 @@ export default function OrganizationDetailsPage() {
     } finally {
       setLoading(false)
     }
-  }, [orgId, userId, db, getOrganizationDetails])
+  }, [orgId, userId, getOrganizationDetails])
 
   useEffect(() => {
     if (!authLoading) fetchOrg()
   }, [fetchOrg, authLoading])
 
   /* ---------------------------------------------------------------------- */
-  /*                             Helpers                                    */
+  /*                Friend‑picker logic (re‑used exactly from modal)         */
+  /* ---------------------------------------------------------------------- */
+  const loadFriends = async () => {
+    if (!organization) return
+    setLoadingFriends(true)
+    try {
+      const snap = await get(ref(db, "users"))
+      const data = snap.val() as Record<string, any> | null
+      if (!data) {
+        setFriends([])
+        return
+      }
+      const list: Friend[] = Object.entries(data).map(([uid, node]) => {
+        const settings =
+          node.UserSettings ??
+          node.userSettings ??
+          node.profile ??
+          node
+        const full =
+          settings?.name
+            ? settings.name + (settings.surname ? ` ${settings.surname}` : "")
+            : "Unnamed user"
+        return { id: uid, name: full, email: settings?.email ?? "" }
+      })
+        .filter(
+          (f) => f.id !== userId && !organization.members[f.id],
+        )
+      setFriends(list)
+    } finally {
+      setLoadingFriends(false)
+    }
+  }
+
+  useEffect(() => {
+    if (showAddDlg) loadFriends()
+  }, [showAddDlg]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filteredFriends = useMemo(() => {
+    const q = friendQuery.toLowerCase()
+    return friends.filter(
+      (f) =>
+        f.name.toLowerCase().includes(q) ||
+        f.email.toLowerCase().includes(q),
+    )
+  }, [friends, friendQuery])
+
+  const toggleFriend = (id: string) =>
+    setSelectedFriends((curr) =>
+      curr.includes(id) ? curr.filter((x) => x !== id) : [...curr, id],
+    )
+
+  const handleAddMembers = async () => {
+    if (selectedFriends.length === 0) return
+    try {
+      await Promise.all(
+        selectedFriends.map((uid) => addMemberFn({ orgId, userId: uid })),
+      )
+      toast.success("Members added")
+      setShowAddDlg(false)
+      setSelectedFriends([])
+      setFriendQuery("")
+      fetchOrg()
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to add members")
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*                             Other helpers                              */
   /* ---------------------------------------------------------------------- */
   const handleToggleFavorite = async () => {
     if (!userId || !organization) return
@@ -290,17 +405,14 @@ export default function OrganizationDetailsPage() {
     if (!organization || !isAdmin || memberId === userId) return
 
     const confirmed = window.confirm(
-      "Are you sure you want to remove this member from the organisation?"
+      "Are you sure you want to remove this member from the organisation?",
     )
     if (!confirmed) return
 
     setDeletingMembers((p) => new Set(p).add(memberId))
     try {
       await removeMemberFn({ orgId, userId: memberId })
-
-      /* refresh organisation data so UI & refresh stay correct */
       await fetchOrg()
-
       toast.success("Member removed")
     } catch (e: any) {
       toast.error(e.message ?? "Failed to remove member")
@@ -372,463 +484,545 @@ export default function OrganizationDetailsPage() {
     )
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className={`border-b-2 ${gradientClass}`}>
-        <div className="p-8">
-          <div className="mb-8"></div>
+    <>
+      {/* ------------------ Add‑Members dialog ------------------ */}
+      <Dialog
+        open={showAddDlg}
+        onOpenChange={setShowAddDlg}
+      >
+        <DialogContent
+          aria-describedby="add‑dlg-desc"
+          className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]"
+        >
+          <p id="add‑dlg-desc" className="sr-only">
+            Choose users to add to this organisation
+          </p>
 
-          <div className="flex flex-col lg:flex-row gap-8 items-start">
-            <div className="flex items-start gap-6 flex-1">
-              <Avatar className="h-24 w-24 border-4 border-white shadow-lg dark:border-black">
-                <AvatarFallback className="text-3xl font-bold bg-white text-primary dark:bg-black">
-                  {organization.name.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Add Members
+            </DialogTitle>
+          </DialogHeader>
 
-              <div className="flex-1 space-y-4">
-                <div>
-                  <h1 className="text-4xl font-bold mb-2">
-                    {organization.name}
-                  </h1>
-                  <p className="text-muted-foreground text-lg leading-relaxed">
-                    {organization.description ||
-                      "No description provided for this organisation."}
-                  </p>
-                </div>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search users…"
+                value={friendQuery}
+                onChange={(e) => setFriendQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
-                <div className="flex flex-wrap gap-3">
-                  <Badge
-                    variant="secondary"
-                    className="px-3 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
+            <div className="max-h-60 overflow-y-auto space-y-1">
+              {loadingFriends ? (
+                <p className="text-center text-sm text-muted-foreground py-6">
+                  Loading users…
+                </p>
+              ) : filteredFriends.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-6">
+                  {friendQuery ? "No users found" : "No users available"}
+                </p>
+              ) : (
+                filteredFriends.map((fr) => (
+                  <div
+                    key={fr.id}
+                    className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
+                      selectedFriends.includes(fr.id)
+                        ? "bg-primary/10 border border-primary/20"
+                        : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => toggleFriend(fr.id)}
                   >
-                    <Users className="h-4 w-4" />
-                    <span>
-                      {memberCount} member{memberCount !== 1 ? "s" : ""}
-                    </span>
-                  </Badge>
-
-                  <Badge
-                    variant="secondary"
-                    className="px-3 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
-                  >
-                    {organization.isPrivate ? (
-                      <>
-                        <Lock className="h-4 w-4" />
-                        <span>Private</span>
-                      </>
-                    ) : (
-                      <>
-                        <Globe className="h-4 w-4" />
-                        <span>Public</span>
-                      </>
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs">
+                        {fr.name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{fr.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {fr.email || "No email"}
+                      </p>
+                    </div>
+                    {selectedFriends.includes(fr.id) && (
+                      <Check className="h-4 w-4 text-primary" />
                     )}
-                  </Badge>
-
-                  <Badge
-                    variant="secondary"
-                    className="px-3 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
-                  >
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      Created {new Date(organization.createdAt).toLocaleDateString()}
-                    </span>
-                  </Badge>
-
-                  {isMember && (
-                    <Badge className="px-3 py-1 bg-green-500 text-white">
-                      <UserCheck className="h-4 w-4 mr-1" />
-                      {isAdmin ? "Admin" : "Member"}
-                    </Badge>
-                  )}
-
-                  {isFavorite && (
-                    <Badge className="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                      <Heart className="h-4 w-4 mr-1" />
-                      Favorite
-                    </Badge>
-                  )}
-                </div>
-              </div>
+                  </div>
+                ))
+              )}
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-3 min-w-[200px]">
-              {!isMember && !organization.isPrivate && (
-                <Button
-                  size="lg"
-                  onClick={handleJoin}
-                  disabled={isJoining}
-                  className="w-full shadow-md"
-                >
-                  {isJoining ? (
-                    <>
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Joining…
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="h-5 w-5 mr-2" />
-                      Join Organisation
-                    </>
-                  )}
-                </Button>
-              )}
-
-              {isMember && (
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={handleLeave}
-                  disabled={isLeaving}
-                  className="w-full bg-transparent"
-                >
-                  {isLeaving ? (
-                    <>
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Leaving…
-                    </>
-                  ) : (
-                    <>
-                      <UserMinus className="h-5 w-5 mr-2" />
-                      Leave Organisation
-                    </>
-                  )}
-                </Button>
-              )}
-
-              <Button
-                size="lg"
-                variant="ghost"
-                onClick={handleToggleFavorite}
-                className="w-full"
-              >
-                <Heart
-                  className={`h-5 w-5 mr-2 ${
-                    isFavorite ? "fill-red-500 text-red-500" : ""
-                  }`}
-                />
-                {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-              </Button>
-            </div>
+            <Button
+              disabled={selectedFriends.length === 0}
+              onClick={handleAddMembers}
+              className="w-full"
+            >
+              Add {selectedFriends.length} member
+              {selectedFriends.length !== 1 ? "s" : ""}
+            </Button>
           </div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
 
-      {/* Content Tabs */}
-      {isMember && (
-        <div className="p-8">
-          <Tabs defaultValue="notes" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="notes" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Notes
-              </TabsTrigger>
-              <TabsTrigger value="details" className="flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                Details
-              </TabsTrigger>
-              <TabsTrigger value="members" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Members
-              </TabsTrigger>
-              <TabsTrigger value="activity" className="flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                Activity
-              </TabsTrigger>
-            </TabsList>
+      {/* ------------------ Main page ------------------ */}
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <div className={`border-b-2 ${gradientClass}`}>
+          <div className="p-8">
+            <div className="mb-8"></div>
 
-            {/* Details Tab */}
-            <TabsContent value="details" className="mt-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Organisation Details</CardTitle>
-                  {isAdmin && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (isEditing) {
-                          setEditName(organization.name)
-                          setEditDescription(organization.description)
-                        }
-                        setIsEditing(!isEditing)
-                      }}
+            <div className="flex flex-col lg:flex-row gap-8 items-start">
+              <div className="flex items-start gap-6 flex-1">
+                <Avatar className="h-24 w-24 border-4 border-white shadow-lg dark:border-black">
+                  <AvatarFallback className="text-3xl font-bold bg-white text-primary dark:bg-black">
+                    {organization.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h1 className="text-4xl font-bold mb-2">
+                      {organization.name}
+                    </h1>
+                    <p className="text-muted-foreground text-lg leading-relaxed">
+                      {organization.description ||
+                        "No description provided for this organisation."}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <Badge
+                      variant="secondary"
+                      className="px-3 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
                     >
-                      {isEditing ? (
+                      <Users className="h-4 w-4" />
+                      <span>
+                        {memberCount} member
+                        {memberCount !== 1 ? "s" : ""}
+                      </span>
+                    </Badge>
+
+                    <Badge
+                      variant="secondary"
+                      className="px-3 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
+                    >
+                      {organization.isPrivate ? (
                         <>
-                          <X className="h-4 w-4 mr-2" />
-                          Cancel
+                          <Lock className="h-4 w-4" />
+                          <span>Private</span>
                         </>
                       ) : (
                         <>
-                          <Edit3 className="h-4 w-4 mr-2" />
-                          Edit
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Name */}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Organisation Name
-                    </label>
-                    {isEditing ? (
-                      <Input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="mt-2"
-                        placeholder="Enter organisation name"
-                      />
-                    ) : (
-                      <p className="mt-2 text-lg font-semibold">
-                        {organization.name}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Description
-                    </label>
-                    {isEditing ? (
-                      <Textarea
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
-                        className="mt-2"
-                        placeholder="Enter organisation description"
-                        rows={4}
-                      />
-                    ) : (
-                      <p className="mt-2 text-muted-foreground leading-relaxed">
-                        {organization.description || "No description provided"}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Privacy */}
-                  {isEditing && (
-                    <div className="mt-6">
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Privacy
-                      </label>
-                      <div className="flex items-center gap-2 mt-2">
-                        <div
-                          className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${
-                            !editIsPrivate
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted hover:bg-muted/80"
-                          }`}
-                          onClick={() => setEditIsPrivate(false)}
-                        >
                           <Globe className="h-4 w-4" />
                           <span>Public</span>
-                        </div>
-                        <div
-                          className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${
-                            editIsPrivate
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted hover:bg-muted/80"
-                          }`}
-                          onClick={() => setEditIsPrivate(true)}
-                        >
-                          <Lock className="h-4 w-4" />
-                          <span>Private</span>
-                        </div>
-                        <div className="ml-2 text-sm text-muted-foreground">
-                          {editIsPrivate
-                            ? "Only members can see this organisation"
-                            : "Anyone can see and join this organisation"}
+                        </>
+                      )}
+                    </Badge>
+
+                    <Badge
+                      variant="secondary"
+                      className="px-3 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      <span>
+                        Created{" "}
+                        {new Date(organization.createdAt).toLocaleDateString()}
+                      </span>
+                    </Badge>
+
+                    {isMember && (
+                      <Badge className="px-3 py-1 bg-green-500 text-white">
+                        <UserCheck className="h-4 w-4 mr-1" />
+                        {isAdmin ? "Admin" : "Member"}
+                      </Badge>
+                    )}
+
+                    {isFavorite && (
+                      <Badge className="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                        <Heart className="h-4 w-4 mr-1" />
+                        Favorite
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-3 min-w-[200px]">
+                {!isMember && !organization.isPrivate && (
+                  <Button
+                    size="lg"
+                    onClick={handleJoin}
+                    disabled={isJoining}
+                    className="w-full shadow-md"
+                  >
+                    {isJoining ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Joining…
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-5 w-5 mr-2" />
+                        Join Organisation
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {isMember && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={handleLeave}
+                    disabled={isLeaving}
+                    className="w-full bg-transparent"
+                  >
+                    {isLeaving ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Leaving…
+                      </>
+                    ) : (
+                      <>
+                        <UserMinus className="h-5 w-5 mr-2" />
+                        Leave Organisation
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                <Button
+                  size="lg"
+                  variant="ghost"
+                  onClick={handleToggleFavorite}
+                  className="w-full"
+                >
+                  <Heart
+                    className={`h-5 w-5 mr-2 ${
+                      isFavorite ? "fill-red-500 text-red-500" : ""
+                    }`}
+                  />
+                  {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Tabs */}
+        {isMember && (
+          <div className="p-8">
+            <Tabs defaultValue="notes" className="w-full">
+              {/* grid‑cols‑3 because activity tab removed */}
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="notes" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Notes
+                </TabsTrigger>
+                <TabsTrigger value="details" className="flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Details
+                </TabsTrigger>
+                <TabsTrigger value="members" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Members
+                </TabsTrigger>
+              </TabsList>
+
+              {/* ---------------- Details Tab ---------------- */}
+              <TabsContent value="details" className="mt-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Organisation Details</CardTitle>
+                    {isAdmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (isEditing) {
+                            setEditName(organization.name)
+                            setEditDescription(organization.description)
+                          }
+                          setIsEditing(!isEditing)
+                        }}
+                      >
+                        {isEditing ? (
+                          <>
+                            <X className="h-4 w-4 mr-2" />
+                            Cancel
+                          </>
+                        ) : (
+                          <>
+                            <Edit3 className="h-4 w-4 mr-2" />
+                            Edit
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Name */}
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Organisation Name
+                      </label>
+                      {isEditing ? (
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="mt-2"
+                          placeholder="Enter organisation name"
+                        />
+                      ) : (
+                        <p className="mt-2 text-lg font-semibold">
+                          {organization.name}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Description
+                      </label>
+                      {isEditing ? (
+                        <Textarea
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          className="mt-2"
+                          placeholder="Enter organisation description"
+                          rows={4}
+                        />
+                      ) : (
+                        <p className="mt-2 text-muted-foreground leading-relaxed">
+                          {organization.description ||
+                            "No description provided"}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Privacy (when editing) */}
+                    {isEditing && (
+                      <div className="mt-6">
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Privacy
+                        </label>
+                        <div className="flex items-center gap-2 mt-2">
+                          <div
+                            className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${
+                              !editIsPrivate
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted hover:bg-muted/80"
+                            }`}
+                            onClick={() => setEditIsPrivate(false)}
+                          >
+                            <Globe className="h-4 w-4" />
+                            <span>Public</span>
+                          </div>
+                          <div
+                            className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${
+                              editIsPrivate
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted hover:bg-muted/80"
+                            }`}
+                            onClick={() => setEditIsPrivate(true)}
+                          >
+                            <Lock className="h-4 w-4" />
+                            <span>Private</span>
+                          </div>
+                          <div className="ml-2 text-sm text-muted-foreground">
+                            {editIsPrivate
+                              ? "Only members can see this organisation"
+                              : "Anyone can see and join this organisation"}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {isEditing && (
-                    <div className="flex gap-2">
+                    {/* Save button */}
+                    {isEditing && (
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleSaveEdit}
+                          disabled={savingEdit}
+                          className="flex items-center gap-2"
+                        >
+                          {savingEdit ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                          Save Changes
+                        </Button>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Created
+                        </label>
+                        <p className="mt-1">
+                          {new Date(
+                            organization.createdAt,
+                          ).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Privacy
+                        </label>
+                        <p className="mt-1">
+                          {organization.isPrivate ? "Private" : "Public"}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Total Members
+                        </label>
+                        <p className="mt-1">{memberCount}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Total Notes
+                        </label>
+                        <p className="mt-1">{organization.notes.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* ---------------- Members Tab ---------------- */}
+              <TabsContent value="members" className="mt-6">
+                <Card>
+                  <CardHeader className="flex flex-row justify-between">
+                    <CardTitle>Members ({memberCount})</CardTitle>
+                    {isAdmin && organization.isPrivate && (
                       <Button
-                        onClick={handleSaveEdit}
-                        disabled={savingEdit}
-                        className="flex items-center gap-2"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowAddDlg(true)}
+                        className="gap-1"
                       >
-                        {savingEdit ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                        Save Changes
+                        <Plus className="h-4 w-4" />
+                        Add Members
                       </Button>
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Created
-                      </label>
-                      <p className="mt-1">
-                        {new Date(organization.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Privacy
-                      </label>
-                      <p className="mt-1">
-                        {organization.isPrivate ? "Private" : "Public"}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Total Members
-                      </label>
-                      <p className="mt-1">{memberCount}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Total Notes
-                      </label>
-                      <p className="mt-1">{organization.notes.length}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Members Tab */}
-            <TabsContent value="members" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Members ({memberCount})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {organization.memberDetails.map((member, index) => (
-                      <div key={member.id}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
-                              <AvatarFallback className="bg-muted">
-                                {member.name.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium">{member.name}</p>
-                              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                <Mail className="h-3 w-3" />
-                                {member.email}
-                              </p>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {organization.memberDetails.map((member, index) => (
+                        <div key={member.id}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback className="bg-muted">
+                                  {member.name.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{member.name}</p>
+                                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                  <Mail className="h-3 w-3" />
+                                  {member.email}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  member.role === "Admin"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                                className={
+                                  member.role === "Admin"
+                                    ? "bg-amber-500"
+                                    : ""
+                                }
+                              >
+                                {member.role === "Admin" && (
+                                  <Crown className="h-3 w-3 mr-1" />
+                                )}
+                                {member.role}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                Joined{" "}
+                                {new Date(
+                                  member.joinedAt,
+                                ).toLocaleDateString()}
+                              </span>
+                              {isAdmin &&
+                                member.id !== userId &&
+                                member.id !== organization.ownerId && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleDeleteMember(member.id)
+                                    }
+                                    disabled={deletingMembers.has(member.id)}
+                                    className="text-destructive hover:text-destructive"
+                                  >
+                                    {deletingMembers.has(member.id) ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={member.role === "Admin" ? "default" : "secondary"}
-                              className={member.role === "Admin" ? "bg-amber-500" : ""}
-                            >
-                              {member.role === "Admin" && (
-                                <Crown className="h-3 w-3 mr-1" />
-                              )}
-                              {member.role}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              Joined {new Date(member.joinedAt).toLocaleDateString()}
-                            </span>
-                            {isAdmin &&
-                              member.id !== userId &&
-                              member.id !== organization.ownerId && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteMember(member.id)}
-                                  disabled={deletingMembers.has(member.id)}
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  {deletingMembers.has(member.id) ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              )}
-                          </div>
+                          {index < organization.memberDetails.length - 1 && (
+                            <Separator className="mt-4" />
+                          )}
                         </div>
-                        {index < organization.memberDetails.length - 1 && (
-                          <Separator className="mt-4" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            {/* Activity Tab */}
-            <TabsContent value="activity" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {organization.activities.map((activity, index) => (
-                      <div key={activity.id}>
-                        <div className="flex items-start gap-3">
-                          <div className="bg-muted rounded-full p-2 mt-1">
-                            <Activity className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm">{activity.description}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(activity.timestamp).toLocaleString()}
-                            </p>
-                          </div>
+              {/* ---------------- Notes Tab ---------------- */}
+              <TabsContent value="notes" className="mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {organization.notes.map((note) => (
+                    <Card
+                      key={note.id}
+                      className="hover:shadow-md transition-shadow"
+                    >
+                      <CardHeader>
+                        <CardTitle className="text-lg line-clamp-2">
+                          {note.title}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-muted-foreground text-sm line-clamp-3 mb-4">
+                          {note.content}
+                        </p>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>By {note.author}</span>
+                          <span>
+                            {new Date(note.createdAt).toLocaleDateString()}
+                          </span>
                         </div>
-                        {index < organization.activities.length - 1 && (
-                          <Separator className="mt-4" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Notes Tab */}
-            <TabsContent value="notes" className="mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {organization.notes.map((note) => (
-                  <Card
-                    key={note.id}
-                    className="hover:shadow-md transition-shadow"
-                  >
-                    <CardHeader>
-                      <CardTitle className="text-lg line-clamp-2">
-                        {note.title}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground text-sm line-clamp-3 mb-4">
-                        {note.content}
-                      </p>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>By {note.author}</span>
-                        <span>
-                          {new Date(note.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      )}
-    </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
