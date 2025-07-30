@@ -3,15 +3,15 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
-import { initializeNewUser } from '@/utils/user'
+import { ref, set } from 'firebase/database'
+import { auth, db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
-import Image from 'next/image'
+import Image from "next/image"
 
 export function SignupForm(
   { className, ...props }: React.ComponentProps<'div'>,
@@ -46,8 +46,13 @@ export function SignupForm(
         password,
       )
 
-      // 🟢 Initialize /users/{uid}/{UserSettings, Friends}
-      await initializeNewUser(user.uid, name)
+      // 🟢 Save profile in Realtime Database: /users/{uid}
+      await set(ref(db, `users/${user.uid}`), {
+        name,
+        role: 'User',
+        email: user.email,
+        createdAt: Date.now(),
+      })
 
       router.push('/dashboard')
     } catch (err: any) {
@@ -149,17 +154,18 @@ export function SignupForm(
           </form>
 
           {/* ── Side image ── */}
-          <div className="hidden md:flex items-center justify-center bg-white p-0">
-            <div className="relative w-120 h-120">
-              <Image
-                src="/sshblogo.png"
-                alt="Smart Student Handbook Logo"
-                fill
-                className="object-contain"
-                priority
-              />
+          {/* right: logo panel */}
+            <div className="hidden md:flex items-center justify-center bg-white p-0">
+              <div className="relative w-120 h-120">
+                <Image
+                  src="/sshblogo.png"
+                  alt="Smart Student Handbook Logo"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
             </div>
-          </div>
         </CardContent>
       </Card>
 

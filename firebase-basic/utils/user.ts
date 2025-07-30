@@ -34,3 +34,4 @@ export async function initializeNewUser(
   // Single atomic write
   await set(ref(db, `users/${uid}`), defaults)
 }
+

@@ -282,7 +282,7 @@ export default function OrganisationsPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b bg-background">
-        <div className="p-8">
+        <div className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-8">
             <div className="flex-1 space-y-4">
               <h1 className="text-5xl font-bold tracking-tight">Organisations</h1>
@@ -299,7 +299,7 @@ export default function OrganisationsPage() {
                 </div>
               )}
             </div>
-            <Button onClick={() => setShowCreate(true)} className="shadow-lg h-10 px-4 py-2 text-base">
+            <Button size="lg" onClick={() => setShowCreate(true)} className="shadow-lg">
               <Plus className="h-5 w-5 mr-2" />
               Create Organisation
             </Button>
@@ -307,16 +307,14 @@ export default function OrganisationsPage() {
 
           {/* Filter Tabs */}
           <div className="flex justify-center">
-            <div className="inline-flex gap-2 p-2 bg-muted/50 rounded-2xl border">
+            <div className="inline-flex gap-2 p-2 bg-muted/50 rounded-2xl">
               {(["all", "joined", "public", "private"] as const).map((f) => (
                 <Button
                   key={f}
                   variant={filter === f ? "default" : "ghost"}
                   size="lg"
                   onClick={() => setFilter(f)}
-                  className={`px-8 py-3 text-base font-medium min-w-[120px] rounded-xl transition-all ${
-                    filter === f ? "shadow-sm" : "hover:bg-background/80"
-                  }`}
+                  className={`min-w-[100px]`}
                 >
                   {f.charAt(0).toUpperCase() + f.slice(1)}
                   <Badge variant="secondary" className="ml-2 text-xs">
@@ -336,8 +334,8 @@ export default function OrganisationsPage() {
         </div>
       </div>
 
-      {/* Organisation Cards */}
-      <div className="p-8">
+      {/* Organisations Grid */}
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
         {orgs.length === 0 ? (
           <div className="flex items-center justify-center min-h-[500px]">
             <div className="text-center py-20 px-8 max-w-2xl mx-auto">
@@ -357,7 +355,7 @@ export default function OrganisationsPage() {
                   : "Be the first to create an organisation."}
               </p>
               {!searchQuery && (
-                <Button onClick={() => setShowCreate(true)} className="shadow-lg h-10 px-4 py-2 text-base">
+                <Button size="sm" onClick={() => setShowCreate(true)} className="shadow-sm">
                   <Plus className="h-5 w-5 mr-2" />
                   Create Your First Organisation
                 </Button>
@@ -365,8 +363,10 @@ export default function OrganisationsPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            {orgs.map((o) => {
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {orgs.map(o => {
+
               const isFav = !!favorites[o.id]
               const memberCount = Object.keys(o.members).length
               const isJoining = joiningOrgs.has(o.id)
@@ -382,116 +382,99 @@ export default function OrganisationsPage() {
                 gradients[Math.abs(o.id.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % gradients.length]
 
               return (
-                <Link href={`/organisations/${o.id}`} key={o.id}>
-                  <div
-                    className={`border-2 rounded-2xl p-8 hover:shadow-xl transition-all ${gradientClass} relative min-h-[360px] group hover:scale-[1.02] ${
-                      isJoining || isLeaving ? "opacity-75" : ""
-                    } cursor-pointer`}
-                  >
-                    {/* fav button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm dark:bg-black/80 dark:hover:bg-black z-10"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        handleToggleFav(o.id)
-                      }}
-                      disabled={isJoining || isLeaving}
-                    >
-                      <Heart
-                        className={`h-5 w-5 transition-colors ${
-                          isFav ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500"
-                        }`}
-                      />
-                    </Button>
 
-                    {/* header */}
-                    <div className="flex items-start gap-4 mb-6">
-                      <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-black">
-                        <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-black">
-                          {o.name.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-xl truncate mb-2">{o.name}</h3>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Badge
-                            variant="secondary"
-                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
-                          >
-                            <Users className="h-3 w-3" />{" "}
-                            <span>
-                              {memberCount} member
-                              {memberCount !== 1 ? "s" : ""}
-                            </span>
-                          </Badge>
-                          <Badge
-                            variant="secondary"
-                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
-                          >
-                            {o.isPrivate ? (
-                              <>
-                                <Lock className="h-3 w-3" /> <span>Private</span>
-                              </>
-                            ) : (
-                              <>
-                                <Globe className="h-3 w-3" /> <span>Public</span>
-                              </>
-                            )}
-                          </Badge>
-                        </div>
+                <div
+                  key={o.id}
+                  className={`bg-white border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-all relative min-h-[360px] group hover:scale-[1.02] ${isJoining || isLeaving ? "opacity-75" : ""}`}
+                >
+                  {/* favorite heart button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm dark:bg-black/80 dark:hover:bg-black"
+                    onClick={() => handleToggleFav(o.id)}
+                    disabled={isJoining || isLeaving}
+                  >
+                    <Heart
+                      className={`h-5 w-5 transition-colors ${
+                        isFav ? "fill-red-500 text-red-500" : "text-gray-400"
+                      }`}
+                    />
+                  </Button>
+
+                  {/* avatar + title */}    
+                  <div className="flex items-start gap-4 mb-6">
+                    <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-black">
+                      <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-black">
+                        {o.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-xl truncate mb-2">{o.name}</h3>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge
+                          variant="secondary"
+                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
+                        >
+                          <Users className="h-3 w-3" /> <span>{memberCount} member{memberCount !== 1 ? "s" : ""}</span>
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
+                        >
+                          {o.isPrivate ? (
+                            <>
+                              <Lock className="h-3 w-3" /> <span>Private</span>
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="h-3 w-3" /> <span>Public</span>
+                            </>
+                          )}
+                        </Badge>
                       </div>
                     </div>
 
-                    {/* description */}
-                    <p className="text-muted-foreground leading-relaxed line-clamp-3 min-h-[72px]">
-                      {o.description || "No description provided for this organization."}
-                    </p>
+                  <p className="text-muted-foreground leading-relaxed line-clamp-3 min-h-[72px]">
+                    {o.description || "No description provided for this organization."}
+                  </p>
 
-                    {/* badges */}
-                    <div className="flex flex-wrap gap-2 mb-6 mt-4">
-                      {o.joined && !isLeaving && (
-                        <Badge className="px-3 py-1 bg-green-500 text-white">
-                          <UserCheck className="h-3 w-3 inline-block mr-1" /> Joined
-                        </Badge>
-                      )}
-                      {isJoining && (
-                        <Badge className="px-3 py-1 bg-blue-500 text-white">
-                          <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Joining...
-                        </Badge>
-                      )}
-                      {isLeaving && (
-                        <Badge className="px-3 py-1 bg-orange-500 text-white">
-                          <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Leaving...
-                        </Badge>
-                      )}
-                      {isFav && (
-                        <Badge className="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                          <Heart className="h-3 w-3 inline-block mr-1" /> Favorite
-                        </Badge>
-                      )}
-                      {o.role === "Admin" && !isLeaving && (
-                        <Badge className="px-3 py-1 bg-amber-500 text-white">
-                          <Crown className="h-3 w-3 inline-block mr-1" /> Admin
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* actions */}
-                    <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-black/30 relative z-10">
-                      {o.joined && !isLeaving ? (
-                        <Button
-                          size="lg"
-                          className="shadow-md"
-                          disabled={isJoining || isLeaving}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            window.location.href = `/organisations/${o.id}/notes`
-                          }}
-                        >
+                  <div className="flex flex-wrap gap-2 mb-6 mt-4">
+                    {o.joined && !isLeaving && (
+                      <Badge className="px-3 py-1 bg-green-500 text-white">
+                        <UserCheck className="h-3 w-3 inline-block mr-1" /> Joined
+                      </Badge>
+                    )}
+                    {isJoining && (
+                      <Badge className="px-3 py-1 bg-blue-500 text-white">
+                        <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Joining...
+                      </Badge>
+                    )}
+                    {isLeaving && (
+                      <Badge className="px-3 py-1 bg-orange-500 text-white">
+                        <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Leaving...
+                      </Badge>
+                    )}
+                    {isFav && (
+                      <Badge className="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                        <Heart className="h-3 w-3 inline-block mr-1" /> Favorite
+                      </Badge>
+                    )}
+                    {o.role === "Admin" && !isLeaving && (
+                      <Badge className="px-3 py-1 bg-amber-500 text-white">
+                        <Crown className="h-3 w-3 inline-block mr-1" /> Admin
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {/* action buttons */}
+                  <div className="mt-4 pt-4 border-t border-white/30 dark:border-black/30 flex flex-col sm:flex-row sm:items-center gap-2">
+                    {o.joined && !isLeaving ? (
+                      <Link href={`/organisations/${o.id}/notes`}>
+                        <Button 
+                          size="sm" 
+                          className="shadow-md" 
+                          disabled={isJoining || isLeaving}>
                           View Notes
                         </Button>
                       ) : (
@@ -519,13 +502,9 @@ export default function OrganisationsPage() {
                       )}
                       {o.joined && !isLeaving && (
                         <Button
-                          size="lg"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleLeave(o.id)
-                          }}
+                          size="sm"
+                          onClick={() => handleJoin(o.id)}
+                          className="shadow-md w-full sm:w-auto"
                           disabled={isJoining || isLeaving}
                         >
                           {isLeaving ? (
@@ -536,13 +515,26 @@ export default function OrganisationsPage() {
                             "Leave"
                           )}
                         </Button>
-                      )}
 
                       {/* View Details indicator */}
-                      <div className="ml-auto flex items-center text-muted-foreground group-hover:text-primary transition-colors">
-                        <ArrowRight className="h-4 w-4" />
-                      </div>
-                    </div>
+                      )
+                    )}
+                    {o.joined && !isLeaving && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleLeave(o.id)}
+                        disabled={isJoining || isLeaving}
+                      >
+                        {isLeaving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Leaving...
+                          </>
+                        ) : (
+                          "Leave"
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </Link>
               )

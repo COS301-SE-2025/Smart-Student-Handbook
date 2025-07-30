@@ -29,6 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+
 import {
   Dialog,
   DialogContent,
@@ -62,7 +63,8 @@ export default function ProfilePage() {
     degree: "",
     occupation: "",
     hobbies: "",
-    description: "",
+    description: 
+    
   })
   const [initialData, setInitialData] = useState(formData)
   const [passwords, setPasswords] = useState({
@@ -79,34 +81,50 @@ export default function ProfilePage() {
   // --- Load friends ---
   useEffect(() => {
     const auth = getAuth()
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
         setFriends([])
         return
       }
-      const uid = user.uid
-      onValue(ref(db, `users/${uid}/Friends`), async (snap) => {
-        const data = snap.val() || {}
-        const ids = Object.entries(data)
-          .filter(([_, v]) => v === true)
+
+      const userID = user.uid
+      const friendsRef = ref(db, `users/${userID}/Friends`)
+
+      onValue(friendsRef, async (snapshot) => {
+        const friendsData = snapshot.val()
+        if (!friendsData) {
+          setFriends([])
+          return
+        }
+
+        const friendIDs = Object.entries(friendsData)
+          .filter(([_, val]) => val === true)
           .map(([id]) => id)
-        const list: { id: string; name: string }[] = []
+
+        const friendsList: { id: string; name: string }[] = []
+
         await Promise.all(
+
           ids.map(async (fid) => {
             const nameSnap = await get(ref(db, `users/${fid}/UserSettings/name`))
             list.push({ id: fid, name: nameSnap.exists() ? nameSnap.val() : "Unknown" })
           }),
         )
-        setFriends(list)
+
+        setFriends(friendsList)
       })
     })
+
     return () => unsubscribe()
   }, [])
 
   // --- Load settings ---
   useEffect(() => {
     const auth = getAuth()
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+
       if (!user) return
       const uid = user.uid
       onValue(ref(db, `users/${uid}/UserSettings`), (snap) => {
@@ -119,10 +137,9 @@ export default function ProfilePage() {
           hobbies: Array.isArray(data.hobbies) ? data.hobbies.join(", ") : data.hobbies || "",
           description: data.description || "",
         }
-        setFormData(loaded)
-        setInitialData(loaded)
       })
     })
+
     return () => unsubscribe()
   }, [])
 
@@ -218,6 +235,9 @@ export default function ProfilePage() {
     } catch (err: any) {
       toast.error(err.message)
     }
+
+    await saveUserSettings(userID, formattedData)
+    toast.success("Your settings have been saved.")
   }
 
   // --- Handlers for Metrics ---
@@ -293,6 +313,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
+
       <PageHeader title="Settings" description="Manage your account information, security, and preferences." />
       <div className="container mx-auto max-w-7xl p-6 space-y-6">
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -336,15 +357,12 @@ export default function ProfilePage() {
                         <Input id="occupation" value={formData.occupation} onChange={handleChange} />
                       </div>
                     </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor="hobbies">Interests & Hobbies</Label>
-                      <Input
-                        id="hobbies"
-                        value={formData.hobbies}
-                        onChange={handleChange}
-                        placeholder="Separate with commas"
-                      />
+                      <Label htmlFor="name">First Name</Label>
+                      <Input id="name" value={formData.name} onChange={handleChange} />
                     </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="description">Bio</Label>
                       <Textarea
@@ -376,7 +394,11 @@ export default function ProfilePage() {
                       <Label htmlFor="current">Current Password</Label>
                       <Input id="current" type="password" value={passwords.current} onChange={handlePasswordChange} />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
+
                       <Label htmlFor="new">New Password</Label>
                       <Input id="new" type="password" value={passwords.new} onChange={handlePasswordChange} />
                     </div>
@@ -384,85 +406,151 @@ export default function ProfilePage() {
                       <Label htmlFor="confirm">Confirm New Password</Label>
                       <Input id="confirm" type="password" value={passwords.confirm} onChange={handlePasswordChange} />
                     </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button onClick={handlePasswordUpdate} className="ml-auto">
-                      Change Password
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
+                  </div>
 
-          {/* Sidebar: Achievements & Study Buddies */}
-          <div className="xl:col-span-1 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Achievements</CardTitle>
-                <CardDescription>Your academic badges and milestones</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">🏆 Best Achiever</Badge>
-                  <Badge variant="outline">⚡ Fast Coder</Badge>
-                  <Badge variant="outline">🔬 Researcher</Badge>
-                  <Badge variant="outline">💻 GitHub Enthusiast</Badge>
-                  <Badge variant="outline">📚 Bookworm</Badge>
-                  <Badge variant="outline">🎯 Goal Setter</Badge>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="space-y-2">
+                    <Label htmlFor="hobbies">Interests & Hobbies</Label>
+                    <Input
+                      id="hobbies"
+                      value={formData.hobbies}
+                      onChange={handleChange}
+                      placeholder="Separate with commas"
+                    />
+                  </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Study Buddies</CardTitle>
-                <CardDescription>Connect with your classmates and study partners</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {friends.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No study buddies yet. Start connecting with classmates!
-                    </p>
-                  ) : (
-                    friends.map(({ id, name }) => (
-                      <div
-                        key={id}
-                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <UserIcon className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="font-medium text-sm">{name}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                            <MessageSquareIcon className="h-4 w-4" />
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>View Profile</DropdownMenuItem>
-                              <DropdownMenuItem>Send Message</DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive">Remove Friend</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Bio</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      placeholder="Tell us about yourself..."
+                      rows={3}
+                    />
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button onClick={handleSave} className="ml-auto">
+                    Save Changes
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="password">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Change Password</CardTitle>
+                  <CardDescription>Update your password to keep your account secure</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="current">Current Password</Label>
+                    <Input id="current" type="password" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new">New Password</Label>
+                    <Input id="new" type="password" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm">Confirm New Password</Label>
+                    <Input id="confirm" type="password" />
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button className="ml-auto">Update Password</Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
+
+        {/* Sidebar Content - Takes up 1 column */}
+        <div className="xl:col-span-1 space-y-6">
+          {/* Achievements */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Achievements</CardTitle>
+              <CardDescription>Your academic badges and milestones</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">🏆 Best Achiever</Badge>
+                <Badge variant="outline">⚡ Fast Coder</Badge>
+                <Badge variant="outline">🔬 Researcher</Badge>
+                <Badge variant="outline">💻 GitHub Enthusiast</Badge>
+                <Badge variant="outline">📚 Bookworm</Badge>
+                <Badge variant="outline">🎯 Goal Setter</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Friends List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Study Buddies</CardTitle>
+              <CardDescription>Connect with your classmates and study partners</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {friends.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No study buddies yet. Start connecting with classmates!
+                  </p>
+                ) : (
+                  friends.map(({ id, name }) => (
+                    <div
+                      key={id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <UserIcon className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="font-medium text-sm">{name}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                          <MessageSquareIcon className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>View Profile</DropdownMenuItem>
+                            <DropdownMenuItem>Send Message</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive">Remove Friend</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Analytics Section - Stats + Chart */}
+      <div className="space-y-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Study Hours</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">127.5</div>
+              <p className="text-xs text-muted-foreground">+12% from last month</p>
+            </CardContent>
+          </Card>
 
         {/* Analytics Section */}
         <div className="space-y-6">
@@ -566,6 +654,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   )
 }
