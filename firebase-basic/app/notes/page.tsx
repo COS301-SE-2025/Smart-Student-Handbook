@@ -140,10 +140,6 @@ export default function NotesPage() {
 
         <div
           onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            const draggedId = e.dataTransfer.getData("text/plain")
-            onDropNode(draggedId, null)
-          }}
           className="drop-root-zone"
         >
           <NoteTree
@@ -165,15 +161,4 @@ export default function NotesPage() {
       </div>
     </div>
   );
-}
-
-function findNodeById(tree: FileNode[], id: string | null): FileNode | null {
-  if (!id) return null;
-  const stack = [...tree];
-  while (stack.length) {
-    const node = stack.pop();
-    if (node?.id === id) return node;
-    if (node?.children) stack.push(...node.children);
-  }
-  return null;
 }
