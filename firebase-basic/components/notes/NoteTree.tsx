@@ -102,13 +102,32 @@ export default function NodeTree({
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
-    setActiveDragNode(null);
     setIsDragging(false);
 
-    if (over && active.id !== over.id) {
-      onDropNode(active.id as string, over.id as string);
+    if (!active) return;
+
+    const draggedId = String(active.id);
+    const targetId = over ? String(over.id) : null;
+
+    if (targetId === draggedId) return;
+
+    const draggedNode = findNodeById(treeData, draggedId);
+    const currentParent = findParentNode(treeData, draggedId);
+
+    if (targetId === "root-drop-zone" || !targetId) {
+      onDropNode(draggedId, null);
+      return;
     }
+
+    if (!treeData.some((node) => node.id === targetId)) {
+      if (currentParent && !currentParent.parentId) {
+        onDropNode(draggedId, null);
+        return;
+      }
+    }
+
+    onDropNode(draggedId, targetId);
+
   };
 
   const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({
