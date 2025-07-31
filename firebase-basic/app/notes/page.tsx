@@ -1,14 +1,16 @@
 // app/notes/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import NoteTree from "@/components/notes/NoteTree";
-import { FileNode } from "@/types/note";
-import { addNode, moveNode, sortTree } from "@/lib/note/treeActions";
+import { FileNode, Note } from "@/types/note";
+import { addNode, moveNode, sortTree, fetchNoteById } from "@/lib/note/treeActions";
 import { buildTreeFromRealtimeDB, createFolderInDB, createNoteInDB, deleteNodeInDB, renameNodeInDB } from "@/lib/DBTree";
 import { getAuth } from "@firebase/auth";
 import { db } from "@/lib";
 import { ref, update } from "@firebase/database";
+
+import Editor from "@/components/notes/Editor"
 
 export default function NotesPage() {
   const auth = getAuth();
@@ -23,6 +25,31 @@ export default function NotesPage() {
 
   const [tree, setTree] = useState<FileNode[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+
+  useEffect(() => {
+    if (!selectedNoteId) {
+      setSelectedNote(null);
+      return;
+    }
+
+    (async () => {
+      const note = await fetchNoteById(selectedNoteId);
+      setSelectedNote(note);
+    })();
+  }, [selectedNoteId]);
+
+  function findNoteById(tree: FileNode[], id: string): FileNode | null {
+    for (const node of tree) {
+      if (node.id === id) return node;
+      if (node.children) {
+        const found = findNoteById(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
 
   const handleAdd = async (type: "note" | "folder") => {
     let newNode;
@@ -152,13 +179,24 @@ export default function NotesPage() {
         </div>
 
       </div>
+
       <div className="flex-1 p-4">
         {selectedNoteId ? (
-          <div>Selected Note ID: {selectedNoteId}</div>
+          <div>
+
+            <Editor
+              onChange={() => {
+                console.log("The File is Changing");
+              }}
+              noteContent={selectedNote?.content}
+              noteID={selectedNoteId} />
+          </div>
+
         ) : (
           <div>Select a note or folder</div>
         )}
       </div>
+
     </div>
   );
 }

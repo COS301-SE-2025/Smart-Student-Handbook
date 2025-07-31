@@ -5,6 +5,7 @@ export type FileNode = {
   type: "folder" | "note"
   parentId?: string | null
   children?: FileNode[]
+  
 }
 
 export type Note = {

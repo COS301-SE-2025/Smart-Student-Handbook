@@ -46,26 +46,6 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
     console.log("Share with:", collaboratorId, "as", permission);
   };
 
-  const searchUsers = async (query: string) => {
-    return [
-      { uid: "123", name: "Alice", surname: "Smith" },
-      { uid: "456", name: "Bob", surname: "Jones" },
-    ].filter((u) =>
-      `${u.name} ${u.surname}`.toLowerCase().includes(query.toLowerCase())
-    );
-  };
-
-  const mockCollaborators = [
-    { uid: "123", name: "Alice", surname: "Smith", permission: "read" },
-    { uid: "456", name: "Bob", surname: "Jones", permission: "write" },
-  ];
-
-  const handleRemoveCollaborator = (uid: string) => {
-    console.log("Remove collaborator:", uid);
-    // later you will update Firebase here
-  };
-
-
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: node.id,
   });
