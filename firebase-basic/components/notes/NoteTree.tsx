@@ -61,6 +61,7 @@ export default function NodeTree({
     const isFolder = node.type === "folder";
     const isExpanded = expandedFolderIds.has(node.id);
 
+
     return (
       <div key={node.id} className="pl-4 max-w-full overflow-hidden">
         {isFolder ? (
@@ -110,6 +111,9 @@ export default function NodeTree({
     }
   };
 
+  const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({
+    id: "root-drop-zone",
+  });
 
   return (
     <>
