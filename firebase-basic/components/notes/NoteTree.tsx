@@ -82,6 +82,7 @@ export default function NodeTree({
             onSelect={onSelect}
             onRename={onRename}
             onDelete={onDelete}
+            noteID={node.id}
           />
         )}
       </div>

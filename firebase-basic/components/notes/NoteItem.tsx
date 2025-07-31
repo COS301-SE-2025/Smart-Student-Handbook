@@ -14,6 +14,7 @@ interface Props {
   onRename: (id: string, newName: string) => void;
   onDelete: (id: string) => void;
   activeDragId?: string;
+  noteID: string;
 }
 
 export async function searchUsersByName(input: string): Promise<User[]> {
@@ -41,12 +42,10 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
 
-  // Replace with actual Firebase call later
   const handleShare = (collaboratorId: string, permission: "read" | "write") => {
     console.log("Share with:", collaboratorId, "as", permission);
   };
 
-  // Replace with real Firebase search logic
   const searchUsers = async (query: string) => {
     return [
       { uid: "123", name: "Alice", surname: "Smith" },
@@ -56,7 +55,6 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
     );
   };
 
-  // Replace with real data later
   const mockCollaborators = [
     { uid: "123", name: "Alice", surname: "Smith", permission: "read" },
     { uid: "456", name: "Bob", surname: "Jones", permission: "write" },
@@ -163,15 +161,13 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
         setOpen={setIsShareOpen}
         onShare={handleShare}
         searchUsers={searchUsersByName}
-        noteId="0axoaxm"
+        noteId={node.id}
       />
 
       <ViewCollaboratorsDialog
         open={isViewOpen}
         setOpen={setIsViewOpen}
-        collaborators={mockCollaborators}
-        onRemove={handleRemoveCollaborator}
-        noteId="0axoaxm"
+        noteId={node.id}
       />
     </div>
   );
