@@ -17,7 +17,7 @@ export default function HelpMenuPage() {
     <div className="min-h-screen bg-background">
       <PageHeader
         title="Help Menu"
-        description="Quick links to user guide, tutorials, and FAQs."
+        description="Quick links to user manual, tutorials, and FAQs."
       />
 
       <div className="p-8">
@@ -27,7 +27,7 @@ export default function HelpMenuPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-primary" />
-                User Guide
+                User Manual
               </CardTitle>
               <CardDescription>
                 Read the full Smart Student Handbook PDF.

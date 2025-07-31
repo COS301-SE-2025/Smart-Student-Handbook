@@ -79,7 +79,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       {/* Banner Image */}
       <section className="w-full">
-        <div className="relative w-full h-[600px] md:h-[600px]">
+        <div className="relative w-full h-[600px] md:h-[600px] overflow-hidden">
           <Image
             src="/sshbbanner.png"
             alt="Smart Student Handbook Banner"
