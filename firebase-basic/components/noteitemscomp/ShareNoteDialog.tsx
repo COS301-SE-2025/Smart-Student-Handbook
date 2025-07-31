@@ -42,7 +42,8 @@ export default function ShareNoteDialog({
     const [searchName, setSearchName] = useState("");
     const [searchResults, setSearchResults] = useState<User[]>([]);
     const [collaboratorId, setCollaboratorId] = useState<string | null>(null);
-    const [permission, setPermission] = useState<"r" | "w">("r");
+    const [permission, setPermission] = useState<"read" | "write" | "none">(
+    "none"); 
 
     const handleSearch = async () => {
         const results = await searchUsers(searchName);
@@ -55,13 +56,14 @@ export default function ShareNoteDialog({
 
         if (!noteId || !collaboratorId || !permission) {
             toast.error("Missing note, collaborator, or permission");
-            // console.log(noteId + collaboratorId + permission) ; 
             return;
         }
 
         try {
             const functions = getFunctions(app);
             const shareNote = httpsCallable(functions, "shareNote");
+
+            console.log(permission) ; 
 
             const result = await shareNote({ collaboratorId, noteId, permission });
 
@@ -117,7 +119,7 @@ export default function ShareNoteDialog({
                 <Label className="mt-4">Permissions</Label>
                 <RadioGroup
                     value={permission}
-                    onValueChange={(value) => setPermission(value as "read" | "write")}
+                    onValueChange={(value) => setPermission(value as "read" | "write" | "none")}
                     className="flex space-x-4 mt-2"
                 >
                     <div className="flex items-center space-x-2">
