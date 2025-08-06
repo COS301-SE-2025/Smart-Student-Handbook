@@ -183,11 +183,7 @@ export default function NotesPage() {
       <div className="flex-1 p-4">
         {selectedNoteId ? (
           <div>
-
             <Editor
-              onChange={() => {
-                console.log("The File is Changing");
-              }}
               noteContent={selectedNote?.content}
               noteID={selectedNoteId} />
           </div>

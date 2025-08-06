@@ -11,19 +11,26 @@ import "@blocknote/react/style.css"
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import { doc } from "@firebase/firestore";
+import { EditorContent } from "@tiptap/react";
 
 interface EditorProps {
-  onChange: (newContent: string) => void;
   initContent?: string;
   editable?: boolean;
   noteID?: string
   noteContent?: string
 }
 
-const Editor: React.FC<EditorProps> = ({ onChange, initContent, editable, noteID, noteContent }) => {
+async function saveToStorage(jsonBlocks: Block[]) {
+  // localStorage.setItem("editorContent", JSON.stringify(jsonBlocks));
+  const jsonBl = JSON.stringify(jsonBlocks) ; 
+  console.log(jsonBl)
+
+}
+
+
+const Editor: React.FC<EditorProps> = ({ initContent, editable, noteID, noteContent }) => {
   const editor: BlockNoteEditor = useCreateBlockNote({
     initialContent: initContent ? (JSON.parse(initContent) as PartialBlock[]) : undefined,
-
   })
 
   const document: Block[] = editor.document;
@@ -33,22 +40,25 @@ const Editor: React.FC<EditorProps> = ({ onChange, initContent, editable, noteID
     []
   )
 
-  useEffect(() => {
-    console.log("File Was Changed " + noteContent + " NoteID " + noteID);
-    const Block = editor.getBlock(document[0]);
+  let saveTimeout: string | number | NodeJS.Timeout | undefined;
 
-    if (Block)
-      editor.updateBlock(Block, { 
-    content: noteContent ,
-    props: {level : 2} ,  
-  });
-  console.log(document) ; 
+editor.onChange((editor, { getChanges }) => {
+  console.log("Editor content has been changed");
 
+  clearTimeout(saveTimeout);
+
+  saveTimeout = setTimeout(() => {
+    saveToStorage(editor.document);
+  }, 1500);
+});
+
+  useEffect(() => { // Simulates On Load Effects .
+    console.log(`Loading Preset , now loading ${noteID}`);
   }, [document])
 
   return (
     <div className="my-4">
-      <BlockNoteView editor={editor} editable={editable} theme="light" onChange={onChange} />
+      <BlockNoteView editor={editor} editable={editable} theme="light" />
     </div>
   )
 }
