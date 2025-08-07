@@ -184,8 +184,8 @@ export default function NotesPage() {
         {selectedNoteId ? (
           <div>
             <Editor
-              noteContent={selectedNote?.content}
-              noteID={selectedNoteId} />
+              noteID={selectedNoteId} 
+              ownerID={user.uid} />
           </div>
 
         ) : (

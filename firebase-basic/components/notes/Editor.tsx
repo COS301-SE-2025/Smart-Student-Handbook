@@ -12,53 +12,105 @@ import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import { doc } from "@firebase/firestore";
 import { EditorContent } from "@tiptap/react";
+import { get, getDatabase, ref, set } from "@firebase/database";
+import { getAuth } from "@firebase/auth";
 
 interface EditorProps {
   initContent?: string;
   editable?: boolean;
   noteID?: string
-  noteContent?: string
+  ownerID?: string
 }
 
-async function saveToStorage(jsonBlocks: Block[]) {
-  const jsonBl = JSON.stringify(jsonBlocks) ; 
-  console.log(jsonBl)
+async function saveToStorage(noteId: string, jsonBlocks: Block[]) {
+  const db = getDatabase();
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    console.error("User not authenticated");
+    return;
+  }
+
+  const jsonBl = JSON.stringify(jsonBlocks);
+  const noteRef = ref(db, `users/${user.uid}/notes/${noteId}/content`);
+  try {
+    await set(noteRef, jsonBl);
+    console.log("Note saved successfully");
+  } catch (error) {
+    console.error("Error saving note:", error);
+  }
+
 }
 
-async function loadFromStorage() {
-  const storageString = localStorage.getItem("editorContent");
-  return storageString
-    ? (JSON.parse(storageString) as PartialBlock[])
-    : undefined;
+async function loadFromStorage(noteId: string): Promise<PartialBlock[] | undefined> {
+  const db = getDatabase();
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    console.error("User not authenticated");
+    return;
+  }
+
+  const noteRef = ref(db, `users/${user.uid}/notes/${noteId}/content`);
+
+  try {
+    const snapshot = await get(noteRef);
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      return JSON.parse(data) as PartialBlock[];
+    } else {
+      console.warn("No note content found for ID:", noteId);
+      return undefined;
+    }
+  } catch (error) {
+    console.error("Error loading note:", error);
+    return undefined;
+  }
 }
 
-const Editor: React.FC<EditorProps> = ({ initContent, editable, noteID, noteContent }) => {
 
-  const editor: BlockNoteEditor = useCreateBlockNote({
-    initialContent: initContent ? (JSON.parse(initContent) as PartialBlock[]) : undefined,
-  })
-
-  const document: Block[] = editor.document;
+const Editor: React.FC<EditorProps> = ({ initContent, editable, noteID, ownerID }) => {
 
   const [initialContent, setInitialContent] = useState<PartialBlock[] | undefined | "loading"
   >("loading");
 
+  useEffect(() => {
+    console.log(`Loading Preset , now loading ${noteID}`);
+    if (noteID) {
+      loadFromStorage(noteID).then((content) => {
+        setInitialContent(content);
+      });
+    } else {
+      console.log('Error occured while loading Note , Invalid NoteID');
+    }
+
+  }, [noteID]);
+
+  const editor = useMemo(() => {
+    if (initialContent === "loading") {
+      return undefined;
+    }
+    return BlockNoteEditor.create({ initialContent });
+  }, [initialContent]);
+  if (editor === undefined) {
+    return "Loading content...";
+  }
 
   let saveTimeout: string | number | NodeJS.Timeout | undefined;
 
-editor.onChange((editor, { getChanges }) => {
-  console.log("Editor content has been changed");
+  editor.onChange((editor, { getChanges }) => {
+    console.log("Editor content has been changed");
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      if (noteID)
+        saveToStorage(noteID, editor.document);
+      else
+        console.log('An error has occurred . No NoteID was entered');
+    }, 1500);
 
-  clearTimeout(saveTimeout);
-
-  saveTimeout = setTimeout(() => {
-    saveToStorage(editor.document);
-  }, 1500);
-});
-
-  useEffect(() => { // Simulates On Load Effects .
-    console.log(`Loading Preset , now loading ${noteID}`);
-  }, [document])
+  });
 
   return (
     <div className="my-4">
