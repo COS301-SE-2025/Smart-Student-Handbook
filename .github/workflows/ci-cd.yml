@@ -1,0 +1,88 @@
+name: CI / CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+ 
+  build-test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: firebase-basic
+
+    steps:
+      # ----- Checkout source -----
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ----- Node setup + dependency cache -----
+      - name: Setup Node 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          # ⤵︎ tell the action where the lock-file lives
+          cache-dependency-path: firebase-basic/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ----- Quality gates -----
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests (Jest)
+        run: npm test -- --passWithNoTests   
+
+      # ----- Build & static export -----
+      - name: Build site
+        run: |
+          npm run build
+          npm run export            
+
+      # ----- Cypress end-to-end tests -----
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: firebase-basic   
+          build: npm run build
+          start: npx next start -p 3000
+          wait-on: 'http://localhost:3000'
+          wait-on-timeout: 120
+
+# -----------------------------------------------------------------
+# 2 — Deploy to Firebase Hosting (optional)
+# -----------------------------------------------------------------
+# deploy:
+#   needs: build-test
+#   if: github.ref == 'refs/heads/main'
+#   runs-on: ubuntu-latest
+#
+#   steps:
+#     - name: Checkout
+#       uses: actions/checkout@v4
+#
+#     - name: Setup Node 20 LTS
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: '20'
+#         cache: npm
+#         cache-dependency-path: firebase-basic/package-lock.json
+#
+#     - name: Install deps (skip postinstall)
+#       run: npm ci --ignore-scripts --prefix firebase-basic
+#
+#     - uses: google-github-actions/auth@v2
+#       with:
+#         credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+#
+#     - name: Deploy to Firebase Hosting (live)
+#       uses: google-github-actions/deploy-firebase@v1
+#       with:
+#         project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+#         channel_id: live

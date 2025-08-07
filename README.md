@@ -48,13 +48,19 @@ The Smart Student Handbook is a digital platform that helps students take, organ
 It offers smart features like AI-powered suggestions, structured categorization, and real-time collaboration.
 Built to boost academic productivity and make studying simpler and smarter.
 
-### Project Links
+## 📑 Project Documentation
 
- - 📝 [Functional Requirements (SRS)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
- - 🗂️ [GitHub Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
- - ❗ [GitHub Issues](https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues)
- - 📈 [Pulse (Activity)](https://github.com/COS301-SE-2025/Smart-Student-Handbook/pulse)
+- 📝 [Functional Requirements (SRS v1)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
+- 📄 [Functional Requirements (SRS v2)](https://docs.google.com/document/d/1GNNrZV6f3-w9E6491yCxKhAI8Hea4iuT/edit?usp=sharing)
+- `</>` [Coding Standards & Style Guide](https://docs.google.com/document/d/1jon85aK5e1c0lPFog6cDFowFoMS-bff--frhNm1pH8U/edit?usp=sharing)
+- 📖 [User Manual](https://docs.google.com/document/d/1zn6EdZky7Wvaw14rAB7GTqvU5vIcr9i1lcMXVe_Ohdg/edit?usp=sharing)
+- 🔗[Demo Video](https://drive.google.com/file/d/1Tkw3Wsu43KCyIVX9yeC8zNIBY9Rl5UNT/view?usp=sharing)
 
+## 🔗 Project Management & Links
+
+- 🗂️ [GitHub Project Board](https://github.com/COS301-SE-2025/Smart-Student-Handbook/projects)
+- ❗ [GitHub Issues](https://github.com/COS301-SE-2025/Smart-Student-Handbook/issues)
+- 📈 [Pulse (Activity)](https://github.com/COS301-SE-2025/Smart-Student-Handbook/pulse)
 
 ---
 

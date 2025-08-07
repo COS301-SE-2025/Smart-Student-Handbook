@@ -4,16 +4,16 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
-import { initializeNewUser } from '@/utils/user'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import { ref, set } from 'firebase/database'
+import { auth, db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
-import Image from 'next/image'
+import Image from "next/image"
 
 export function SignupForm(
   { className, ...props }: React.ComponentProps<'div'>,
@@ -21,6 +21,7 @@ export function SignupForm(
   const router = useRouter()
 
   const [name, setName] = React.useState('')
+  const [surname, setSurname] = React.useState('')
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [error, setError] = React.useState('')
@@ -30,12 +31,23 @@ export function SignupForm(
     e.preventDefault()
     setError('')
 
-    const trimmedEmail = email.trim()
-    const trimmedPassword = password.trim()
-    const trimmedName = name.trim()
+    const trimmedFirst = name.trim()
+    const trimmedSurname = surname.trim()
+    const trimmedEmail = email.trim().toLowerCase()
+    const trimmedPassword = password.trim();
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(trimmedEmail)) {
+
+    if (!trimmedFirst || !trimmedSurname) {
+      setError('Please provide both first name and surname.')
+      return
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+ 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       setError('Please enter a valid email address.')
       return
     }
@@ -49,11 +61,24 @@ export function SignupForm(
         trimmedPassword,
       )
 
-      await initializeNewUser(user.uid, trimmedName)
+      // Update displayName in Auth
+      await updateProfile(user, {
+        displayName: `${trimmedFirst} ${trimmedSurname}`,
+      })
+      
+      // 🟢 Save profile in Realtime Database: /users/{uid}
+      await set(ref(db, `users/${user.uid}`), {
+        name: trimmedFirst,
+        surname: trimmedSurname,
+        role: 'User',
+        email: user.email,
+        createdAt: Date.now(),
+      })
 
       router.push('/dashboard')
     } catch (err: any) {
-      setError(err.message)
+      console.error('Signup error:', err)
+      setError(err.message || 'Failed to create account.')
     } finally {
       setIsLoading(false)
     }
@@ -77,11 +102,37 @@ export function SignupForm(
                 <Input
                   id="name"
                   type="text"
-                  placeholder="Your full name"
+                  placeholder="Your first name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
                   data-testid="name-input"
+                />
+              </div>
+
+              {/* Surname */}
+              <div className="grid gap-2">
+                <Label htmlFor="surname">Surname</Label>
+                <Input
+                  id="surname"
+                  type="text"
+                  placeholder="Your surname"
+                  value={surname}
+                  onChange={(e) => setSurname(e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Surname */}
+              <div className="grid gap-2">
+                <Label htmlFor="surname">Surname</Label>
+                <Input
+                  id="surname"
+                  type="text"
+                  placeholder="Your surname"
+                  value={surname}
+                  onChange={(e) => setSurname(e.target.value)}
+                  required
                 />
               </div>
 
@@ -153,17 +204,19 @@ export function SignupForm(
             </div>
           </form>
 
-          <div className="hidden md:flex items-center justify-center bg-white p-0">
-            <div className="relative w-120 h-120">
-              <Image
-                src="/sshblogo.png"
-                alt="Smart Student Handbook Logo"
-                fill
-                className="object-contain"
-                priority
-              />
+          {/* ── Side image ── */}
+          {/* right: logo panel */}
+            <div className="hidden md:flex items-center justify-center bg-white p-0">
+              <div className="relative w-120 h-120">
+                <Image
+                  src="/sshblogo.png"
+                  alt="Smart Student Handbook Logo"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
             </div>
-          </div>
         </CardContent>
       </Card>
 

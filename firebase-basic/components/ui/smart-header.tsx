@@ -21,6 +21,7 @@ import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
 import { getDatabase, ref as dbRef, onValue, remove as dbRemove } from "firebase/database"
 import { isSameDay, parseISO, format } from "date-fns"
+import Link from "next/link"
 
 interface Notification {
   id: string
@@ -295,6 +296,12 @@ export function SmartHeader() {
   )
 
   // Page info
+  type PageInfo = {
+    title: string
+    icon: React.ReactNode
+    href: string
+  }
+
   const pageInfo = (() => {
     switch (pathname) {
       case "/dashboard":
@@ -306,11 +313,13 @@ export function SmartHeader() {
         return {
           title: "Smart Student Handbook",
           icon: <GraduationCap className="h-4 w-4" />,
+          href: "/",
         }
       default:
         return {
           title: "Smart Student Handbook",
           icon: <GraduationCap className="h-4 w-4" />,
+          href: "../page.tsx",
         }
     }
   })()
@@ -354,8 +363,13 @@ export function SmartHeader() {
         <div className="flex items-center gap-3">
           <SidebarTrigger className="h-8 w-8" />
           <div className="flex items-center gap-2">
-            <div className="text-muted-foreground">{pageInfo.icon}</div>
-            <h1 className="font-semibold text-foreground">{pageInfo.title}</h1>
+            <Link
+              href={pageInfo.href}
+              className="flex items-center gap-2 font-semibold hover:underline underline-offset-4"
+            >
+              {pageInfo.icon}
+              <span>{pageInfo.title}</span>
+          </Link>
           </div>
         </div>
 

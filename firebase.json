@@ -6,24 +6,36 @@
     "rules": "database.rules.json"
   },
   "hosting": {
-    "source": "firebase-basic",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
-    "frameworksBackend": {
-      "region": "europe-west1"
-    },
     "rewrites": [
-      { "source": "**", "function": "nextApp" }
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   },
   "emulators": {
-    "auth":      { "port": 9099 },
-    "database":  { "host": "127.0.0.1", "port": 9000 },
-    "functions": { "port": 5001 },
-    "hosting":   { "port": 5000 },
-    "ui":        { "enabled": true, "port": 4000 }
+    "auth": {
+      "port": 9099
+    },
+    "database": {
+      "host": "127.0.0.1",
+      "port": 9000
+    },
+    "functions": {
+      "port": 5001
+    },
+    "hosting": {
+      "port": 5000
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    }
   }
 }

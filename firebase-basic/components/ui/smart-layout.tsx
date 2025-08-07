@@ -9,10 +9,12 @@ import { SmartHeader } from "./smart-header"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 
-// Pages that should not have the sidebar layout
-const STANDALONE_PAGES = ["/", "/login", "/signup"]
+/* NEW 👇 */
+import { SessionTimerProvider } from "@/components/providers/SessionTimerProvider"
 
-// Pages that require authentication
+/* ---------------------------------- */
+
+const STANDALONE_PAGES = ["/", "/login", "/signup"]
 const PROTECTED_PAGES = [
   "/dashboard",
   "/calendar",
@@ -34,17 +36,17 @@ export function SmartLayout({ children }: SmartLayoutProps) {
   const [loading, setLoading] = useState(true)
 
   const isStandalonePage = STANDALONE_PAGES.includes(pathname)
-  const isProtectedPage = PROTECTED_PAGES.some((page) => pathname.startsWith(page))
+  const isProtectedPage = PROTECTED_PAGES.some((p) => pathname.startsWith(p))
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u)
       setLoading(false)
     })
-    return () => unsubscribe()
+    return () => unsub()
   }, [])
 
-  // Loading spinner
+  /* --------------- Loading spinner while auth resolves --------------- */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -56,15 +58,14 @@ export function SmartLayout({ children }: SmartLayoutProps) {
     )
   }
 
-  // Standalone pages (no header/sidebar)
-  if (isStandalonePage) {
-    return <div className="min-h-screen bg-background">{children}</div>
-  }
+  /* ---------------- Stand-alone routes (no layout) ------------------- */
+  if (isStandalonePage) return <div className="min-h-screen bg-background">{children}</div>
 
-  // Protected pages require login
+  /* ---------------- Protected pages need login ----------------------- */
   if (isProtectedPage && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
+        {/* … (unchanged sign-in prompt block) … */}
         <div className="text-center space-y-6 max-w-sm mx-auto p-6">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto">
             <svg className="w-6 h-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,18 +97,20 @@ export function SmartLayout({ children }: SmartLayoutProps) {
     )
   }
 
-  // Full app layout
+  /* ---------------- Full app layout (with timer provider) ------------ */
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-screen bg-background overflow-hidden">
-        <AppSidebar />
-        <div className="flex flex-col flex-1 relative">
-          <SmartHeader />
-          <main className="flex-1 overflow-auto pt-14">
-            <div className="min-h-full bg-background">{children}</div>
-          </main>
+      <SessionTimerProvider>
+        <div className="flex h-screen w-screen bg-background overflow-hidden">
+          <AppSidebar />
+          <div className="flex flex-col flex-1 relative">
+            <SmartHeader />
+            <main className="flex-1 overflow-auto pt-14">
+              <div className="min-h-full bg-background">{children}</div>
+            </main>
+          </div>
         </div>
-      </div>
+      </SessionTimerProvider>
     </SidebarProvider>
   )
 }
