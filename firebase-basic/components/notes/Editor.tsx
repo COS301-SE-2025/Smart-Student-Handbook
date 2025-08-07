@@ -19,10 +19,10 @@ interface EditorProps {
   initContent?: string;
   editable?: boolean;
   noteID?: string
-  ownerID?: string
+  ownerID: string
 }
 
-async function saveToStorage(noteId: string, jsonBlocks: Block[]) {
+async function saveToStorage(noteId: string, jsonBlocks: Block[] , ownerID: string) {
   const db = getDatabase();
   const auth = getAuth();
   const user = auth.currentUser;
@@ -33,7 +33,7 @@ async function saveToStorage(noteId: string, jsonBlocks: Block[]) {
   }
 
   const jsonBl = JSON.stringify(jsonBlocks);
-  const noteRef = ref(db, `users/${user.uid}/notes/${noteId}/content`);
+  const noteRef = ref(db, `users/${ownerID}/notes/${noteId}/content`);
   try {
     await set(noteRef, jsonBl);
     console.log("Note saved successfully");
@@ -43,7 +43,7 @@ async function saveToStorage(noteId: string, jsonBlocks: Block[]) {
 
 }
 
-async function loadFromStorage(noteId: string): Promise<PartialBlock[] | undefined> {
+async function loadFromStorage(noteId: string , ownerID:string): Promise<PartialBlock[] | undefined> {
   const db = getDatabase();
   const auth = getAuth();
   const user = auth.currentUser;
@@ -53,7 +53,7 @@ async function loadFromStorage(noteId: string): Promise<PartialBlock[] | undefin
     return;
   }
 
-  const noteRef = ref(db, `users/${user.uid}/notes/${noteId}/content`);
+  const noteRef = ref(db, `users/${ownerID}/notes/${noteId}/content`);
 
   try {
     const snapshot = await get(noteRef);
@@ -79,7 +79,7 @@ const Editor: React.FC<EditorProps> = ({ initContent, editable, noteID, ownerID 
   useEffect(() => {
     console.log(`Loading Preset , now loading ${noteID}`);
     if (noteID) {
-      loadFromStorage(noteID).then((content) => {
+      loadFromStorage(noteID , ownerID).then((content) => {
         setInitialContent(content);
       });
     } else {
@@ -105,7 +105,7 @@ const Editor: React.FC<EditorProps> = ({ initContent, editable, noteID, ownerID 
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
       if (noteID)
-        saveToStorage(noteID, editor.document);
+        saveToStorage(noteID, editor.document , ownerID);
       else
         console.log('An error has occurred . No NoteID was entered');
     }, 1500);
