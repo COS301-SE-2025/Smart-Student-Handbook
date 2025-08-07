@@ -18,7 +18,6 @@ export async function buildTreeFromRealtimeDB(userID: string): Promise<FileNode[
         const item = data[id];
 
         if (!item.name || !item.type) continue;
-
         const node: FileNode = {
             id,
             name: item.name,
@@ -49,6 +48,52 @@ export async function buildTreeFromRealtimeDB(userID: string): Promise<FileNode[
     }
 
     return tree;
+}
+
+const SHARED_FOLDER_ID = "shared-root";
+const SHARED_FOLDER_NAME = "Shared Notes";
+
+export async function buildSharedTreeFromRealtimeDB(userID: string): Promise<FileNode[]> {
+  const db = getDatabase();
+  const sharedNotesRef = ref(db, `users/${userID}/sharedNotes`);
+  const snapshot = await get(sharedNotesRef);
+
+  if (!snapshot.exists()) return [];
+
+  const sharedData: Record<string, { owner: string }> = snapshot.val();
+  const flatNodes: FileNode[] = [];
+
+  const sharedFolderNode: FileNode = {
+    id: SHARED_FOLDER_ID,
+    name: SHARED_FOLDER_NAME,
+    type: "folder",
+    parentId: null,
+    children: [],
+  };
+
+  for (const noteId in sharedData) {
+    const ownerId = sharedData[noteId].owner;
+    if (!ownerId) continue;
+
+    const ownerNoteRef = ref(db, `users/${ownerId}/notes/${noteId}`);
+    const noteSnap = await get(ownerNoteRef);
+
+    if (!noteSnap.exists()) continue;
+
+    const noteData = noteSnap.val();
+    if (!noteData.name || noteData.type !== "note") continue;
+
+    const sharedNoteNode: FileNode = {
+      id: noteId,
+      name: noteData.name,
+      type: "note",
+      parentId: SHARED_FOLDER_ID,
+    };
+
+    sharedFolderNode.children!.push(sharedNoteNode);
+  }
+
+  return sharedFolderNode.children!.length > 0 ? [sharedFolderNode] : [];
 }
 
 export const createFolderInDB = async (

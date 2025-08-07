@@ -5,7 +5,7 @@ import { use, useEffect, useState } from "react";
 import NoteTree from "@/components/notes/NoteTree";
 import { FileNode, Note } from "@/types/note";
 import { addNode, moveNode, sortTree, fetchNoteById } from "@/lib/note/treeActions";
-import { buildTreeFromRealtimeDB, createFolderInDB, createNoteInDB, deleteNodeInDB, renameNodeInDB } from "@/lib/DBTree";
+import { buildSharedTreeFromRealtimeDB, buildTreeFromRealtimeDB, createFolderInDB, createNoteInDB, deleteNodeInDB, renameNodeInDB } from "@/lib/DBTree";
 import { getAuth } from "@firebase/auth";
 import { db } from "@/lib";
 import { ref, update } from "@firebase/database";
@@ -24,6 +24,7 @@ export default function NotesPage() {
   }
 
   const [tree, setTree] = useState<FileNode[]>([]);
+  const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
@@ -50,7 +51,6 @@ export default function NotesPage() {
     return null;
   }
 
-
   const handleAdd = async (type: "note" | "folder") => {
     let newNode;
     if (type === "folder") {
@@ -70,17 +70,29 @@ export default function NotesPage() {
     const fetchTree = async () => {
       console.log(user.uid)
       const firebaseTree = await loadTree(user.uid);
+      const sharedTree = await loadSharedTree(user.uid);
+      console.log("Shared Tree :" , sharedTree) ; 
       setTree(firebaseTree);
+      setSharedTree(sharedTree);
     };
 
     fetchTree();
   }, []);
 
+  const loadSharedTree = async (userID: string): Promise<FileNode[]> => {
+    try {
+      const tree = await buildSharedTreeFromRealtimeDB(userID);
+      return tree;
+    } catch (error) {
+      console.error("Error loading tree:", error);
+      return [];
+    }
+  };
+
 
   const loadTree = async (userID: string): Promise<FileNode[]> => {
     try {
       const tree = await buildTreeFromRealtimeDB(userID);
-      console.log(tree)
       return tree;
     } catch (error) {
       console.error("Error loading tree:", error);
@@ -176,15 +188,22 @@ export default function NotesPage() {
             onDelete={handleDelete}
             onDropNode={handleMove}
           />
-        </div>
 
+          <NoteTree
+            treeData={sharedTree}
+            onSelect={setSelectedNoteId}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onDropNode={handleMove}
+          />
+        </div>
       </div>
 
       <div className="flex-1 p-4">
         {selectedNoteId ? (
           <div>
             <Editor
-              noteID={selectedNoteId} 
+              noteID={selectedNoteId}
               ownerID={user.uid} />
           </div>
 
@@ -192,6 +211,8 @@ export default function NotesPage() {
           <div>Select a note or folder</div>
         )}
       </div>
+
+      <div className=""></div>
 
     </div>
   );
