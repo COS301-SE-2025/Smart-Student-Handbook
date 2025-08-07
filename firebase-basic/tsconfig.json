@@ -20,8 +20,18 @@
     ],
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+    // Add this line:
+    "types": ["jest", "node", "@testing-library/jest-dom"]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts", 
+    "**/*.ts", 
+    "**/*.tsx", 
+    ".next/types/**/*.ts",
+    // Add this if you have global test types:
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ],
   "exclude": ["node_modules"]
 }

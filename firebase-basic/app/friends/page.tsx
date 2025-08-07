@@ -98,7 +98,11 @@ export default function FriendsPage() {
     await remove(ref(db, `users/${uid}/incomingRequests/${user.uid}`))
   }
 
-  const getInitials = (name: string, surname: string) => `${name[0]}${surname[0]}`.toUpperCase()
+  const getInitials = (name: string, surname: string) => {
+    const first = name?.[0] || '';
+    const last = surname?.[0] || '';
+    return `${first}${last}`.toUpperCase();
+  }
 
   return (
     <div className="min-h-screen bg-background">
