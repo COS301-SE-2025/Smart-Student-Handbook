@@ -1,6 +1,7 @@
 "use client";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
+import "@blocknote/mantine/style.css";  
 
 import YPartyKitProvider from "y-partykit/provider";
 import * as Y from "yjs";
@@ -27,7 +28,7 @@ export default function YjsBlockNoteEditor({
       fragment: doc.getXmlFragment("document-store"),
       user: {
         name: userName,
-        color: "#ff0000",
+        color: "#808080",
       },
 
       showCursorLabels: 'activity'

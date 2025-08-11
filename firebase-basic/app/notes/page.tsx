@@ -10,8 +10,8 @@ import { getAuth } from "@firebase/auth";
 import { db } from "@/lib";
 import { ref, update } from "@firebase/database";
 
-import Editor from "@/components/notes/Editor" ; 
-import YjsBlockNoteEditor from "@/components/YjsEditor/YjsEditor" ; 
+import Editor from "@/components/notes/Editor";
+import YjsBlockNoteEditor from "@/components/YjsEditor/YjsEditor";
 
 export default function NotesPage() {
   const auth = getAuth();
@@ -72,7 +72,7 @@ export default function NotesPage() {
       console.log(user.uid)
       const firebaseTree = await loadTree(user.uid);
       const sharedTree = await loadSharedTree(user.uid);
-      console.log("Shared Tree :" , sharedTree) ; 
+      console.log("Shared Tree :", sharedTree);
       setTree(firebaseTree);
       setSharedTree(sharedTree);
     };
@@ -203,11 +203,10 @@ export default function NotesPage() {
       <div className="flex-1 p-4">
         {selectedNoteId ? (
           <div>
-            
-            <YjsBlockNoteEditor 
-            roomName={selectedNoteId} 
-            userName={user.uid}
 
+            <YjsBlockNoteEditor
+              roomName={selectedNoteId}
+              userName={user.uid}
             />
           </div>
 
