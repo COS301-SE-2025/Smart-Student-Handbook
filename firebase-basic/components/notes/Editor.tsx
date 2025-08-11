@@ -8,10 +8,7 @@ import { Block, BlockNoteEditor, PartialBlock } from "@blocknote/core";
 import "@blocknote/core/fonts/inter.css"
 import "@blocknote/react/style.css"
 
-import dynamic from "next/dynamic";
 import { useMemo } from "react";
-import { doc } from "@firebase/firestore";
-import { EditorContent } from "@tiptap/react";
 import { get, getDatabase, ref, set } from "@firebase/database";
 import { getAuth } from "@firebase/auth";
 
@@ -22,7 +19,7 @@ interface EditorProps {
   ownerID: string
 }
 
-async function saveToStorage(noteId: string, jsonBlocks: Block[] , ownerID: string) {
+async function saveToStorage(noteId: string, jsonBlocks: Block[], ownerID: string) {
   const db = getDatabase();
   const auth = getAuth();
   const user = auth.currentUser;
@@ -40,10 +37,9 @@ async function saveToStorage(noteId: string, jsonBlocks: Block[] , ownerID: stri
   } catch (error) {
     console.error("Error saving note:", error);
   }
-
 }
 
-async function loadFromStorage(noteId: string , ownerID:string): Promise<PartialBlock[] | undefined> {
+async function loadFromStorage(noteId: string, ownerID: string): Promise<PartialBlock[] | undefined> {
   const db = getDatabase();
   const auth = getAuth();
   const user = auth.currentUser;

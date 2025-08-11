@@ -10,7 +10,8 @@ import { getAuth } from "@firebase/auth";
 import { db } from "@/lib";
 import { ref, update } from "@firebase/database";
 
-import Editor from "@/components/notes/Editor"
+import Editor from "@/components/notes/Editor" ; 
+import YjsBlockNoteEditor from "@/components/YjsEditor/YjsEditor" ; 
 
 export default function NotesPage() {
   const auth = getAuth();
@@ -202,9 +203,12 @@ export default function NotesPage() {
       <div className="flex-1 p-4">
         {selectedNoteId ? (
           <div>
-            <Editor
-              noteID={selectedNoteId}
-              ownerID={user.uid} />
+            
+            <YjsBlockNoteEditor 
+            roomName={selectedNoteId} 
+            userName={user.uid}
+
+            />
           </div>
 
         ) : (
