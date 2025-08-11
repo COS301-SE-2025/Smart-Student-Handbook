@@ -652,7 +652,7 @@ function StudentCalendar() {
       return nd
     })
 
-  if (!userId) return <div className="text-center py-10 text-foreground">Please sign in to use the calendar.</div>
+  //if (!userId) return <div className="text-center py-10 text-foreground">Please sign in to use the calendar.</div>
 
   const isPersonalSelectedDate = selectedDate != null && !getSemesterForDate(selectedDate as Date)
 

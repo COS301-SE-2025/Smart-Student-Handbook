@@ -6,7 +6,7 @@ import { fns } from "@/lib/firebase"
 import { getDatabase, ref, get, set, remove } from "firebase/database"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Heart, Users, Lock, Globe, Plus, Crown, UserCheck, SearchX, Loader2, ArrowRight } from "lucide-react"
+import { Heart, Users, Lock, Globe, Plus, Crown, UserCheck, SearchX, Loader2 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -52,7 +52,8 @@ export default function OrganisationsPage() {
   const searchParams = useSearchParams()
   const [orgsData, setOrgsData] = useState<(Org & { joined: boolean })[]>([])
   const [favorites, setFavorites] = useState<Record<string, boolean>>({})
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false)           // data fetch status (not used for page spinner)
+  const [hasLoaded, setHasLoaded] = useState(false)       // first fetch completed?
   const [filter, setFilter] = useState<Filter>("all")
   const [showCreate, setShowCreate] = useState(false)
   const [joiningOrgs, setJoiningOrgs] = useState<Set<string>>(new Set())
@@ -65,33 +66,20 @@ export default function OrganisationsPage() {
     () => httpsCallableFromURL<{}, Org[]>(fns, "https://getpublicorganizations-omrwo3ykaa-uc.a.run.app"),
     [],
   )
-
   const getPrivateOrgs = useMemo(
     () => httpsCallableFromURL<{}, Org[]>(fns, "https://getuserorganizations-omrwo3ykaa-uc.a.run.app"),
     [],
   )
-
   const joinOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(fns, "https://joinorganization-omrwo3ykaa-uc.a.run.app"),
+    () => httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(fns, "https://joinorganization-omrwo3ykaa-uc.a.run.app"),
     [],
   )
-
   const leaveOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(
-        fns,
-        "https://leaveorganization-omrwo3ykaa-uc.a.run.app",
-      ),
+    () => httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(fns, "https://leaveorganization-omrwo3ykaa-uc.a.run.app"),
     [],
   )
-
   const createOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ organization: CreateOrgInput }, Org>(
-        fns,
-        "https://createorganization-omrwo3ykaa-uc.a.run.app",
-      ),
+    () => httpsCallableFromURL<{ organization: CreateOrgInput }, Org>(fns, "https://createorganization-omrwo3ykaa-uc.a.run.app"),
     [],
   )
 
@@ -106,21 +94,15 @@ export default function OrganisationsPage() {
     try {
       const [pubRes, privRes] = await Promise.all([getPublicOrgs({}), getPrivateOrgs({})])
 
-      /* ---- favourites --------------------------------------------------- */
       const favSnap = await get(ref(db, `userFavorites/${userId}`))
       const favObj = (favSnap.val() as Record<string, boolean>) || {}
 
-      /* ---- build combined list ----------------------------------------- */
       const publicList = pubRes.data.map((o) => ({
         ...o,
         joined: !!o.members?.[userId],
         role: o.members?.[userId] as "Admin" | "Member" | undefined,
       }))
-
-      const privateList = privRes.data.map((o) => ({
-        ...o,
-        joined: true,
-      }))
+      const privateList = privRes.data.map((o) => ({ ...o, joined: true }))
 
       const map = new Map<string, Org & { joined: boolean }>()
       ;[...publicList, ...privateList].forEach((o) => map.set(o.id, o))
@@ -132,6 +114,7 @@ export default function OrganisationsPage() {
       toast.error("Failed to load organisations.")
     } finally {
       setLoading(false)
+      setHasLoaded(true) // mark that we completed 1 fetch (success or fail)
     }
   }, [userId, getPublicOrgs, getPrivateOrgs, db])
 
@@ -149,7 +132,7 @@ export default function OrganisationsPage() {
     try {
       const favRef = ref(db, `userFavorites/${userId}/${orgId}`)
       next ? await set(favRef, true) : await remove(favRef)
-    } catch (e) {
+    } catch {
       toast.error("Failed to update favorite.")
       setFavorites((prev) => ({ ...prev, [orgId]: !next }))
     }
@@ -160,17 +143,9 @@ export default function OrganisationsPage() {
     setJoiningOrgs((prev) => new Set(prev).add(orgId))
     setOrgsData((prev) =>
       prev.map((o) =>
-        o.id === orgId
-          ? {
-              ...o,
-              joined: true,
-              role: "Member",
-              members: { ...o.members, [userId]: "Member" },
-            }
-          : o,
+        o.id === orgId ? { ...o, joined: true, role: "Member", members: { ...o.members, [userId]: "Member" } } : o,
       ),
     )
-
     try {
       await joinOrg({ orgId })
       toast.success("Successfully joined organization.")
@@ -216,15 +191,13 @@ export default function OrganisationsPage() {
     )
 
     setFavorites((p) => {
-      const { [orgId]: _, ...rest } = p
+      const { [orgId]: _ignore, ...rest } = p
       return rest
     })
 
     try {
       const res = await leaveOrg({ orgId })
-      if (original?.isPrivate) {
-        setOrgsData((prev) => prev.filter((o) => o.id !== orgId))
-      }
+      if (original?.isPrivate) setOrgsData((prev) => prev.filter((o) => o.id !== orgId))
       if (res.data.transferred) console.log("Ownership transferred")
       toast.success("Successfully left organization.")
     } catch (e: any) {
@@ -248,9 +221,8 @@ export default function OrganisationsPage() {
   const orgs = useMemo(() => {
     return orgsData
       .filter((o) => {
-        const matches =
-          o.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          o.description.toLowerCase().includes(searchQuery.toLowerCase())
+        const q = searchQuery.toLowerCase()
+        const matches = o.name.toLowerCase().includes(q) || o.description.toLowerCase().includes(q)
         if (!matches) return false
         if (filter === "joined") return o.joined
         if (filter === "public") return !o.isPrivate
@@ -267,16 +239,9 @@ export default function OrganisationsPage() {
   /* ---------------------------------------------------------------------- */
   /*                             JSX                                         */
   /* ---------------------------------------------------------------------- */
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-3">
-          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent mx-auto" />
-          <p className="text-muted-foreground text-sm">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  // IMPORTANT: while auth is resolving, render nothing here.
+  // The universal layout shows its own loader, and it will stop once auth resolves.
+  if (authLoading) return null
 
   return (
     <div className="min-h-screen bg-background">
@@ -338,33 +303,8 @@ export default function OrganisationsPage() {
 
       {/* Organisation Cards */}
       <div className="p-8">
-        {orgs.length === 0 ? (
-          <div className="flex items-center justify-center min-h-[500px]">
-            <div className="text-center py-20 px-8 max-w-2xl mx-auto">
-              <div className="bg-gradient-to-br from-muted/30 to-muted/50 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-8 shadow-lg">
-                {searchQuery ? (
-                  <SearchX className="h-16 w-16 text-muted-foreground" />
-                ) : (
-                  <Users className="h-16 w-16 text-muted-foreground" />
-                )}
-              </div>
-              <h3 className="text-3xl font-bold mb-6">
-                {searchQuery ? "No matching organisations found" : "No organisations found"}
-              </h3>
-              <p className="text-muted-foreground text-xl mb-8 max-w-lg mx-auto leading-relaxed">
-                {searchQuery
-                  ? `No organisations match "${searchQuery}". Try different keywords.`
-                  : "Be the first to create an organisation."}
-              </p>
-              {!searchQuery && (
-                <Button onClick={() => setShowCreate(true)} className="shadow-lg h-10 px-4 py-2 text-base">
-                  <Plus className="h-5 w-5 mr-2" />
-                  Create Your First Organisation
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : (
+        {/* No page-level spinner. Show cards if we have any. */}
+        {orgs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {orgs.map((o) => {
               const isFav = !!favorites[o.id]
@@ -372,7 +312,6 @@ export default function OrganisationsPage() {
               const isJoining = joiningOrgs.has(o.id)
               const isLeaving = leavingOrgs.has(o.id)
 
-              
               return (
                 <Link href={`/organisations/${o.id}`} key={o.id}>
                   <div
@@ -415,8 +354,7 @@ export default function OrganisationsPage() {
                           >
                             <Users className="h-3 w-3" />{" "}
                             <span>
-                              {memberCount} member
-                              {memberCount !== 1 ? "s" : ""}
+                              {memberCount} member{memberCount !== 1 ? "s" : ""}
                             </span>
                           </Badge>
                           <Badge
@@ -535,6 +473,32 @@ export default function OrganisationsPage() {
               )
             })}
           </div>
+        ) : hasLoaded ? (
+          // true empty state AFTER first fetch completes
+          <div className="flex items-center justify-center min-h-[500px]">
+            <div className="text-center py-20 px-8 max-w-2xl mx-auto">
+              <div className="bg-gradient-to-br from-muted/30 to-muted/50 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-8 shadow-lg">
+                {searchQuery ? <SearchX className="h-16 w-16 text-muted-foreground" /> : <Users className="h-16 w-16 text-muted-foreground" />}
+              </div>
+              <h3 className="text-3xl font-bold mb-6">
+                {searchQuery ? "No matching organisations found" : "No organisations found"}
+              </h3>
+              <p className="text-muted-foreground text-xl mb-8 max-w-lg mx-auto leading-relaxed">
+                {searchQuery
+                  ? `No organisations match "${searchQuery}". Try different keywords.`
+                  : "Be the first to create an organisation."}
+              </p>
+              {!searchQuery && (
+                <Button onClick={() => setShowCreate(true)} className="shadow-lg h-10 px-4 py-2 text-base">
+                  <Plus className="h-5 w-5 mr-2" />
+                  Create Your First Organisation
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          // before first fetch completes: render a neutral spacer (no spinner, no empty flash)
+          <div className="min-h-[300px]" />
         )}
       </div>
 
@@ -555,7 +519,7 @@ export default function OrganisationsPage() {
             toast.success("Organization created.")
             setShowCreate(false)
             fetchOrgs()
-          } catch (e) {
+          } catch {
             toast.error("Failed to create organization.")
           }
         }}
