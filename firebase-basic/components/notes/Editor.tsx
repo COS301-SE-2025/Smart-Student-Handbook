@@ -66,7 +66,6 @@ async function loadFromStorage(noteId: string, ownerID: string): Promise<Partial
   }
 }
 
-
 const Editor: React.FC<EditorProps> = ({ editable, noteID, ownerID }) => {
   const [initialContent, setInitialContent] = useState<PartialBlock[] | undefined | "loading"
   >("loading");
@@ -89,6 +88,7 @@ const Editor: React.FC<EditorProps> = ({ editable, noteID, ownerID }) => {
     }
     return BlockNoteEditor.create({ initialContent });
   }, [initialContent]);
+  
   if (editor === undefined) {
     return "Loading content...";
   }

@@ -11,9 +11,11 @@ import { db } from "@/lib";
 import { ref, update } from "@firebase/database";
 
 import Editor from "@/components/notes/Editor";
-import YjsBlockNoteEditor from "@/components/YjsEditor/YjsEditor";
+import { YjsBlockNoteEditor } from "@/components/YjsEditor/YjsEditor";
+import Main from "@/components/YjsEditor/EditorMain";
 
 export default function NotesPage() {
+  console.log("Rendered Once!"); 
   const auth = getAuth();
   const user = auth.currentUser;
 
@@ -197,6 +199,7 @@ export default function NotesPage() {
             onDelete={handleDelete}
             onDropNode={handleMove}
           />
+
         </div>
       </div>
 
@@ -204,12 +207,11 @@ export default function NotesPage() {
         {selectedNoteId ? (
           <div>
 
-            <YjsBlockNoteEditor
-              roomName={selectedNoteId}
-              userName={user.uid}
-            />
-          </div>
+            <Main searchParams={{
+              doc: selectedNoteId
+            }} />
 
+          </div>
         ) : (
           <div>Select a note or folder</div>
         )}

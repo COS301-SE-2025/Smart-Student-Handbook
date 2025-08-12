@@ -1,39 +1,39 @@
 "use client";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
-import "@blocknote/mantine/style.css";  
+import "@blocknote/mantine/style.css";
+import { saveToStorage, loadFromStorage } from "@/lib/storageFunctions";
 
-import YPartyKitProvider from "y-partykit/provider";
-import * as Y from "yjs";
+import { useYDoc, useYjsProvider } from '@y-sweet/react'
+import { useEffect, useMemo, useState } from "react";
+import { BlockNoteEditor, PartialBlock } from "@blocknote/core";
+
+import * as Y from "yjs" ;
+import {WebrtcProvider} from "y-webrtc"
 
 interface YjsBlockNoteEditorProps {
-  roomName: string;
-  userName: string;
+  noteID: string;
+  username: string;
 }
 
-export default function YjsBlockNoteEditor({
-  roomName,
-  userName,
-}: YjsBlockNoteEditorProps) {
-  const doc = new Y.Doc();
-  const provider = new YPartyKitProvider(
-    "blocknote-dev.yousefed.partykit.dev",
-    roomName,
-    doc
-  );
+export function YjsBlockNoteEditor({ noteID, username }: YjsBlockNoteEditorProps) {
+  const [initialContent, setInitialContent] = useState<PartialBlock[] | undefined | "loading"
+  >("loading");
+
+  const doc = useYDoc(); 
+  const provider = useYjsProvider();
 
   const editor = useCreateBlockNote({
     collaboration: {
       provider,
-      fragment: doc.getXmlFragment("document-store"),
-      user: {
-        name: userName,
-        color: "#808080",
-      },
-
-      showCursorLabels: 'activity'
+      fragment: doc.getXmlFragment("blocknote"),
+      user: { name: "Your Username", color: "#ff0000" },
     },
   });
 
-  return <BlockNoteView editor={editor} />;
+  return (
+    <div className="flex-1  bg-white px-2 py-4 rounded-lg">
+      <BlockNoteView editor={editor} theme="light" />
+    </div>
+  )
 }
