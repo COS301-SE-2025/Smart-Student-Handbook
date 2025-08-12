@@ -463,17 +463,29 @@ export default function DashboardPage() {
               <div className="flex items-end gap-3 h-24">
                 {(dailyBars.length ? dailyBars : [0, 0, 0, 0, 0, 0, 0]).map((h, idx) => (
                   <div key={idx} className="flex flex-col items-center gap-2">
-                    <div className="bg-gradient-to-t from-blue-500 to-blue-400 w-8 rounded-t-md transition-all duration-300 hover:from-amber-600 hover:to-amber-500" style={{ height: `${Math.max(h * 8, 8)}px` }} title={`${h.toFixed(2)}h`} />
+                    <div
+                      className="bg-gradient-to-t from-blue-500 to-blue-400 w-8 rounded-t-md transition-all duration-300 hover:from-amber-600 hover:to-amber-500"
+                      style={{ height: `${Math.max(h * 8, 8)}px` }}
+                      title={`${h.toFixed(2)}h`}
+                    />
                     <span className="text-xs text-muted-foreground">{h.toFixed(1)}h</span>
                   </div>
                 ))}
               </div>
-              <div className="mt-4 text-sm text-muted-foreground"><p>Total this week: {(thisWeekHours || dailyBars.reduce((a, b) => a + b, 0)).toFixed(1)} hours</p><p className="text-xs mt-1">All-time total: {totalStudyHours.toFixed(1)} hours</p></div>
+              <div className="mt-4 text-sm text-muted-foreground">
+                {/* Prefer the daily series (7-day) so it's always consistent with the chart */}
+                <p>Total this week: {dailyBars.reduce((a, b) => a + b, 0).toFixed(1)} hours</p>
+                <p className="text-xs mt-1">All-time total: {totalStudyHours.toFixed(1)} hours</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <CreateOrganizationModal open={showCreateModal} onOpenChange={setShowCreateModal} onCreateOrganization={handleCreateOrganization} />
+        <CreateOrganizationModal
+          open={showCreateModal}
+          onOpenChange={setShowCreateModal}
+          onCreateOrganization={handleCreateOrganization}
+        />
       </div>
     </div>
   )
