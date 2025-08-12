@@ -15,7 +15,7 @@ import { getAuth } from "@firebase/auth";
 interface EditorProps {
   initContent?: string;
   editable?: boolean;
-  noteID?: string
+  noteID: string
   ownerID: string
 }
 

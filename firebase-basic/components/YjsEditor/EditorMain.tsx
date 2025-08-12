@@ -2,16 +2,16 @@
 import { createYjsProvider, YDocProvider } from "@y-sweet/react";
 import { YjsBlockNoteEditor } from "./YjsEditor";
 import { getAuth } from "firebase/auth";
-import { saveToStorage, loadFromStorage } from "@/lib/storageFunctions";
+import React from "react";
+import Editor from "@/components/notes/Editor";
 
 export default function Main({ searchParams }: { searchParams: { doc: string } }) {
-  const docID = searchParams.doc ?? crypto.randomUUID();
-
-  console.log( "Search Parameters : " , searchParams) ; 
+  const docIDRef = React.useRef(searchParams.doc ?? crypto.randomUUID());
+  console.log(searchParams) ; 
 
   return (
-    <YDocProvider docId={docID} authEndpoint="/api/auth" showDebuggerLink={false}>
-      <YjsBlockNoteEditor noteID={docID} username={"Username"} />
-    </YDocProvider> 
+    <YDocProvider docId={docIDRef.current} authEndpoint="/api/auth" showDebuggerLink={false}>
+      <YjsBlockNoteEditor noteID={docIDRef.current} username={"Username"} ownerID={"ZdbGGf5OcRNQOJCrb0a3LXzVAIA3"} />
+    </YDocProvider>
   );
 }
