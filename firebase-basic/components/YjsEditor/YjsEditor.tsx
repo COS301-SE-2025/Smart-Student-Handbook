@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useCreateBlockNote } from "@blocknote/react";
-import { Block, PartialBlock } from "@blocknote/core";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
 
-import * as Y from "yjs";
 import { useYDoc, useYjsProvider } from "@y-sweet/react";
-import { loadFromStorage } from "@/lib/storageFunctions"; // adjust path
+import { PartialBlock } from "@blocknote/core";
+import { loadFromStorage } from "@/lib/storageFunctions";
+import * as Y from "yjs" ; 
 
 interface YjsBlockNoteEditorProps {
   noteID: string;
@@ -16,9 +16,6 @@ interface YjsBlockNoteEditorProps {
   username: string;
 }
 
-/**
- * Parent: fetches data first, then mounts the child that calls the hook.
- */
 export function YjsBlockNoteEditor({
   noteID,
   ownerID,
@@ -27,18 +24,34 @@ export function YjsBlockNoteEditor({
   const doc = useYDoc();
   const provider = useYjsProvider();
 
-  const [initialContent, setInitialContent] = useState<PartialBlock[] | undefined | null>(null);
+  const [initialContent, setInitialContent] = useState<
+    PartialBlock[] | undefined | null
+  >(null);
 
+  const editor = useCreateBlockNote(
+    provider
+      ? {
+          collaboration: {
+            provider,
+            fragment: doc.getXmlFragment("blocknote"),
+            user: { name: username, color: "#ff0000" },
+          },
+        }
+      : {}
+  );
+
+  // Load initial content from storage
   useEffect(() => {
     let mounted = true;
     async function fetchNote() {
       try {
         const content = await loadFromStorage(noteID, ownerID);
-        if (!mounted) return;
-        setInitialContent(content);
-        console.log("fetched content:", content);
+        if (mounted) {
+          console.log("Fetched initial content:", content);
+          setInitialContent(content);
+        }
       } catch (err) {
-        console.error("failed to load note", err);
+        console.error("Failed to load note", err);
         if (mounted) setInitialContent(undefined);
       }
     }
@@ -48,49 +61,18 @@ export function YjsBlockNoteEditor({
     };
   }, [noteID, ownerID]);
 
+  // Insert initial content after both provider + initial content are ready
   useEffect(() => {
-    console.log("initialContent changed:", initialContent);
-  }, [initialContent]);
+    if (provider && Array.isArray(initialContent)) {
+      editor.insertBlocks(initialContent, editor.getBlock("initialBlockId") as any);
+      console.log("Inserted initial content:", initialContent);
+    }
+  }, [provider, initialContent, editor]);
 
-  if (initialContent === null || !provider) {
+  // Only show editor once both are ready
+  if (!provider || initialContent === null) {
     return <div>Loading editor…</div>;
   }
 
-  return (
-    <EditorInner
-      initialContent={initialContent}
-      doc={doc}
-      provider={provider}
-      username={username}
-    />
-  );
-}
-
-function EditorInner({
-  initialContent,
-  doc,
-  provider,
-  username,
-}: {
-  initialContent: PartialBlock[] | undefined;
-  doc: Y.Doc;
-  provider: any;
-  username: string;
-}) {
-  const editor = useCreateBlockNote({
-    initialContent: initialContent,
-    collaboration: {
-      provider,
-      fragment: doc.getXmlFragment("blocknote"),
-      user: { name: username, color: "#ff0000" },
-    },
-  });
-
-  if (!editor) return <div>Initializing editor…</div>;
-
-  return (
-    <div className="flex-1 bg-white px-2 py-4 rounded-lg">
-      <BlockNoteView editor={editor} theme="light" />
-    </div>
-  );
+  return <BlockNoteView editor={editor} />;
 }
