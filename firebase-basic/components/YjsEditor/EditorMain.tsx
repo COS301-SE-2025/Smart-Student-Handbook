@@ -4,11 +4,21 @@ import { YDocProvider } from "@y-sweet/react";
 import { YjsBlockNoteEditor } from "./YjsEditor";
 import React from "react";
 
-export default function Main({ searchParams }: { searchParams: { doc: string } }) {
-  // Use the searchParams directly, fallback to random UUID
-  const docID = searchParams.doc ?? crypto.randomUUID();
+interface MainProps {
+  searchParams: {
+    doc: string;
+    ownerId?: string;
+    username?: string;
+  };
+}
 
-  console.log("Current docID:", docID);
+export default function Main({ searchParams }: MainProps) {
+  // Use searchParams directly, fallback to defaults
+  const docID = searchParams.doc ?? crypto.randomUUID();
+  const ownerID = searchParams.ownerId ?? "null";
+  const username = searchParams.username ?? "Username";
+
+  console.log("Current docID:", docID, "OwnerID:", ownerID, "Username:", username);
 
   return (
     <YDocProvider
@@ -19,8 +29,8 @@ export default function Main({ searchParams }: { searchParams: { doc: string } }
     >
       <YjsBlockNoteEditor
         noteID={docID}
-        username="Username"
-        ownerID="ZdbGGf5OcRNQOJCrb0a3LXzVAIA3"
+        ownerID={ownerID}
+        username={username}
       />
     </YDocProvider>
   );

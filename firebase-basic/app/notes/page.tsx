@@ -37,7 +37,6 @@ export default function NotesPage() {
     return () => unsub();
   }, []);
 
-  // ✅ Only fetch tree after user is set
   useEffect(() => {
     if (!user) return;
 
@@ -51,7 +50,6 @@ export default function NotesPage() {
     fetchTree();
   }, [user]);
 
-  // ✅ Fetch selected note once ID changes
   useEffect(() => {
     if (!selectedNoteId) {
       setSelectedNote(null);
@@ -144,18 +142,35 @@ export default function NotesPage() {
         </div>
 
         <div onDragOver={(e) => e.preventDefault()} className="drop-root-zone">
-          <NoteTree treeData={tree} onSelect={setSelectedNoteId} onRename={handleRename} onDelete={handleDelete} onDropNode={handleMove} />
-          <NoteTree treeData={sharedTree} onSelect={setSelectedNoteId} onRename={handleRename} onDelete={handleDelete} onDropNode={handleMove} />
+          <NoteTree
+            treeData={tree}
+            onSelect={setSelectedNoteId}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onDropNode={handleMove} />
+          <NoteTree
+            treeData={sharedTree}
+            onSelect={setSelectedNoteId}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onDropNode={handleMove} />
         </div>
       </div>
 
       <div className="flex-1 p-4">
         {selectedNoteId ? (
-          <Main searchParams={{ doc: selectedNoteId }} />
+          <Main
+            searchParams={{
+              doc: selectedNoteId,
+              ownerId: currentOwnerId,
+              username: user.displayName ?? undefined,
+            }}
+          />
         ) : (
           <div>Select a note or folder</div>
         )}
       </div>
+
     </div>
   );
 }
