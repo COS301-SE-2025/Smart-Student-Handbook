@@ -28,6 +28,7 @@ export default function NotesPage() {
   const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [currentOwnerId, setOwnerID] = useState<string | null>(null);
 
   useEffect(() => {
     const auth = getAuth();
@@ -131,8 +132,20 @@ export default function NotesPage() {
           children: node.children ? handleDeleteChildren(node.children, deleteId) : undefined,
         }));
     }
+
   };
 
+  function findNodeById(nodes: FileNode[], id: string): FileNode | null {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children) {
+        const found = findNodeById(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  
   return (
     <div className="flex h-screen">
       <div className="w-1/4 border-r p-2 space-y-2">
@@ -144,16 +157,27 @@ export default function NotesPage() {
         <div onDragOver={(e) => e.preventDefault()} className="drop-root-zone">
           <NoteTree
             treeData={tree}
-            onSelect={setSelectedNoteId}
+            onSelect={(id: string) => {
+              setSelectedNoteId(id);
+              const node = findNodeById(tree, id);
+              setOwnerID(node?.ownerId ?? null);
+            }}
             onRename={handleRename}
             onDelete={handleDelete}
-            onDropNode={handleMove} />
+            onDropNode={handleMove}
+          />
+
           <NoteTree
             treeData={sharedTree}
-            onSelect={setSelectedNoteId}
+            onSelect={(id: string) => {
+              setSelectedNoteId(id);
+              const node = findNodeById(sharedTree, id);
+              setOwnerID(node?.ownerId ?? null);
+            }}
             onRename={handleRename}
             onDelete={handleDelete}
-            onDropNode={handleMove} />
+            onDropNode={handleMove}
+          />
         </div>
       </div>
 
@@ -162,7 +186,7 @@ export default function NotesPage() {
           <Main
             searchParams={{
               doc: selectedNoteId,
-              ownerId: currentOwnerId,
+              ownerId: currentOwnerId ?? undefined,
               username: user.displayName ?? undefined,
             }}
           />

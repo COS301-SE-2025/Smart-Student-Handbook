@@ -19,11 +19,12 @@ export async function buildTreeFromRealtimeDB(userID: string): Promise<FileNode[
 
         if (!item.name || !item.type) continue;
         const node: FileNode = {
-            id,
-            name: item.name,
-            type: item.type,
-            parentId: item.parentId ?? null,
-            ...(item.type === "folder" ? { children: [] } : {}),
+          id,
+          name: item.name,
+          type: item.type,
+          parentId: item.parentId ?? null,
+          ...(item.type === "folder" ? { children: [] } : {}),
+          ownerId: userID
         };
 
         flatNodes.push(node);
@@ -69,6 +70,7 @@ export async function buildSharedTreeFromRealtimeDB(userID: string): Promise<Fil
     type: "folder",
     parentId: null,
     children: [],
+    ownerId: userID
   };
 
   for (const noteId in sharedData) {
@@ -88,6 +90,7 @@ export async function buildSharedTreeFromRealtimeDB(userID: string): Promise<Fil
       name: noteData.name,
       type: "note",
       parentId: SHARED_FOLDER_ID,
+      ownerId: ownerId
     };
 
     sharedFolderNode.children!.push(sharedNoteNode);
@@ -113,7 +116,8 @@ export const createFolderInDB = async (
     collaborators: {
       [userID]: "owner",
     },
-    parentId: "" 
+    parentId: "",
+    ownerId: userID
   };
 
   await set(ref(db, `users/${userID}/notes/${id}`), newFolder);

@@ -1,5 +1,6 @@
 // types/note.ts
 export type FileNode = {
+  ownerId: string ; 
   id: string
   name: string
   type: "folder" | "note"
@@ -21,6 +22,7 @@ export type Note = {
 };
 
 export type Folder = {
+  ownerId: string ; 
   id: string;
   name: string;
   type: "folder";
