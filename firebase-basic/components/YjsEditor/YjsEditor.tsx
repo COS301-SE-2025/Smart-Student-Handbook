@@ -6,9 +6,8 @@ import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
 
 import { useYDoc, useYjsProvider } from "@y-sweet/react";
-import { PartialBlock } from "@blocknote/core";
-import { loadFromStorage } from "@/lib/storageFunctions";
-import * as Y from "yjs" ; 
+import { PartialBlock, Block } from "@blocknote/core";
+import { loadFromStorage, saveToStorage } from "@/lib/storageFunctions";
 
 interface YjsBlockNoteEditorProps {
   noteID: string;
@@ -22,11 +21,10 @@ export function YjsBlockNoteEditor({
   username,
 }: YjsBlockNoteEditorProps) {
   const doc = useYDoc();
-  const provider = useYjsProvider();
+  const provider: any = useYjsProvider();
 
-  const [initialContent, setInitialContent] = useState<
-    PartialBlock[] | undefined | null
-  >(null);
+  const [initialContent, setInitialContent] = useState<PartialBlock[] | null>(null);
+  const [providerReady, setProviderReady] = useState(false);
 
   const editor = useCreateBlockNote(
     provider
@@ -43,34 +41,61 @@ export function YjsBlockNoteEditor({
   // Load initial content from storage
   useEffect(() => {
     let mounted = true;
+    setInitialContent(null);
+
     async function fetchNote() {
       try {
         const content = await loadFromStorage(noteID, ownerID);
-        if (mounted) {
-          console.log("Fetched initial content:", content);
-          setInitialContent(content);
-        }
+        if (mounted) setInitialContent(content as any);
       } catch (err) {
         console.error("Failed to load note", err);
-        if (mounted) setInitialContent(undefined);
+        if (mounted) setInitialContent(undefined as any);
       }
     }
+
     fetchNote();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [noteID, ownerID]);
 
-  // Insert initial content after both provider + initial content are ready
+  // Track provider status
   useEffect(() => {
-    if (provider && Array.isArray(initialContent)) {
-      editor.insertBlocks(initialContent, editor.getBlock("initialBlockId") as any);
-      console.log("Inserted initial content:", initialContent);
-    }
-  }, [provider, initialContent, editor]);
+    if (!provider) return;
 
-  // Only show editor once both are ready
-  if (!provider || initialContent === null) {
+    const handleStatus = ({ status }: { status: string }) => {
+      setProviderReady(status !== "connecting");
+    };
+
+    provider.on("status", handleStatus);
+    return () => { provider.off("status", handleStatus); };
+  }, [provider]);
+
+  // Insert initial content once provider is ready
+  useEffect(() => {
+    if (!providerReady || !editor || !Array.isArray(initialContent)) return;
+
+    if (editor.document.length === 0) {
+      editor.insertBlocks(initialContent, editor.getBlock("initialBlockId") as any);
+      console.log("Inserted initial content after provider ready:", initialContent);
+    }
+  }, [providerReady, initialContent, editor]);
+
+  // Auto-save every 5 seconds
+  useEffect(() => {
+    if (!editor) return;
+
+    const interval = setInterval(() => {
+      try {
+        const currentBlocks: Block[] = editor.document;
+        saveToStorage(noteID, currentBlocks, ownerID);
+      } catch (err) {
+        console.error("Failed to save note:", err);
+      }
+    }, 5000); // every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [editor, noteID, ownerID]);
+
+  if (!provider || !providerReady || initialContent === null) {
     return <div>Loading editor…</div>;
   }
 
