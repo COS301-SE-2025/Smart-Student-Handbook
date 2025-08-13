@@ -13,7 +13,7 @@ interface MainProps {
 }
 
 export default function Main({ searchParams }: MainProps) {
-  // Use searchParams directly, fallback to defaults
+
   const docID = searchParams.doc ?? crypto.randomUUID();
   const ownerID = searchParams.ownerId ?? "null";
   const username = searchParams.username ?? "Username";

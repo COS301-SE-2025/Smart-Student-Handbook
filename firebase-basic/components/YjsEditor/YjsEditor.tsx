@@ -8,6 +8,7 @@ import "@blocknote/mantine/style.css";
 import { useYDoc, useYjsProvider } from "@y-sweet/react";
 import { PartialBlock, Block } from "@blocknote/core";
 import { loadFromStorage, saveToStorage } from "@/lib/storageFunctions";
+import { useTheme } from "next-themes";
 
 interface YjsBlockNoteEditorProps {
   noteID: string;
@@ -20,6 +21,20 @@ export function YjsBlockNoteEditor({
   ownerID,
   username,
 }: YjsBlockNoteEditorProps) {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => {
+      setTheme(root.classList.contains('dark') ? 'dark' : 'light');
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+
+    setTheme(root.classList.contains('dark') ? 'dark' : 'light');
+    return () => observer.disconnect();
+  }, []);
+
+
   const doc = useYDoc();
   const provider: any = useYjsProvider();
 
@@ -29,12 +44,12 @@ export function YjsBlockNoteEditor({
   const editor = useCreateBlockNote(
     provider
       ? {
-          collaboration: {
-            provider,
-            fragment: doc.getXmlFragment("blocknote"),
-            user: { name: username, color: "#ff0000" },
-          },
-        }
+        collaboration: {
+          provider,
+          fragment: doc.getXmlFragment("blocknote"),
+          user: { name: username, color: "#ff0000" },
+        },
+      }
       : {}
   );
 
@@ -99,5 +114,5 @@ export function YjsBlockNoteEditor({
     return <div>Loading editor…</div>;
   }
 
-  return <BlockNoteView editor={editor} />;
+  return <BlockNoteView editor={editor} theme={theme} />;
 }

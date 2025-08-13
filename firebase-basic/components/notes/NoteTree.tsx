@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDroppable } from "@dnd-kit/core";
 import FolderItem from "./FolderItem";
 import NoteItem from "./NoteItem";
@@ -25,6 +25,20 @@ export default function NodeTree({
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [activeDragNode, setActiveDragNode] = useState<FileNode | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light'); // new
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    const updateTheme = () => setTheme(root.classList.contains('dark') ? 'dark' : 'light');
+    updateTheme();
+
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+
+    return () => observer.disconnect();
+  }, []);
+
 
   const toggleExpand = (id: string) => {
     setExpandedFolderIds((prev) => {
@@ -135,30 +149,40 @@ export default function NodeTree({
   });
 
   return (
-    <>
-      <DndContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
-        <div
-          className={`dnd-context-container p-4 border rounded ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-white"
-            }`}
-          style={{ minHeight: 300 }}
-        >
-          <div>{treeData.map((node) => renderNode(node))}</div>
-        </div>
+    <DndContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
+      <div
+        ref={setRootDropRef}
+        className={`dnd-context-container p-4 border rounded
+    ${isDragging
+            ? theme === 'dark'
+              ? "border-blue-500 bg-gray-800"
+              : "border-blue-500 bg-blue-50"
+            : theme === 'dark'
+              ? "border-gray-700 bg-gray-900 text-white"
+              : "border-gray-300 bg-white text-black"
+          }
+    ${isRootOver ? (theme === 'dark' ? "bg-gray-700" : "bg-blue-100") : ""}
+  `}
+        style={{ minHeight: 300 }}
+      >
+        <div>{treeData.map((node) => renderNode(node))}</div>
+      </div>
 
-        <DragOverlay dropAnimation={null}>
-          {activeDragNode && (
-            <div className="px-3 py-1 rounded bg-white shadow-md opacity-70 flex items-center gap-2 pointer-events-none">
-              {activeDragNode.type === "folder" ? (
-                <Folder className="w-4 h-4 text-yellow-500" />
-              ) : (
-                <FileText className="w-4 h-4 text-blue-500" />
-              )}
-              <span className="text-sm truncate max-w-[150px]">{activeDragNode.name}</span>
-            </div>
-          )}
-        </DragOverlay>
-      </DndContext>
-    </>
-
+      <DragOverlay dropAnimation={null}>
+        {activeDragNode && (
+          <div
+            className={`px-3 py-1 rounded shadow-md opacity-70 flex items-center gap-2 pointer-events-none ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-black'
+              }`}
+          >
+            {activeDragNode.type === "folder" ? (
+              <Folder className="w-4 h-4 text-yellow-500" />
+            ) : (
+              <FileText className="w-4 h-4 text-blue-500" />
+            )}
+            <span className="text-sm truncate max-w-[150px]">{activeDragNode.name}</span>
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
   );
 }
