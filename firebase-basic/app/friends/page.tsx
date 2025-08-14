@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getAuth } from "firebase/auth"
-import { db } from "@/lib/firebase"
-import { ref, get, onValue, remove, set } from "firebase/database"
+import { httpsCallable } from "firebase/functions"
+import { fns } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -12,6 +11,8 @@ import Link from "next/link"
 import { Users, Mail, Check, X } from "lucide-react"
 import AddFriendModal from "@/components/ui/addfriendmodal"
 import { PageHeader } from "@/components/ui/page-header"
+import { useUserId } from "@/hooks/useUserId"
+import { toast } from "sonner"
 
 type UserProfile = {
   uid: string
@@ -24,81 +25,86 @@ export default function FriendsPage() {
   const [friends, setFriends] = useState<UserProfile[]>([])
   const [incomingRequests, setIncomingRequests] = useState<UserProfile[]>([])
   const [sentRequests, setSentRequests] = useState<UserProfile[]>([])
-  const auth = getAuth()
-  const user = auth.currentUser
+  const [loading, setLoading] = useState(true)
+  const { userId } = useUserId()
 
-  const [searchName, setSearchName] = useState("");
-  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  // Firebase Functions
+  const getFriendsFunc = httpsCallable<{}, UserProfile[]>(fns, "getFriends")
+  const getFriendRequestsFunc = httpsCallable<{}, { incoming: UserProfile[], sent: UserProfile[] }>(fns, "getFriendRequests")
+  const acceptFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "acceptFriendRequest")
+  const rejectFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "rejectFriendRequest")
+  const cancelFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "cancelFriendRequest")
 
-  const handleSearch = async () => {
-    const snap = await get(ref(db, "users"));
-    if (snap.exists()) {
-      const users = snap.val();
-      const matches: UserProfile[] = [];
+  const loadFriendsData = async () => {
+    if (!userId) return
+    
+    try {
+      setLoading(true)
+      const [friendsResult, requestsResult] = await Promise.all([
+        getFriendsFunc({}),
+        getFriendRequestsFunc({})
+      ])
 
-      for (const uid in users) {
-        const settings = users[uid]?.UserSettings;
-        const fullName = `${settings?.name ?? ""} ${settings?.surname ?? ""}`.toLowerCase();
-        if (fullName.includes(searchName.toLowerCase())) {
-          matches.push({ uid, ...settings });
-        }
-      }
-
-      setSearchResults(matches);
+      setFriends(friendsResult.data)
+      setIncomingRequests(requestsResult.data.incoming)
+      setSentRequests(requestsResult.data.sent)
+    } catch (error) {
+      console.error("Error loading friends data:", error)
+      toast.error("Failed to load friends data")
+    } finally {
+      setLoading(false)
     }
-  };
-
-  useEffect(() => {
-    if (!user) return
-    const uid = user.uid
-    const userRef = ref(db, `users/${uid}`)
-
-    const unsubscribe = onValue(userRef, async (snapshot) => {
-      if (!snapshot.exists()) return
-      const data = snapshot.val()
-
-      const friendIds = Object.keys(data.friends || {})
-      const incomingIds = Object.keys(data.incomingRequests || {})
-      const sentIds = Object.keys(data.sentRequests || {})
-
-      await loadUsers(friendIds, setFriends)
-      await loadUsers(incomingIds, setIncomingRequests)
-      await loadUsers(sentIds, setSentRequests)
-    })
-
-    return () => unsubscribe()
-  }, [user])
-
-  const loadUsers = async (ids: string[], setter: (users: UserProfile[]) => void) => {
-    const profiles: UserProfile[] = []
-    for (const id of ids) {
-      const snap = await get(ref(db, `users/${id}/UserSettings`))
-      if (snap.exists()) profiles.push({ uid: id, ...snap.val() })
-    }
-    setter(profiles)
   }
 
+  useEffect(() => {
+    loadFriendsData()
+  }, [userId])
+
   const handleAccept = async (uid: string) => {
-    if (!user) return
-    await set(ref(db, `users/${user.uid}/friends/${uid}`), true)
-    await set(ref(db, `users/${uid}/friends/${user.uid}`), true)
-    await remove(ref(db, `users/${user.uid}/incomingRequests/${uid}`))
-    await remove(ref(db, `users/${uid}/sentRequests/${user.uid}`))
+    try {
+      const result = await acceptFriendRequestFunc({ targetUserId: uid })
+      toast.success(result.data.message)
+      await loadFriendsData() // Refresh data
+    } catch (error: any) {
+      console.error("Error accepting friend request:", error)
+      toast.error(error.message || "Failed to accept friend request")
+    }
   }
 
   const handleReject = async (uid: string) => {
-    if (!user) return
-    await remove(ref(db, `users/${user.uid}/incomingRequests/${uid}`))
-    await remove(ref(db, `users/${uid}/sentRequests/${user.uid}`))
+    try {
+      const result = await rejectFriendRequestFunc({ targetUserId: uid })
+      toast.success(result.data.message)
+      await loadFriendsData() // Refresh data
+    } catch (error: any) {
+      console.error("Error rejecting friend request:", error)
+      toast.error(error.message || "Failed to reject friend request")
+    }
   }
 
   const handleCancel = async (uid: string) => {
-    if (!user) return
-    await remove(ref(db, `users/${user.uid}/sentRequests/${uid}`))
-    await remove(ref(db, `users/${uid}/incomingRequests/${user.uid}`))
+    try {
+      const result = await cancelFriendRequestFunc({ targetUserId: uid })
+      toast.success(result.data.message)
+      await loadFriendsData() // Refresh data
+    } catch (error: any) {
+      console.error("Error cancelling friend request:", error)
+      toast.error(error.message || "Failed to cancel friend request")
+    }
   }
 
-  const getInitials = (name: string, surname: string) => `${name[0]}${surname[0]}`.toUpperCase()
+  const getInitials = (name: string, surname: string) => `${name[0] || ''}${surname[0] || ''}`.toUpperCase()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading friends...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -200,7 +206,7 @@ export default function FriendsPage() {
                           </Button>
                           <Button
                             size="sm"
-                            variant="destructive"
+                            variant="outline"
                             onClick={() => handleReject(req.uid)}
                             className="h-8 px-3"
                           >
@@ -238,7 +244,7 @@ export default function FriendsPage() {
                             {req.name} {req.surname}
                           </span>
                         </Link>
-                        <Button size="sm" variant="destructive" onClick={() => handleCancel(req.uid)} className="h-8 px-3">
+                        <Button size="sm" variant="outline" onClick={() => handleCancel(req.uid)} className="h-8 px-3">
                           <X className="h-3 w-3 mr-1" />
                           Cancel
                         </Button>

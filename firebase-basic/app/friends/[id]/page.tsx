@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { httpsCallable } from "firebase/functions"
+import { fns } from "@/lib/firebase"
 import { getAuth } from "firebase/auth"
-import { getDatabase, ref, get, onValue, set, remove, off } from "firebase/database"
+import { getDatabase, ref, onValue, off } from "firebase/database"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -21,6 +23,7 @@ import {
   Calendar,
   Users,
 } from "lucide-react"
+import { toast } from "sonner"
 
 export default function FriendPage() {
   const params = useParams()
@@ -30,20 +33,29 @@ export default function FriendPage() {
   const [status, setStatus] = useState<"friends" | "sent" | "incoming" | "none">("none")
   const [mutualFriends, setMutualFriends] = useState<any[]>([])
   const [commonOrgs, setCommonOrgs] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   const currentUser = getAuth().currentUser
   const db = getDatabase()
+
+  // Firebase Functions
+  const sendFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "sendFriendRequest")
+  const acceptFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "acceptFriendRequest")
+  const rejectFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "rejectFriendRequest")
+  const cancelFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "cancelFriendRequest")
+  const removeFriendFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "removeFriend")
 
   useEffect(() => {
     if (!currentUser) return
 
     const friendRef = ref(db, `users/${id}/UserSettings`)
     const currentUserRef = ref(db, `users/${currentUser.uid}`)
-    const friendFriendsRef = ref(db, `users/${id}/friends`)
-    const currentFriendsRef = ref(db, `users/${currentUser.uid}/friends`)
 
     const unsubProfile = onValue(friendRef, (snapshot) => {
-      if (snapshot.exists()) setFriend(snapshot.val())
+      if (snapshot.exists()) {
+        setFriend(snapshot.val())
+      }
+      setLoading(false)
     })
 
     const unsubStatus = onValue(currentUserRef, (snapshot) => {
@@ -57,77 +69,71 @@ export default function FriendPage() {
       else if (incoming[id]) setStatus("incoming")
       else if (sent[id]) setStatus("sent")
       else setStatus("none")
-
-      const myOrgs = new Set<string>(userData.organizations || [])
-      const theirOrgs = new Set<string>(friend?.organizations || [])
-      const common = [...myOrgs].filter((org) => theirOrgs.has(org))
-      setCommonOrgs(common)
-    })
-
-    const unsubMutuals = onValue(currentFriendsRef, (snap1) => {
-      const currentList = snap1.exists() ? Object.keys(snap1.val()) : []
-      onValue(friendFriendsRef, (snap2) => {
-        const friendList = snap2.exists() ? Object.keys(snap2.val()) : []
-        const mutuals = currentList.filter((uid) => friendList.includes(uid))
-        Promise.all(
-          mutuals.map(async (uid) => {
-            const s = await get(ref(db, `users/${uid}/UserSettings`))
-            return { uid, ...s.val() }
-          }),
-        ).then(setMutualFriends)
-      })
     })
 
     return () => {
       off(friendRef)
       off(currentUserRef)
-      off(friendFriendsRef)
-      off(currentFriendsRef)
     }
-  }, [id, currentUser, friend])
+  }, [id, currentUser])
 
   const handleSendRequest = async () => {
-    if (!currentUser || !friend) return
-    const requestData = {
-      name: friend.name ?? "",
-      surname: friend.surname ?? "",
-      email: friend.email ?? "",
+    try {
+      const result = await sendFriendRequestFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("sent")
+    } catch (error: any) {
+      console.error("Error sending friend request:", error)
+      toast.error(error.message || "Failed to send friend request")
     }
-    await set(ref(db, `users/${currentUser.uid}/sentRequests/${id}`), requestData)
-    await set(ref(db, `users/${id}/incomingRequests/${currentUser.uid}`), {
-      name: currentUser.displayName ?? "",
-      email: currentUser.email ?? "",
-    })
   }
 
   const handleCancel = async () => {
-    if (!currentUser) return
-    await remove(ref(db, `users/${currentUser.uid}/sentRequests/${id}`))
-    await remove(ref(db, `users/${id}/incomingRequests/${currentUser.uid}`))
+    try {
+      const result = await cancelFriendRequestFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("none")
+    } catch (error: any) {
+      console.error("Error cancelling friend request:", error)
+      toast.error(error.message || "Failed to cancel friend request")
+    }
   }
 
   const handleAccept = async () => {
-    if (!currentUser) return
-    await set(ref(db, `users/${currentUser.uid}/friends/${id}`), true)
-    await set(ref(db, `users/${id}/friends/${currentUser.uid}`), true)
-    await remove(ref(db, `users/${currentUser.uid}/incomingRequests/${id}`))
-    await remove(ref(db, `users/${id}/sentRequests/${currentUser.uid}`))
+    try {
+      const result = await acceptFriendRequestFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("friends")
+    } catch (error: any) {
+      console.error("Error accepting friend request:", error)
+      toast.error(error.message || "Failed to accept friend request")
+    }
   }
 
   const handleReject = async () => {
-    if (!currentUser) return
-    await remove(ref(db, `users/${currentUser.uid}/incomingRequests/${id}`))
-    await remove(ref(db, `users/${id}/sentRequests/${currentUser.uid}`))
+    try {
+      const result = await rejectFriendRequestFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("none")
+    } catch (error: any) {
+      console.error("Error rejecting friend request:", error)
+      toast.error(error.message || "Failed to reject friend request")
+    }
   }
 
   const handleUnfriend = async () => {
-    if (!currentUser) return
-    await remove(ref(db, `users/${currentUser.uid}/friends/${id}`))
-    await remove(ref(db, `users/${id}/friends/${currentUser.uid}`))
+    try {
+      const result = await removeFriendFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("none")
+    } catch (error: any) {
+      console.error("Error removing friend:", error)
+      toast.error(error.message || "Failed to remove friend")
+    }
   }
 
   const getInitials = (name: string, surname: string) => {
-    return `${name.charAt(0)}${surname.charAt(0)}`.toUpperCase()
+    return `${name?.charAt(0) || ''}${surname?.charAt(0) || ''}`.toUpperCase()
   }
 
   const getActionButton = () => {
@@ -135,7 +141,7 @@ export default function FriendPage() {
       case "friends":
         return (
           <Button variant="destructive" onClick={handleUnfriend}>
-            <UserX className="h-4 w-4 mr-2" /> Cancel Friendship
+            <UserX className="h-4 w-4 mr-2" /> Remove Friend
           </Button>
         )
       case "sent":
@@ -162,6 +168,17 @@ export default function FriendPage() {
           </Button>
         )
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -197,19 +214,9 @@ export default function FriendPage() {
                       <Mail className="h-4 w-4" /> <span>{friend.email}</span>
                     </div>
                   )}
-                  {friend?.phone && (
+                  {friend?.degree && (
                     <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-4 w-4" /> <span>{friend.phone}</span>
-                    </div>
-                  )}
-                  {friend?.location && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" /> <span>{friend.location}</span>
-                    </div>
-                  )}
-                  {friend?.joinDate && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-4 w-4" /> <span>Joined {friend.joinDate}</span>
+                      <Building2 className="h-4 w-4" /> <span>{friend.degree}</span>
                     </div>
                   )}
                 </div>
@@ -218,81 +225,7 @@ export default function FriendPage() {
           </CardContent>
         </Card>
 
-        {/* Mutual Friends */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" /> Mutual Friends
-              <Badge variant="secondary" className="ml-auto">
-                {mutualFriends.length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {mutualFriends.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {mutualFriends.map((f) => (
-                  <div key={f.uid} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 border">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={f.profilePicture || ""} alt={f.name} />
-                      <AvatarFallback>
-                        {f.name.charAt(0)}
-                        {f.surname?.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium">
-                      {f.name} {f.surname}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No mutual friends found</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Common Organizations */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" /> Common Organizations
-              <Badge variant="secondary" className="ml-auto">
-                {commonOrgs.length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {commonOrgs.length > 0 ? (
-              <ul className="space-y-2">
-                {commonOrgs.map((org, i) => (
-                  <li key={i} className="bg-muted/50 px-3 py-2 rounded-md border">
-                    {org}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">No common organizations found.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Shared Notes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" /> Shared Notes
-              <Badge variant="secondary" className="ml-auto">
-                0
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Shared and public notes from this user will appear here once available.
-            </p>
-          </CardContent>
-        </Card>
+        {/* Additional cards for mutual friends, organizations, etc. can be added here */}
       </div>
     </div>
   )
