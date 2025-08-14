@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { ref, set } from 'firebase/database'
 import { auth, db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ export function SignupForm(
 
   /* ─── Form state ─────────────────────────────────────────────── */
   const [name, setName] = React.useState('')
+  const [surname, setSurname] = React.useState('')
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [error, setError] = React.useState('')
@@ -30,7 +31,20 @@ export function SignupForm(
     e.preventDefault()
     setError('')
 
-    const trimmedEmail = email.trim()
+    const trimmedFirst = name.trim()
+    const trimmedSurname = surname.trim()
+    const trimmedEmail = email.trim().toLowerCase()
+
+    if (!trimmedFirst || !trimmedSurname) {
+      setError('Please provide both first name and surname.')
+      return
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+ 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       setError('Please enter a valid email address.')
       return
@@ -46,9 +60,15 @@ export function SignupForm(
         password,
       )
 
+      // Update displayName in Auth
+      await updateProfile(user, {
+        displayName: `${trimmedFirst} ${trimmedSurname}`,
+      })
+      
       // 🟢 Save profile in Realtime Database: /users/{uid}
       await set(ref(db, `users/${user.uid}`), {
-        name,
+        name: trimmedFirst,
+        surname: trimmedSurname,
         role: 'User',
         email: user.email,
         createdAt: Date.now(),
@@ -56,7 +76,8 @@ export function SignupForm(
 
       router.push('/dashboard')
     } catch (err: any) {
-      setError(err.message)
+      console.error('Signup error:', err)
+      setError(err.message || 'Failed to create account.')
     } finally {
       setIsLoading(false)
     }
@@ -84,9 +105,22 @@ export function SignupForm(
                 <Input
                   id="name"
                   type="text"
-                  placeholder="Your full name"
+                  placeholder="Your first name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Surname */}
+              <div className="grid gap-2">
+                <Label htmlFor="surname">Surname</Label>
+                <Input
+                  id="surname"
+                  type="text"
+                  placeholder="Your surname"
+                  value={surname}
+                  onChange={(e) => setSurname(e.target.value)}
                   required
                 />
               </div>

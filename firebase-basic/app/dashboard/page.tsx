@@ -1,22 +1,24 @@
 "use client"
 
 import Link from "next/link"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Calendar, FileText, Heart, Plus, Share2, Star, Users as UsersIcon, BookOpen, Clock, TrendingUp } from "lucide-react"
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { CreateOrganizationModal } from "@/components/ui/create-organization-modal"
-import { Users, Lock, Globe } from "lucide-react"
+import { format, isSameDay } from "date-fns"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/ui/page-header"
+import { CreateOrganizationModal } from "@/components/ui/create-organization-modal"
 import { httpsCallable } from "firebase/functions"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
-import { fns } from "@/lib/firebase"
 import { getDatabase, ref, get, onValue } from "firebase/database"
+import { fns } from "@/lib/firebase"
 import { useUserId } from "@/hooks/useUserId"
-import { PageHeader } from "@/components/ui/page-header"
-import { format, isToday, isTomorrow, isThisWeek, parseISO } from "date-fns"
+import { Calendar, FileText, Heart, Plus, Share2, Star, Users, Lock, Globe } from "lucide-react"
+import { toast } from "sonner"
 
-interface Org {
+/* --------------------------- Shared types --------------------------- */
+
+type Org = {
   id: string
   ownerId: string
   name: string
@@ -27,7 +29,7 @@ interface Org {
   createdAt?: number
 }
 
-interface CreateOrgInput {
+type CreateOrgInput = {
   name: string
   description: string
   isPrivate: boolean
@@ -35,253 +37,106 @@ interface CreateOrgInput {
   invitedUserIds: string[]
 }
 
-// Friend interface to match your Firebase Functions
-interface Friend {
-  uid: string
-  name: string
-  surname: string
-  profilePicture?: string
-}
+type EventType = "exam" | "assignment" | "reminder" | "class"
 
-// Note interface for recent notes
-interface RecentNote {
-  id: string
-  name: string
-  content: string
-  lastModified: number
-  type: string
-  path: string
-}
-
-// Event interface for upcoming events
-interface UpcomingEvent {
+type Event = {
   id: string
   title: string
-  type: 'lecture' | 'exam' | 'assignment' | 'study' | 'other'
-  date: string
-  time?: string
   description?: string
+  date: string | Date
+  type: EventType
+  time?: string
+  endTime?: string
+  semesterId?: string
 }
 
-// Study stats interface
-interface StudyStats {
-  totalHours: number
-  dailyHours: number[]
-  notesCount: number
-  weeklyGoal: number
+type LectureSlot = {
+  id: string
+  subject: string
+  lecturer: string
+  room: string
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+  semesterId: string
+  // legacy fields
+  timeSlot?: string
+  duration?: number
 }
+
+type Semester = {
+  id: string
+  name: string
+  startDate: string | Date
+  endDate: string | Date
+  isActive: boolean
+}
+
+/* ---------------------- Utility helpers ---------------------- */
+
+const callFn = <TReq, TRes>(name: string, data: TReq) =>
+  httpsCallable<TReq, TRes>(fns, name)(data).then((r) => r.data)
+
+const timeToMinutes = (t?: string) => {
+  if (!t) return null
+  const [h, m] = t.split(":").map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return null
+  return h * 60 + m
+}
+
+const normalizeLecture = (raw: any): LectureSlot => {
+  if (raw.startTime && raw.endTime) return raw as LectureSlot
+  const start = raw.timeSlot as string
+  const dur = (raw.duration as number) ?? 50
+  const startM = timeToMinutes(start) ?? 0
+  const end = `${String(Math.floor((startM + dur) / 60)).padStart(2, "0")}:${String((startM + dur) % 60).padStart(2, "0")}`
+  return { ...raw, startTime: start, endTime: end } as LectureSlot
+}
+
+/* ---------------------- Static placeholders ---------------------- */
+
+const notebooks = [
+  { title: "COS301 Computer Science Fundamentals", tag: "LECTURE", tagType: "important", timestamp: "Today at 2:30PM", likes: 1 },
+  { title: "COS701 AI & Machine Learning Concepts", tag: "RESEARCH", tagType: "", timestamp: "Yesterday", likes: 1 },
+  { title: "COS221 Database System Architecture", tag: "LECTURE", tagType: "", timestamp: "2 days ago", likes: 1 },
+  { title: "COS301 Software Engineering Principles", tag: "EXAM", tagType: "important", timestamp: "1 week ago", likes: 1 },
+]
+
+const friends = [
+  { name: "Ndhlovu Tanaka", role: "Student" },
+  { name: "Takudzwa Magunda", role: "Lecturer" },
+]
+
+/* ---------------------------------------------------------------- */
 
 export default function DashboardPage() {
-  const { userId, loading: authLoading } = useUserId()
+  const { userId } = useUserId()
+
+  /* ---------------- Welcome name ---------------- */
   const [userName, setUserName] = useState<string>("")
-  const [friends, setFriends] = useState<Friend[]>([])
-  const [recentNotes, setRecentNotes] = useState<RecentNote[]>([])
-  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([])
-  const [studyStats, setStudyStats] = useState<StudyStats>({
-    totalHours: 0,
-    dailyHours: [0, 0, 0, 0, 0, 0, 0],
-    notesCount: 0,
-    weeklyGoal: 25
-  })
-  
-  const [loadingFriends, setLoadingFriends] = useState(false)
-  const [loadingNotes, setLoadingNotes] = useState(false)
-  const [loadingEvents, setLoadingEvents] = useState(false)
-  const [loadingStats, setLoadingStats] = useState(false)
-  
+  useEffect(() => {
+    const auth = getAuth()
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) return
+      const raw = user.displayName || user.email?.split("@")[0] || "Student"
+      setUserName(raw.charAt(0).toUpperCase() + raw.slice(1))
+    })
+    return unsub
+  }, [])
+
+  /* --------------- Organisations --------------- */
   const [organizations, setOrganizations] = useState<(Org & { joined: boolean; role?: string })[]>([])
   const [favorites, setFavorites] = useState<Record<string, boolean>>({})
   const [loadingOrgs, setLoadingOrgs] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
 
-  // Callable functions
   const getMyOrgs = useMemo(() => httpsCallable<{}, Org[]>(fns, "getUserOrganizations"), [])
-  const createOrg = useMemo(() => httpsCallable<{ organization: CreateOrgInput }, Org>(fns, "createOrganization"), [])
-  const getFriendsFunc = useMemo(() => httpsCallable<{}, Friend[]>(fns, "getFriends"), [])
-  const getEventsFunc = useMemo(() => httpsCallable<{ semesterId?: string }, UpcomingEvent[]>(fns, "getEvents"), [])
-  const getSemestersFunc = useMemo(() => httpsCallable<{}, any[]>(fns, "getSemesters"), [])
-
+  const createOrg = useMemo(
+    () => httpsCallable<{ organization: CreateOrgInput }, Org>(fns, "createOrganization"),
+    [],
+  )
   const db = getDatabase()
 
-  // Set user name from auth
-  useEffect(() => {
-    const auth = getAuth()
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) return
-      const raw = user.displayName || user.email?.split("@")[0] || "Student"
-      setUserName(raw.charAt(0).toUpperCase() + raw.slice(1))
-    })
-    return unsubscribe
-  }, [])
-
-  // Fetch user's friends
-  const fetchFriends = useCallback(async () => {
-    if (!userId) return
-    setLoadingFriends(true)
-    try {
-      const result = await getFriendsFunc({})
-      setFriends(result.data)
-    } catch (error) {
-      console.error("❌ Failed to load friends", error)
-      setFriends([])
-    } finally {
-      setLoadingFriends(false)
-    }
-  }, [userId, getFriendsFunc])
-
-  // Fetch recent notes from Firebase
-  const fetchRecentNotes = useCallback(async () => {
-    if (!userId) return
-    setLoadingNotes(true)
-    try {
-      const notesRef = ref(db, `users/${userId}/notes`)
-      const snapshot = await get(notesRef)
-      
-      if (snapshot.exists()) {
-        const notesData = snapshot.val()
-        const notesList: RecentNote[] = []
-        
-        Object.entries(notesData).forEach(([noteId, noteData]: [string, any]) => {
-          if (noteData.type === 'note' && noteData.content) {
-            // Extract plain text from HTML content for preview
-            const textContent = noteData.content.replace(/<[^>]*>/g, '').substring(0, 100)
-            notesList.push({
-              id: noteId,
-              name: noteData.name || 'Untitled Note',
-              content: textContent,
-              lastModified: noteData.lastModified || Date.now(),
-              type: noteData.type,
-              path: noteData.parentId ? `${noteData.parentId}/${noteId}` : noteId
-            })
-          }
-        })
-        
-        // Sort by last modified and take top 4
-        notesList.sort((a, b) => b.lastModified - a.lastModified)
-        setRecentNotes(notesList.slice(0, 4))
-      } else {
-        setRecentNotes([])
-      }
-    } catch (error) {
-      console.error("❌ Failed to load recent notes", error)
-      setRecentNotes([])
-    } finally {
-      setLoadingNotes(false)
-    }
-  }, [userId, db])
-
-  // Fetch upcoming events
-  const fetchUpcomingEvents = useCallback(async () => {
-    if (!userId) return
-    setLoadingEvents(true)
-    try {
-      // First get active semester
-      const semestersResult = await getSemestersFunc({})
-      const semesters = Array.isArray(semestersResult.data) ? semestersResult.data : []
-      const activeSemester = semesters.find(s => s.isActive)
-      
-      if (activeSemester) {
-        const eventsResult = await getEventsFunc({ semesterId: activeSemester.id })
-        const events = Array.isArray(eventsResult.data) ? eventsResult.data : []
-        
-        // Filter for upcoming events (today and future)
-        const now = new Date()
-        const upcomingEventsList = events
-          .filter((event: any) => {
-            const eventDate = new Date(event.date)
-            return eventDate >= now
-          })
-          .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .slice(0, 3) // Take top 3 upcoming events
-          .map((event: any) => ({
-            ...event,
-            date: event.date,
-            time: event.time || '08:00'
-          }))
-        
-        setUpcomingEvents(upcomingEventsList)
-      } else {
-        setUpcomingEvents([])
-      }
-    } catch (error) {
-      console.error("❌ Failed to load upcoming events", error)
-      setUpcomingEvents([])
-    } finally {
-      setLoadingEvents(false)
-    }
-  }, [userId, getEventsFunc, getSemestersFunc])
-
-  // Calculate study statistics
-  const fetchStudyStats = useCallback(async () => {
-    if (!userId) return
-    setLoadingStats(true)
-    try {
-      // Get notes count
-      const notesRef = ref(db, `users/${userId}/notes`)
-      const notesSnapshot = await get(notesRef)
-      let notesCount = 0
-      
-      if (notesSnapshot.exists()) {
-        const notesData = notesSnapshot.val()
-        notesCount = Object.values(notesData).filter((note: any) => note.type === 'note').length
-      }
-
-      // Get study sessions (if you have this data structure)
-      const studySessionsRef = ref(db, `users/${userId}/studySessions`)
-      const studySnapshot = await get(studySessionsRef)
-      
-      let totalHours = 0
-      const dailyHours = [0, 0, 0, 0, 0, 0, 0] // Last 7 days
-      
-      if (studySnapshot.exists()) {
-        const sessions = studySnapshot.val()
-        const now = new Date()
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        
-        Object.values(sessions).forEach((session: any) => {
-          if (session.date && session.duration) {
-            const sessionDate = new Date(session.date)
-            const hours = session.duration / 60 // Convert minutes to hours
-            
-            if (sessionDate >= weekAgo) {
-              const dayIndex = Math.floor((now.getTime() - sessionDate.getTime()) / (24 * 60 * 60 * 1000))
-              if (dayIndex >= 0 && dayIndex < 7) {
-                dailyHours[6 - dayIndex] += hours
-              }
-            }
-            totalHours += hours
-          }
-        })
-      } else {
-        // If no study data, generate some sample data based on notes activity
-        const baseHours = Math.min(notesCount * 0.5, 15) // Estimate based on notes
-        totalHours = baseHours
-        for (let i = 0; i < 7; i++) {
-          dailyHours[i] = Math.random() * 4 + 1 // Random hours between 1-5
-        }
-      }
-
-      setStudyStats({
-        totalHours: Math.round(totalHours * 10) / 10,
-        dailyHours: dailyHours.map(h => Math.round(h * 10) / 10),
-        notesCount,
-        weeklyGoal: 25
-      })
-    } catch (error) {
-      console.error("❌ Failed to load study stats", error)
-      // Set default stats
-      setStudyStats({
-        totalHours: 0,
-        dailyHours: [2, 3, 1, 4, 2, 5, 3],
-        notesCount: 0,
-        weeklyGoal: 25
-      })
-    } finally {
-      setLoadingStats(false)
-    }
-  }, [userId, db])
-
-  // Fetch user's organizations and favorites
   const fetchOrganizations = useCallback(async () => {
     if (!userId) return
     setLoadingOrgs(true)
@@ -292,14 +147,13 @@ export default function DashboardPage() {
         joined: true,
         role: o.members[userId!],
       }))
-
       const favSnap = await get(ref(db, `userFavorites/${userId}`))
       const favObj = (favSnap.val() as Record<string, boolean>) || {}
-
       setOrganizations(myOrgs)
       setFavorites(favObj)
-    } catch (e) {
-      console.error("❌ Failed to load organizations", e)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to load organisations"
+      toast.error(msg)
       setOrganizations([])
     } finally {
       setLoadingOrgs(false)
@@ -308,15 +162,142 @@ export default function DashboardPage() {
 
   // Load all data when userId is available
   useEffect(() => {
-    if (userId) {
-      fetchFriends()
-      fetchRecentNotes()
-      fetchUpcomingEvents()
-      fetchStudyStats()
-      fetchOrganizations()
-    }
-  }, [userId, fetchFriends, fetchRecentNotes, fetchUpcomingEvents, fetchStudyStats, fetchOrganizations])
+    fetchOrganizations()
+  }, [fetchOrganizations])
 
+  const sortedOrganizations = useMemo(() => {
+    return [...organizations].sort((a, b) => {
+      if (favorites[a.id] && !favorites[b.id]) return -1
+      if (!favorites[a.id] && favorites[b.id]) return 1
+      return a.name.localeCompare(b.name)
+    })
+  }, [organizations, favorites])
+
+  /* --------------- Upcoming events --------------- */
+  const [upcoming, setUpcoming] = useState<Array<{ id: string; title: string; type: EventType | "lecture"; date: string; time?: string }>>([])
+
+  const fetchTodayAgenda = useCallback(async () => {
+    if (!userId) return
+    const today = new Date()
+    try {
+      const sems = await callFn<{}, Semester[]>("getSemesters", {})
+      const semesters = (sems || []).map((s) => ({
+        ...s,
+        startDate: new Date(s.startDate as any),
+        endDate: new Date(s.endDate as any),
+      }))
+      const active = semesters.find((s) => s.isActive) || null
+
+      const calls: Array<Promise<any>> = [
+        callFn<{ semesterId: string }, Event[]>("getEvents", { semesterId: "personal" }),
+      ]
+      if (active) {
+        calls.push(callFn<{ semesterId: string }, Event[]>("getEvents", { semesterId: active.id }))
+        calls.push(callFn<{ semesterId: string }, LectureSlot[]>("getLectures", { semesterId: active.id }))
+      }
+
+      const [personalEvents, semEvents = [], lectures = []] = await Promise.all(calls)
+
+      const allEvents: Event[] = [...(personalEvents || []), ...(semEvents as Event[])].map((ev) => ({
+        ...ev,
+        date: new Date(ev.date),
+      }))
+
+      const todaysEvents = allEvents.filter((ev) => isSameDay(ev.date as Date, today))
+      const todaysLectures: LectureSlot[] = (lectures as LectureSlot[]).map(normalizeLecture).filter((l) => l.dayOfWeek === today.getDay())
+
+      const merged: typeof upcoming = []
+      todaysEvents.forEach((ev) => {
+        merged.push({
+          id: `evt-${ev.id}`,
+          title: ev.title,
+          type: ev.type,
+          date: format(today, "EEE, d MMM"),
+          time: ev.time,
+        })
+      })
+      todaysLectures.forEach((lec) => {
+        merged.push({
+          id: `lec-${lec.id}`,
+          title: lec.subject,
+          type: "lecture",
+          date: format(today, "EEE, d MMM"),
+          time: lec.startTime,
+        })
+      })
+
+      merged.sort((a, b) => {
+        const am = timeToMinutes(a.time) ?? 1e9
+        const bm = timeToMinutes(b.time) ?? 1e9
+        return am - bm
+      })
+
+      setUpcoming(merged)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load today's events"
+      toast.error(msg)
+      setUpcoming([])
+    }
+  }, [userId])
+
+  useEffect(() => {
+    fetchTodayAgenda()
+  }, [fetchTodayAgenda])
+
+  /* --------------- Study hours (metrics) --------------- */
+  const [totalStudyHours, setTotalStudyHours] = useState(0)
+  const [thisWeekHours, setThisWeekHours] = useState(0)
+  const [dailyBars, setDailyBars] = useState<number[]>([])
+
+  useEffect(() => {
+    if (!userId) return
+    const db = getDatabase()
+    const metricsRef = ref(db, `users/${userId}/metrics`)
+    const dailyRef = ref(db, `users/${userId}/metrics/daily`)
+
+    let latestTodayDate = ""
+    let latestTodaySeconds = 0
+
+    const offMetrics = onValue(metricsRef, (snap) => {
+      const v = snap.val() || {}
+      setTotalStudyHours(Number(v.totalStudyHours || 0))
+      setThisWeekHours(Number(v.thisWeekHours || 0))
+      latestTodayDate = v.todayDate || ""
+      latestTodaySeconds = Number(v.todaySeconds || 0)
+      // fallback if no daily series yet
+      setDailyBars((prev) => {
+        if (prev.length === 7) return prev
+        return [0, 0, 0, 0, 0, 0, Number((latestTodaySeconds / 3600).toFixed(2))]
+      })
+    })
+
+    const offDaily = onValue(dailyRef, (snap) => {
+      const obj = snap.val() as Record<string, number | { seconds?: number; hours?: number }> | null
+      const days: number[] = []
+      const today = new Date()
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today)
+        d.setDate(today.getDate() - i)
+        const key = format(d, "yyyy-MM-dd")
+        let hours = 0
+        if (obj && obj[key] != null) {
+          const v = obj[key] as any
+          hours = typeof v === "number" ? v : v.hours ?? (v.seconds ?? 0) / 3600
+        } else if (key === latestTodayDate) {
+          hours = latestTodaySeconds / 3600
+        }
+        days.push(Number(hours.toFixed(2)))
+      }
+      setDailyBars(days)
+    })
+
+    return () => {
+      offMetrics()
+      offDaily()
+    }
+  }, [userId])
+
+  /* --------------- Create organisation --------------- */
   const handleCreateOrganization = async (data: {
     name: string
     description: string
@@ -336,384 +317,167 @@ export default function DashboardPage() {
       })
       setShowCreateModal(false)
       await fetchOrganizations()
-    } catch (e) {
-      console.error("Failed to create organization:", e)
+      toast.success("Organization created")
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to create organization"
+      toast.error(msg)
     }
   }
 
-  // Sort organizations with favorites first
-  const sortedOrganizations = useMemo(() => {
-    return organizations.sort((a, b) => {
-      if (favorites[a.id] && !favorites[b.id]) return -1
-      if (!favorites[a.id] && favorites[b.id]) return 1
-      return a.name.localeCompare(b.name)
-    })
-  }, [organizations, favorites])
-
-  // Helper function to get initials
-  const getInitials = (name: string, surname: string) => {
-    return `${name?.charAt(0) || ''}${surname?.charAt(0) || ''}`.toUpperCase()
-  }
-
-  // Helper function to format event date
-  const formatEventDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString)
-      if (isToday(date)) return "Today"
-      if (isTomorrow(date)) return "Tomorrow"
-      if (isThisWeek(date)) return format(date, "EEEE")
-      return format(date, "MMM d")
-    } catch {
-      return dateString
-    }
-  }
-
-  // Helper function to get tag type
-  const getTagType = (noteType: string) => {
-    switch (noteType.toLowerCase()) {
-      case 'exam':
-      case 'assignment':
-        return 'important'
-      default:
-        return ''
-    }
-  }
+  /* ------------------------ Render ------------------------ */
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader
-        title={`Welcome ${userName}`}
-        description="Here's an overview of your notebooks, study buddies, events, and more."
-      />
+      <PageHeader title={`Welcome ${userName}`} description="Here’s an overview of your notebooks, study buddies, events, and more." />
+
       <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* My Recent Notes Section */}
+          {/* Notebooks */}
           <div className="col-span-1 bg-card p-6 rounded-lg shadow-sm border">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Recent Notes</h2>
+              <h2 className="text-lg font-semibold">My Notebooks</h2>
               <div className="flex gap-2">
-                <Link href="/hardnotes">
-                  <Button variant="ghost" size="icon">
-                    <Plus className="h-5 w-5" />
-                  </Button>
-                </Link>
-                <Link href="/hardnotes">
-                  <Button variant="ghost" size="sm">
-                    View All
-                  </Button>
-                </Link>
+                <Link href="/notes"><Button variant="ghost" size="icon"><Plus className="h-5 w-5" /></Button></Link>
+                <Button variant="ghost" size="sm">Filter</Button>
+                <Button variant="ghost" size="sm">Sort</Button>
+                <Button variant="ghost" size="sm">Tags</Button>
               </div>
             </div>
-            
-            {loadingNotes ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              </div>
-            ) : recentNotes.length === 0 ? (
-              <div className="text-center py-8">
-                <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                <p className="text-muted-foreground mb-4">No notes yet</p>
-                <Link href="/hardnotes">
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Note
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentNotes.map((note) => (
-                  <Link href="/hardnotes" key={note.id}>
-                    <div className="border-b py-3 hover:bg-muted/50 transition-colors rounded-md px-2">
-                      <div className="flex flex-col w-full">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium truncate">{note.name}</span>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon">
-                              <FileText className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <Star className="h-4 w-4" />
-                            </Button>
-                          </div>
+
+            <div className="space-y-4">
+              {notebooks.map((nb) => (
+                <Link href="/notes" key={`${nb.title}-${nb.timestamp}`}>
+               <div className="border-b py-3 hover:bg-muted/50 transition-colors rounded-md px-2">
+                    <div className="flex flex-col w-full">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium truncate">{nb.title}</span>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon"><FileText className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon"><Star className="h-4 w-4" /></Button>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
-                            NOTE
-                          </span>
-                          <span>{format(new Date(note.lastModified), 'MMM d, yyyy')}</span>
-                        </div>
-                        {note.content && (
-                          <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                            {note.content}
-                          </p>
-                        )}
                       </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${nb.tagType === "important" ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"}`}>{nb.tag}</span>
+                        <span>{nb.timestamp}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Button variant="ghost" size="sm" className="text-muted-foreground h-8"><Heart className="h-4 w-4 mr-1" />{nb.likes}</Button>
+                        <Button variant="ghost" size="sm" className="text-muted-foreground h-8"><Share2 className="h-4 w-4 mr-1" /></Button>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Friends & Organisations */}
+          <div className="col-span-1 space-y-6">
+            {/* Friends */}
+            <div className="bg-card p-6 rounded-lg shadow-sm border">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">Friends</h2>
+                <Link href="#"><Button variant="ghost" size="icon"><Avatar className="h-6 w-6"><AvatarFallback>+</AvatarFallback></Avatar></Button></Link>
+              </div>
+              <div className="space-y-3">
+                {friends.map((f) => (
+                  <Link href="#" key={f.name}>
+                    <div className="flex items-center justify-between hover:bg-muted/50 transition-colors p-3 rounded-md">
+                      <div className="flex items-center gap-3">
+                        <Avatar><AvatarFallback>{f.name.charAt(0)}</AvatarFallback></Avatar>
+                        <div>
+                          <p className="font-medium">{f.name}</p>
+                          <p className="text-sm text-muted-foreground">{f.role}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon"><div className="flex gap-1"><span className="h-1 w-1 bg-muted-foreground rounded-full" /><span className="h-1 w-1 bg-muted-foreground rounded-full" /><span className="h-1 w-1 bg-muted-foreground rounded-full" /></div></Button>
                     </div>
                   </Link>
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Second Column - Friends and My Organisations */}
-          <div className="col-span-1 space-y-6">
-            {/* Friends Section */}
-            <div className="bg-card p-6 rounded-lg shadow-sm border">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">Friends</h2>
-                <Link href="/friends">
-                  <Button variant="ghost" size="icon">
-                    <Plus className="h-5 w-5" />
-                  </Button>
-                </Link>
-              </div>
-              
-              {loadingFriends ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                </div>
-              ) : friends.length === 0 ? (
-                <div className="text-center py-8">
-                  <UsersIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p className="text-muted-foreground mb-4">No friends yet</p>
-                  <Link href="/friends?add=true">
-                    <Button size="sm" className="bg-blue-500 hover:bg-blue-600">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Friends
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {friends.slice(0, 3).map((friend) => (
-                    <Link href={`/friends/${friend.uid}`} key={friend.uid}>
-                      <div className="flex items-center justify-between hover:bg-muted/50 transition-colors p-3 rounded-md">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={friend.profilePicture || "/placeholder.svg"} />
-                            <AvatarFallback className="bg-muted text-foreground">
-                              {getInitials(friend.name, friend.surname)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{friend.name} {friend.surname}</p>
-                            <p className="text-sm text-muted-foreground">Friend</p>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                  
-                  {friends.length > 3 && (
-                    <div className="text-center pt-2">
-                      <Link href="/friends">
-                        <Button variant="outline" size="sm">
-                          View All Friends ({friends.length})
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
-            {/* My Organisations Section */}
+            {/* Organisations */}
             <div className="bg-card p-6 rounded-lg shadow-sm border">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">My Organisations</h2>
-                <Button variant="ghost" size="icon" onClick={() => setShowCreateModal(true)}>
-                  <Plus className="h-5 w-5" />
-                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setShowCreateModal(true)}><Plus className="h-5 w-5" /></Button>
               </div>
 
-              {loadingOrgs ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                </div>
-              ) : sortedOrganizations.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-muted-foreground mb-3">You haven't joined any organisations</p>
-                  <Link href="/organisations">
-                    <Button size="sm">Browse Organisations</Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {sortedOrganizations.slice(0, 3).map((org) => {
+              <div className="space-y-3">
+                {sortedOrganizations.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-muted-foreground mb-3">You haven't joined any organisations</p>
+                    <Link href="/organisations"><Button size="sm">Browse Organisations</Button></Link>
+                  </div>
+                ) : (
+                  sortedOrganizations.slice(0, 3).map((org) => {
                     const memberCount = Object.keys(org.members).length
-
                     return (
-                      <Link href={`/organisations/${org.id}/notes`} key={org.id}>
+                      <Link href={`/organisations/${org.id}`} key={org.id}>
                         <div className="border rounded-xl p-4 hover:shadow-md hover:border-primary/20 transition-all duration-200 bg-card">
                           <div className="flex items-center gap-3 mb-3">
-                            <Avatar className="h-10 w-10 border">
-                              <AvatarFallback className="text-sm font-medium bg-muted text-foreground">
-                                {org.name.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
+                            <Avatar className="h-10 w-10 border"><AvatarFallback className="text-sm font-medium bg-muted text-foreground">{org.name.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
                             <div className="flex-1 min-w-0">
                               <h3 className="font-medium truncate text-foreground">{org.name}</h3>
-                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                                <div className="flex items-center gap-1">
-                                  <Users className="h-3 w-3" />
-                                  <span>{memberCount}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  {org.isPrivate ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
-                                  <span>{org.isPrivate ? "Private" : "Public"}</span>
-                                </div>
-                              </div>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1"><div className="flex items-center gap-1"><Users className="h-3 w-3" /><span>{memberCount}</span></div><div className="flex items-center gap-1">{org.isPrivate ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}<span>{org.isPrivate ? "Private" : "Public"}</span></div></div>
                             </div>
-                            <Badge variant={org.role === "Admin" ? "default" : "secondary"} className="text-xs px-2 py-1">
-                              {org.role}
-                            </Badge>
+                            <Badge variant={org.role === "Admin" ? "default" : "secondary"} className="text-xs px-2 py-1">{org.role}</Badge>
                           </div>
-                          {org.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                              {org.description}
-                            </p>
-                          )}
+                          {org.description && <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{org.description}</p>}
                         </div>
                       </Link>
                     )
-                  })}
-                  {sortedOrganizations.length > 3 && (
-                    <div className="text-center mt-4">
-                      <Link href="/organisations">
-                        <Button variant="outline" size="sm">
-                          View All Organisations
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
+                  })
+                )}
+                {sortedOrganizations.length > 3 && (
+                  <div className="text-center mt-4"><Link href="/organisations"><Button variant="outline" size="sm">View All Organisations</Button></Link></div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Third Column - Upcoming Events and Study Stats */}
+          {/* Upcoming & Study hours */}
           <div className="col-span-1 space-y-6">
-            {/* Upcoming Events Section */}
+            {/* Upcoming */}
             <div className="bg-card p-6 rounded-lg shadow-sm border">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">Upcoming Events</h2>
-                <Link href="/calendar">
-                  <Button variant="ghost" size="icon">
-                    <Plus className="h-5 w-5" />
-                  </Button>
-                </Link>
-              </div>
-              
-              {loadingEvents ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                </div>
-              ) : upcomingEvents.length === 0 ? (
-                <div className="text-center py-8">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p className="text-muted-foreground mb-4">No upcoming events</p>
-                  <Link href="/calendar">
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Event
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {upcomingEvents.map((event) => (
-                    <Link href="/calendar" key={event.id}>
+              <h2 className="text-lg font-semibold mb-4">Upcoming Events</h2>
+              <div className="space-y-3">
+                {upcoming.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No items for today.</div>
+                ) : (
+                  upcoming.map((it) => (
+                    <Link href="/calendar" key={it.id}>
                       <div className="flex items-center gap-3 hover:bg-muted/50 transition-colors p-3 rounded-md">
-                        <div className="p-2 bg-blue-100 text-blue-700 rounded-md">
-                          <Calendar className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {event.title}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatEventDate(event.date)} {event.time && `at ${event.time}`}
-                          </p>
-                          <Badge variant="outline" className="text-xs mt-1">
-                            {event.type.toUpperCase()}
-                          </Badge>
-                        </div>
+                        <div className="p-2 bg-blue-100 text-blue-700 rounded-md"><Calendar className="h-5 w-5" /></div>
+                        <div><p className="font-medium">{it.title} {it.type}</p><p className="text-sm text-muted-foreground">{it.date}{it.time ? ` ${it.time}` : ""}</p></div>
                       </div>
                     </Link>
-                  ))}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
             </div>
 
-            {/* Study Statistics Section */}
+            {/* Study hours */}
             <div className="bg-card p-6 rounded-lg shadow-sm border">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">Study Statistics</h2>
-                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+              <h2 className="text-lg font-semibold mb-4">Total Study Hours</h2>
+              <div className="flex items-end gap-3 h-24">
+                {(dailyBars.length ? dailyBars : [0, 0, 0, 0, 0, 0, 0]).map((h, idx) => (
+                  <div key={idx} className="flex flex-col items-center gap-2">
+                    <div
+                      className="bg-gradient-to-t from-blue-500 to-blue-400 w-8 rounded-t-md transition-all duration-300 hover:from-amber-600 hover:to-amber-500"
+                      style={{ height: `${Math.max(h * 8, 8)}px` }}
+                      title={`${h.toFixed(2)}h`}
+                    />
+                    <span className="text-xs text-muted-foreground">{h.toFixed(1)}h</span>
+                  </div>
+                ))}
               </div>
-              
-              {loadingStats ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Weekly Hours Chart */}
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">This Week's Study Hours</p>
-                    <div className="flex items-end gap-2 h-20">
-                      {studyStats.dailyHours.map((hours, index) => (
-                        <div key={index} className="flex flex-col items-center gap-1">
-                          <div
-                            className="bg-gradient-to-t from-blue-500 to-blue-400 w-6 rounded-t-sm transition-all duration-300 hover:from-amber-600 hover:to-amber-500"
-                            style={{ height: `${Math.max(hours * 10, 4)}px` }}
-                          ></div>
-                          <span className="text-xs text-muted-foreground">
-                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'][index]}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Stats Summary */}
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <Clock className="h-4 w-4 text-blue-500" />
-                        <span className="text-lg font-semibold">{studyStats.totalHours}h</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Total Hours</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <BookOpen className="h-4 w-4 text-green-500" />
-                        <span className="text-lg font-semibold">{studyStats.notesCount}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Notes Created</p>
-                    </div>
-                  </div>
-
-                  {/* Weekly Progress */}
-                  <div className="pt-2">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-muted-foreground">Weekly Goal</span>
-                      <span className="text-sm font-medium">
-                        {studyStats.dailyHours.reduce((a, b) => a + b, 0).toFixed(1)}h / {studyStats.weeklyGoal}h
-                      </span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div 
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${Math.min((studyStats.dailyHours.reduce((a, b) => a + b, 0) / studyStats.weeklyGoal) * 100, 100)}%` 
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <div className="mt-4 text-sm text-muted-foreground">
+                {/* Prefer the daily series (7-day) so it's always consistent with the chart */}
+                <p>Total this week: {dailyBars.reduce((a, b) => a + b, 0).toFixed(1)} hours</p>
+                <p className="text-xs mt-1">All-time total: {totalStudyHours.toFixed(1)} hours</p>
+              </div>
             </div>
           </div>
         </div>

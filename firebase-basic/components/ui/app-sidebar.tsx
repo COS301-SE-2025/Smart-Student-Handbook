@@ -26,7 +26,7 @@ const items = [
   },
   {
     title: "Library",
-    url: "/hardnotes",
+    url: "/notes",
     icon: Edit3,
     description: "Create & edit notes",
   },
@@ -56,8 +56,8 @@ const items = [
     description: "Manage your organisations",
   },
     {
-    title: "Help & Support",
-    url: "/notes",
+    title: "Help Menu",
+    url: "/help",
     icon: BookOpen,
     description: "User guide & support",
    },

@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-
+  serverExternalPackages: ["yjs"],
 };
 module.exports = {
   // ...other config,
@@ -17,6 +16,5 @@ module.exports = {
     unoptimized: true,
   },
 };
-
 
 export default nextConfig;
