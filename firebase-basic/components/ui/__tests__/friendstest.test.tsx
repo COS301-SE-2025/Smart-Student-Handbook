@@ -471,7 +471,6 @@ describe('FriendsPage() FriendsPage method', () => {
       const getAuth = require("firebase/auth").getAuth;
       getAuth.mockReturnValue({ currentUser: undefined });
 
-      // Mock the component methods directly since we can't import the page
       const mockHandleAccept = jest.fn().mockResolvedValue(undefined);
       const mockHandleReject = jest.fn().mockResolvedValue(undefined);
       const mockHandleCancel = jest.fn().mockResolvedValue(undefined);

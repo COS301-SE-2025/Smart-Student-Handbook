@@ -43,7 +43,11 @@ jest.mock("@/components/ui/dropdown-menu", () => ({
       {children}
     </div>
   ),
-  DropdownMenuTrigger: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  DropdownMenuTrigger: ({ children, asChild, ...props }: any) => (
+    <div {...(asChild ? {} : props)}>
+      {asChild ? children : <div>{children}</div>}
+    </div>
+  ),
 }));
 
 const setThemeMock = jest.fn();
@@ -75,13 +79,13 @@ describe('AppSidebar() AppSidebar method', () => {
     it("renders all sidebar menu items with correct titles and descriptions", () => {
       render(<AppSidebar />);
       const menuTitles = [
-        "Dashboard",
-        "Note Editor",
-        "Library",
-        "Calendar",
-        "Settings",
-        "Friends",
-        "My Organisations",
+        'Dashboard',
+        'Library',
+        'Calendar',
+        'Friends',
+        'Organisations',
+        'Help Menu',
+        'Settings',
       ];
       menuTitles.forEach((title) => {
         expect(screen.getByText(title)).toBeInTheDocument();
@@ -89,30 +93,30 @@ describe('AppSidebar() AppSidebar method', () => {
     });
 
     it("highlights the active menu item based on pathname", () => {
-      mockPathname = "/notes";
+      mockPathname = "/hardnotes";
       render(<AppSidebar />);
       const titleElement = screen.getByText("Library");
       const link = titleElement.closest('a');
-      expect(link).toHaveClass("bg-blue-100");
+      expect(link?.className).toContain('bg-blue-100');
     });
 
     it("renders all icons for each menu item", () => {
       render(<AppSidebar />);
       const menuItems = [
         { title: "Dashboard", icon: "BarChart3" },
-        { title: "Note Editor", icon: "Edit3" },
-        { title: "Library", icon: "BookOpen" },
+        { title: "Library", icon: "Edit3" },
         { title: "Calendar", icon: "Calendar" },
-        { title: "Settings", icon: "Settings" },
         { title: "Friends", icon: "Users" },
-        { title: "My Organisations", icon: "Building2" },
+        { title: "Organisations", icon: "Building2" },
+        { title: "Help Menu", icon: "BookOpen" },
+        { title: "Settings", icon: "Settings" },
       ];
 
       menuItems.forEach(({ title, icon }) => {
         const titleElement = screen.getByText(title);
         const link = titleElement.closest('a');
-        expect(link).toBeInTheDocument(); // Add this check
-        if (link) { // Add null check
+        expect(link).toBeInTheDocument();
+        if (link) {
           expect(within(link).getByTestId(icon)).toBeInTheDocument();
         }
       });
@@ -148,7 +152,7 @@ describe('AppSidebar() AppSidebar method', () => {
       render(<AppSidebar />);
       const links = screen.getAllByRole("link");
       links.forEach((link) => {
-        expect(link).not.toHaveClass("bg-blue-100");
+        expect(link?.className).not.toContain('bg-blue-100');
       });
     });
 
@@ -169,7 +173,7 @@ describe('AppSidebar() AppSidebar method', () => {
       render(<AppSidebar />);
       const links = screen.getAllByRole("link");
       links.forEach((link) => {
-        expect(link).not.toHaveClass("bg-blue-100");
+        expect(link?.className).not.toContain('bg-blue-100');
       });
     });
   });

@@ -3,9 +3,8 @@ import { SignupForm } from '@/components/signup-form';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import "@testing-library/jest-dom";
 
-// Mock implementations
+// Mock implementations - declare functions directly in jest.mock calls
 const mockCreateUserWithEmailAndPassword = jest.fn();
-const mockInitializeNewUser = jest.fn();
 const mockPush = jest.fn();
 
 jest.mock("next/navigation", () => ({
@@ -18,23 +17,31 @@ jest.mock("firebase/auth", () => ({
   getAuth: jest.fn(() => ({})),
   createUserWithEmailAndPassword: jest.fn((...args) => 
     mockCreateUserWithEmailAndPassword(...args)),
+  updateProfile: jest.fn(() => Promise.resolve()),
+}));
+
+// Fix: Create mock functions directly in the mock call
+jest.mock("firebase/database", () => ({
+  ref: jest.fn((db, path) => ({ db, path })),
+  set: jest.fn(),
 }));
 
 jest.mock("@/lib/firebase", () => ({
   auth: {},
+  db: {},
 }));
 
-jest.mock("@/utils/user", () => ({
-  initializeNewUser: jest.fn((...args) => 
-    mockInitializeNewUser(...args)),
-}));
+// Import the mocked functions after mocking
+import { ref as mockRef, set as mockSet } from 'firebase/database';
 
 describe('SignupForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateUserWithEmailAndPassword.mockReset();
-    mockInitializeNewUser.mockReset();
+    (mockSet as jest.Mock).mockReset();
+    (mockRef as jest.Mock).mockReset();
     mockPush.mockReset();
+    (mockRef as jest.Mock).mockImplementation((db, path) => ({ db, path }));
   });
 
   describe('Happy paths', () => {
@@ -44,6 +51,8 @@ describe('SignupForm', () => {
       expect(screen.getByText('Create Account')).toBeInTheDocument();
       expect(screen.getByText('Join the Smart Student community')).toBeInTheDocument();
       expect(screen.getByTestId('name-input')).toBeInTheDocument();
+      // Fixed: Use placeholder text selector instead of testid for now
+      expect(screen.getByPlaceholderText('Your surname')).toBeInTheDocument();
       expect(screen.getByTestId('email-input')).toBeInTheDocument();
       expect(screen.getByTestId('password-input')).toBeInTheDocument();
       expect(screen.getByTestId('submit-button')).toBeInTheDocument();
@@ -52,15 +61,19 @@ describe('SignupForm', () => {
     });
 
     test('successful form submission', async () => {
-      const mockUser = { uid: 'test-uid' };
+      const mockUser = { 
+        uid: 'test-uid',
+        email: 'test@example.com' 
+      };
       
       mockCreateUserWithEmailAndPassword.mockResolvedValue({ user: mockUser });
-      mockInitializeNewUser.mockResolvedValue(undefined);
+      (mockSet as jest.Mock).mockResolvedValue(undefined);
     
       render(<SignupForm />);
     
-      // Fill out the form
-      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test User' } });
+      // Fill out the form - Fixed: Use specific selectors
+      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
       fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
       fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
       
@@ -74,7 +87,18 @@ describe('SignupForm', () => {
           'test@example.com',
           'password123'
         );
-        expect(mockInitializeNewUser).toHaveBeenCalledWith('test-uid', 'Test User');
+        
+        expect(mockSet).toHaveBeenCalledWith(
+          expect.anything(),
+          {
+            name: 'Test',
+            surname: 'User',
+            role: 'User',
+            email: 'test@example.com',
+            createdAt: expect.any(Number),
+          }
+        );
+        
         expect(mockPush).toHaveBeenCalledWith('/dashboard');
       });
     });
@@ -95,6 +119,7 @@ describe('SignupForm', () => {
 
       // Fill out form with valid data
       fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
       fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
       fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
       
@@ -107,15 +132,20 @@ describe('SignupForm', () => {
       });
     });
 
-    test('shows error when initialization fails', async () => {
-      const mockUser = { uid: 'test-uid' };
+    test('shows error when database write fails', async () => {
+      const mockUser = { 
+        uid: 'test-uid',
+        email: 'test@example.com' 
+      };
+      
       mockCreateUserWithEmailAndPassword.mockResolvedValue({ user: mockUser });
-      mockInitializeNewUser.mockRejectedValue(new Error('Initialization failed'));
+      (mockSet as jest.Mock).mockRejectedValue(new Error('Database write failed'));
 
       render(<SignupForm />);
 
       // Fill out form
       fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
       fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
       fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
       
@@ -124,7 +154,7 @@ describe('SignupForm', () => {
 
       // Wait for error message
       await waitFor(() => {
-        expect(screen.getByText('Initialization failed')).toBeInTheDocument();
+        expect(screen.getByText('Database write failed')).toBeInTheDocument();
       });
     });
   });
@@ -140,6 +170,7 @@ describe('SignupForm', () => {
       render(<SignupForm />);
       
       fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
       fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
       fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
       
@@ -148,14 +179,19 @@ describe('SignupForm', () => {
     });
 
     test('trims whitespace from inputs', async () => {
-      const mockUser = { uid: 'test-uid' };
+      const mockUser = { 
+        uid: 'test-uid',
+        email: 'test@example.com' 
+      };
+      
       mockCreateUserWithEmailAndPassword.mockResolvedValue({ user: mockUser });
-      mockInitializeNewUser.mockResolvedValue(true);
+      (mockSet as jest.Mock).mockResolvedValue(true);
 
       render(<SignupForm />);
 
       // Fill form with whitespace
-      fireEvent.change(screen.getByTestId('name-input'), { target: { value: '  Test User  ' } });
+      fireEvent.change(screen.getByTestId('name-input'), { target: { value: '  Test  ' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: '  User  ' } });
       fireEvent.change(screen.getByTestId('email-input'), { target: { value: '  test@example.com  ' } });
       fireEvent.change(screen.getByTestId('password-input'), { target: { value: '  password123  ' } });
       
@@ -169,7 +205,17 @@ describe('SignupForm', () => {
           'test@example.com',
           'password123'
         );
-        expect(mockInitializeNewUser).toHaveBeenCalledWith('test-uid', 'Test User');
+        
+        expect(mockSet).toHaveBeenCalledWith(
+          expect.anything(),
+          {
+            name: 'Test',
+            surname: 'User',
+            role: 'User',
+            email: 'test@example.com',
+            createdAt: expect.any(Number),
+          }
+        );
       });
     });
   });

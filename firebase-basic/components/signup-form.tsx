@@ -110,31 +110,18 @@ export function SignupForm(
                 />
               </div>
 
-              {/* Surname */}
               <div className="grid gap-2">
-                <Label htmlFor="surname">Surname</Label>
-                <Input
+              <Label htmlFor="surname">Surname</Label>
+                  <Input
                   id="surname"
                   type="text"
                   placeholder="Your surname"
                   value={surname}
                   onChange={(e) => setSurname(e.target.value)}
                   required
-                />
+              />
               </div>
 
-              {/* Surname */}
-              <div className="grid gap-2">
-                <Label htmlFor="surname">Surname</Label>
-                <Input
-                  id="surname"
-                  type="text"
-                  placeholder="Your surname"
-                  value={surname}
-                  onChange={(e) => setSurname(e.target.value)}
-                  required
-                />
-              </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
