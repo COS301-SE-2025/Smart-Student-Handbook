@@ -26,7 +26,7 @@ const items = [
   },
   {
     title: "Library",
-    url: "/hardnotes",
+    url: "/notes",
     icon: Edit3,
     description: "Create & edit notes",
   },

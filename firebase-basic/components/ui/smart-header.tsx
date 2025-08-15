@@ -29,6 +29,8 @@ interface Notification {
   type: string
   time: string
   description: string
+  fromUserId?: string // Add this for friend notifications
+  orgId?: string // Add this for organization notifications
 }
 
 export function SmartHeader() {
@@ -93,29 +95,14 @@ export function SmartHeader() {
     return formattedTitle
   }
 
-  // Get notification type display name
-  const getNotificationTypeDisplay = (type: string) => {
-    switch (type) {
-      case "lecture":
-        return "LECTURE"
-      case "assignment":
-        return "ASSIGNMENT"
-      case "study":
-        return "STUDY"
-      case "added_to_group":
-        return "INVITE"
-      case "new_public_org":
-        return "NEW ORG"
-      default:
-        return type.replace("_", " ").toUpperCase()
-    }
-  }
-
-  // Dismiss a notification
+  // Update the dismissNotification function
   const dismissNotification = useCallback(
-    (id: string, type: string) => {
-      if (type === "added_to_group" || type === "new_public_org") {
-        // For organization notifications, remove from Firebase
+    (id: string, type?: string) => {
+      if (type === "added_to_group" || 
+          type === "new_public_org" || 
+          type === "friend_request" || 
+          type === "friend_request_accepted") {
+        // For organization and friend notifications, remove from Firebase
         if (!user?.uid) return
         const db = getDatabase()
         dbRemove(dbRef(db, `users/${user.uid}/notifications/${id}`))
@@ -148,38 +135,65 @@ export function SmartHeader() {
     return () => unsub()
   }, [])
 
-  // Listen for both "added_to_group" and "new_public_org"
+  // Listen for notifications (including friend requests)
   useEffect(() => {
-    if (!user?.uid) return
+    if (!user?.uid) {
+      console.log(`❌ No user ID for notifications`);
+      return;
+    }
+    
+    console.log(`👂 Setting up notification listener for user: ${user.uid}`);
     const db = getDatabase()
     const notifRef = dbRef(db, `users/${user.uid}/notifications`)
+    
     const off = onValue(notifRef, (snap) => {
+      console.log(`📨 Raw notification snapshot:`, snap.val())
       const raw = snap.val() as Record<string, any> | null
+      
       if (!raw) {
+        console.log(`📭 No notifications found`)
         setOrgNotifications([])
         return
       }
+      
       const filtered: Notification[] = []
       snap.forEach((childSnap) => {
         const n = childSnap.val() as any
         const key = childSnap.key!
-        if (n.type === "added_to_group" || n.type === "new_public_org") {
-          filtered.push({
+        
+        console.log(`🔍 Processing notification:`, { key, type: n.type, data: n })
+        
+        if (n.type === "added_to_group" || 
+            n.type === "new_public_org" || 
+            n.type === "friend_request" || 
+            n.type === "friend_request_accepted") {
+          
+          const notification = {
             id: key,
             title: n.message,
             type: n.type,
-            time: new Date(n.timestamp).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            description: "",
-          })
+            time: formatDate(n.timestamp),
+            description: getNotificationDescription(n.type, n.message),
+            fromUserId: n.fromUserId,
+            orgId: n.orgId
+          }
+          
+          console.log(`✅ Adding notification to list:`, notification)
+          filtered.push(notification)
+        } else {
+          console.log(`❌ Notification type not matching:`, n.type)
         }
       })
+      
+      console.log(`📊 Total filtered notifications:`, filtered.length)
       setOrgNotifications(filtered)
     })
-    return () => off()
-  }, [user])
+    
+    return () => {
+      console.log(`🛑 Cleaning up notification listener`)
+      off()
+    }
+  }, [user?.uid])
 
   // Fetch active semester
   useEffect(() => {
@@ -324,7 +338,55 @@ export function SmartHeader() {
     }
   })()
 
-  // Notification icon based on type
+    // Get notification description
+  const getNotificationDescription = (type: string, message: string) => {
+    switch (type) {
+      case "friend_request":
+        return "Click to view and respond to the friend request"
+      case "friend_request_accepted":
+        return "Your friend request was accepted"
+      case "added_to_group":
+        return "You've been added to a private organization"
+      case "new_public_org":
+        return "A new public organization has been created"
+      default:
+        return message
+    }
+  }
+
+  const getNotificationTitle = (type: string, formattedTitle: string) => {
+    if (type === "new_public_org") {
+      const match = formattedTitle.match(/New organization "(.+)" was created/)
+      if (match) {
+        const orgName = match[1]
+        return `New organization: ${orgName}`
+      }
+    }
+    if (type === "added_to_group") {
+      const match = formattedTitle.match(/You were added to "(.+)"/)
+      if (match) {
+        return `Added to: ${match[1]}`
+      }
+    }
+    if (type === "friend_request") {
+      const match = formattedTitle.match(/(.+) sent you a friend request/)
+      if (match) {
+        return `Friend request from ${match[1]}`
+      }
+    }
+    if (type === "friend_request_accepted") {
+      const match = formattedTitle.match(/(.+) accepted your friend request/)
+      if (match) {
+        return `${match[1]} accepted your request`
+      }
+    }
+    return formattedTitle
+  }
+  // Add this function near your other utility functions
+  const formatDate = (timestamp: number) => {
+    return format(new Date(timestamp), "MMM d, h:mm a")
+  }
+  // Update the notification icon function to include friend icons
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "lecture":
@@ -337,11 +399,59 @@ export function SmartHeader() {
         return <div className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
       case "new_public_org":
         return <div className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" />
+      case "friend_request":
+        return <div className="w-2 h-2 rounded-full bg-pink-500 flex-shrink-0" />
+      case "friend_request_accepted":
+        return <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
       default:
         return <div className="w-2 h-2 rounded-full bg-muted-foreground flex-shrink-0" />
     }
   }
+  // Get notification type display name
+  const getNotificationTypeDisplay = (type: string) => {
+    switch (type) {
+      case "lecture":
+        return "LECTURE"
+      case "assignment":
+        return "ASSIGNMENT"
+      case "study":
+        return "STUDY"
+      case "added_to_group":
+        return "INVITE"
+      case "new_public_org":
+        return "NEW ORG"
+      case "friend_request":
+        return "FRIEND REQ"
+      case "friend_request_accepted":
+        return "ACCEPTED"
+      default:
+        return type.replace("_", " ").toUpperCase()
+    }
+  }
 
+  // Update the handleNotificationClick function
+  const handleNotificationClick = useCallback(
+    (notification: Notification) => {
+      // Mark as read - IMPORTANT: Pass the type parameter
+      dismissNotification(notification.id, notification.type)
+      
+      // Navigate based on notification type
+      if (notification.type === "friend_request" && notification.fromUserId) {
+        // Navigate to the friend's profile page to accept/reject
+        router.push(`/friends/${notification.fromUserId}`)
+      } else if (notification.type === "friend_request_accepted" && notification.fromUserId) {
+        // Navigate to the friend's profile page
+        router.push(`/friends/${notification.fromUserId}`)
+      } else if (notification.type === "added_to_group") {
+        // Navigate to organisations page (correct spelling)
+        router.push("/organisations")
+      } else if (notification.type === "new_public_org") {
+        // Navigate to organisations page (correct spelling)
+        router.push("/organisations")
+      }
+    },
+    [dismissNotification, router]
+  )
   // Search placeholder
   const getSearchPlaceholder = () => {
     switch (pathname) {
@@ -416,19 +526,23 @@ export function SmartHeader() {
                     {notifications.map((n) => (
                       <div
                         key={n.id}
-                        className="flex items-start gap-3 p-3 hover:bg-muted rounded-md border border-border/50"
+                        className="flex items-start gap-3 p-3 hover:bg-muted rounded-md border border-border/50 cursor-pointer transition-colors"
+                        onClick={() => handleNotificationClick(n)}
                       >
                         <div className="mt-1">{getNotificationIcon(n.type)}</div>
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-medium leading-tight">
-                              {formatNotificationTitle(n.title, n.type)}
+                              {getNotificationTitle(n.type, formatNotificationTitle(n.title, n.type))}
                             </p>
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-6 w-6 p-0 hover:bg-destructive/10"
-                              onClick={() => dismissNotification(n.id, n.type)}
+                              onClick={(e) => {
+                                e.stopPropagation() // Prevent triggering the notification click
+                                dismissNotification(n.id, n.type)
+                              }}
                             >
                               <X className="h-3 w-3" />
                             </Button>

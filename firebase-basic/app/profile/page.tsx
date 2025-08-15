@@ -169,16 +169,15 @@ export default function ProfilePage() {
   }, [])
 
   /* ---------------- Derived live metrics -------------------------------- */
+  // Show DB + in-flight seconds so the cards feel real-time.
+  // Server-side transaction handles week resets & streak updates.
   const live = useMemo(() => {
-    const now = new Date()
-    const last = new Date(baseMetrics.lastUpdated || 0)
-    const thisWeekBase = isSameWeek(now, last) ? baseMetrics.thisWeekHours : 0
-
+    const extraHours = sessionSeconds / 3600
     return {
-      totalStudyHours: baseMetrics.totalStudyHours + sessionSeconds / 3600,
-      thisWeekHours: thisWeekBase + sessionSeconds / 3600,
+      totalStudyHours: (baseMetrics.totalStudyHours || 0) + extraHours,
+      thisWeekHours: (baseMetrics.thisWeekHours || 0) + extraHours,
       notesCreated: notesCount,
-      studyStreak: baseMetrics.studyStreak,
+      studyStreak: baseMetrics.studyStreak || 0,
     }
   }, [baseMetrics, sessionSeconds, notesCount])
 
