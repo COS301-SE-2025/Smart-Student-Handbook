@@ -34,12 +34,8 @@ export default function HelpMenuPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild size="lg" className="full">
-                <Link
-                  href="/Smart Student Handbook User Manual.pdf"
-                  target="_blank"
-                  rel="noopener"
-                >
+              <Button asChild size="lg" className="w-full">
+                <Link href="/user-manual.pdf" target="_blank" rel="noopener">
                   Open PDF
                 </Link>
               </Button>
