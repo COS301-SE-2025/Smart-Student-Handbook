@@ -239,8 +239,6 @@ export default function OrganisationsPage() {
   /* ---------------------------------------------------------------------- */
   /*                             JSX                                         */
   /* ---------------------------------------------------------------------- */
-  // IMPORTANT: while auth is resolving, render nothing here.
-  // The universal layout shows its own loader, and it will stop once auth resolves.
   if (authLoading) return null
 
   return (
@@ -303,7 +301,6 @@ export default function OrganisationsPage() {
 
       {/* Organisation Cards */}
       <div className="p-8">
-        {/* No page-level spinner. Show cards if we have any. */}
         {orgs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {orgs.map((o) => {
@@ -313,163 +310,147 @@ export default function OrganisationsPage() {
               const isLeaving = leavingOrgs.has(o.id)
 
               return (
-                <Link href={`/organisations/${o.id}`} key={o.id}>
-                  <div
-                    className={`border-2 bg-white dark:bg-neutral-900 rounded-2xl p-8 hover:shadow-xl transition-all relative min-h-[360px] group hover:scale-[1.02] ${
-                      isJoining || isLeaving ? "opacity-75" : ""
-                    } cursor-pointer`}
+                <div
+                  key={o.id}
+                  className={`border-2 bg-white dark:bg-neutral-900 rounded-2xl p-8 hover:shadow-xl transition-all relative min-h-[360px] group ${
+                    isJoining || isLeaving ? "opacity-75" : ""
+                  }`}
+                >
+                  {/* fav button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm dark:bg-black/80 dark:hover:bg-black z-10"
+                    onClick={() => handleToggleFav(o.id)}
+                    disabled={isJoining || isLeaving}
                   >
-                    {/* fav button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm dark:bg-black/80 dark:hover:bg-black z-10"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        handleToggleFav(o.id)
-                      }}
-                      disabled={isJoining || isLeaving}
-                    >
-                      <Heart
-                        className={`h-5 w-5 transition-colors ${
-                          isFav ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500"
-                        }`}
-                      />
-                    </Button>
+                    <Heart
+                      className={`h-5 w-5 transition-colors ${
+                        isFav ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500"
+                      }`}
+                    />
+                  </Button>
 
-                    {/* header */}
-                    <div className="flex items-start gap-4 mb-6">
-                      <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-black">
-                        <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-black">
-                          {o.name.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-xl truncate mb-2">{o.name}</h3>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Badge
-                            variant="secondary"
-                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
-                          >
-                            <Users className="h-3 w-3" />{" "}
-                            <span>
-                              {memberCount} member{memberCount !== 1 ? "s" : ""}
-                            </span>
-                          </Badge>
-                          <Badge
-                            variant="secondary"
-                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
-                          >
-                            {o.isPrivate ? (
-                              <>
-                                <Lock className="h-3 w-3" /> <span>Private</span>
-                              </>
-                            ) : (
-                              <>
-                                <Globe className="h-3 w-3" /> <span>Public</span>
-                              </>
-                            )}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* description */}
-                    <p className="text-muted-foreground leading-relaxed line-clamp-3 min-h-[72px]">
-                      {o.description || "No description provided for this organization."}
-                    </p>
-
-                    {/* badges */}
-                    <div className="flex flex-wrap gap-2 mb-6 mt-4">
-                      {o.joined && !isLeaving && (
-                        <Badge className="px-3 py-1 bg-green-500 text-white">
-                          <UserCheck className="h-3 w-3 inline-block mr-1" /> Joined
-                        </Badge>
-                      )}
-                      {isJoining && (
-                        <Badge className="px-3 py-1 bg-blue-500 text-white">
-                          <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Joining...
-                        </Badge>
-                      )}
-                      {isLeaving && (
-                        <Badge className="px-3 py-1 bg-orange-500 text-white">
-                          <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Leaving...
-                        </Badge>
-                      )}
-                      {isFav && (
-                        <Badge className="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                          <Heart className="h-3 w-3 inline-block mr-1" /> Favorite
-                        </Badge>
-                      )}
-                      {o.role === "Admin" && !isLeaving && (
-                        <Badge className="px-3 py-1 bg-amber-500 text-white">
-                          <Crown className="h-3 w-3 inline-block mr-1" /> Admin
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* actions */}
-                    <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-black/30 relative z-10">
-                      {o.joined && !isLeaving ? (
-                        <Button
-                          size="lg"
-                          className="shadow-md"
-                          disabled={isJoining || isLeaving}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            window.location.href = `/organisations/${o.id}/notes`
-                          }}
+                  {/* header */}
+                  <div className="flex items-start gap-4 mb-6">
+                    <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-black">
+                      <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-black">
+                        {o.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-xl truncate mb-2">{o.name}</h3>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge
+                          variant="secondary"
+                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
                         >
-                          View Notes
-                        </Button>
-                      ) : (
-                        !o.isPrivate &&
-                        !o.joined && (
-                          <Button
-                            size="lg"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleJoin(o.id)
-                            }}
-                            className="shadow-md"
-                            disabled={isJoining || isLeaving}
-                          >
-                            {isJoining ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Joining...
-                              </>
-                            ) : (
-                              "Join Organisation"
-                            )}
-                          </Button>
-                        )
-                      )}
-                      {o.joined && !isLeaving && (
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleLeave(o.id)
-                          }}
-                          disabled={isJoining || isLeaving}
+                          <Users className="h-3 w-3" />{" "}
+                          <span>
+                            {memberCount} member{memberCount !== 1 ? "s" : ""}
+                          </span>
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
                         >
-                          {isLeaving ? (
+                          {o.isPrivate ? (
                             <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Leaving...
+                              <Lock className="h-3 w-3" /> <span>Private</span>
                             </>
                           ) : (
-                            "Leave"
+                            <>
+                              <Globe className="h-3 w-3" /> <span>Public</span>
+                            </>
                           )}
-                        </Button>
-                      )}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                </Link>
+
+                  {/* description */}
+                  <p className="text-muted-foreground leading-relaxed line-clamp-3 min-h-[72px]">
+                    {o.description || "No description provided for this organization."}
+                  </p>
+
+                  {/* badges */}
+                  <div className="flex flex-wrap gap-2 mb-6 mt-4">
+                    {o.joined && !isLeaving && (
+                      <Badge className="px-3 py-1 bg-green-500 text-white">
+                        <UserCheck className="h-3 w-3 inline-block mr-1" /> Joined
+                      </Badge>
+                    )}
+                    {isJoining && (
+                      <Badge className="px-3 py-1 bg-blue-500 text-white">
+                        <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Joining...
+                      </Badge>
+                    )}
+                    {isLeaving && (
+                      <Badge className="px-3 py-1 bg-orange-500 text-white">
+                        <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Leaving...
+                      </Badge>
+                    )}
+                    {isFav && (
+                      <Badge className="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                        <Heart className="h-3 w-3 inline-block mr-1" /> Favorite
+                      </Badge>
+                    )}
+                    {o.role === "Admin" && !isLeaving && (
+                      <Badge className="px-3 py-1 bg-amber-500 text-white">
+                        <Crown className="h-3 w-3 inline-block mr-1" /> Admin
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* actions */}
+                  <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-black/30 relative z-10">
+                    {o.joined && !isLeaving ? (
+                      <Button
+                        size="lg"
+                        className="shadow-md flex-1 basis-1/2"
+                        asChild
+                        disabled={isJoining || isLeaving}
+                      >
+                        <Link href={`/organisations/${o.id}`}>View Organisation</Link>
+                      </Button>
+                    ) : (
+                      !o.isPrivate &&
+                      !o.joined && (
+                        <Button
+                          size="lg"
+                          onClick={() => handleJoin(o.id)}
+                          className="shadow-md w-full"
+                          disabled={isJoining || isLeaving}
+                        >
+                          {isJoining ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Joining...
+                            </>
+                          ) : (
+                            "Join Organisation"
+                          )}
+                        </Button>
+                      )
+                    )}
+                    {o.joined && !isLeaving && (
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="flex-1 basis-1/2"
+                        onClick={() => handleLeave(o.id)}
+                        disabled={isJoining || isLeaving}
+                      >
+                        {isLeaving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Leaving...
+                          </>
+                        ) : (
+                          "Leave"
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               )
             })}
           </div>

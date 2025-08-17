@@ -1,18 +1,22 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { PageHeader } from "@/components/ui/page-header"
+import { Suspense } from "react";
+import Link from "next/link";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { BookOpen, Video, HelpCircle } from "lucide-react"
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { BookOpen, Video, HelpCircle } from "lucide-react";
 
-export default function HelpMenuPage() {
+// Prevent static prerendering since we rely on client router state somewhere down-tree
+export const dynamic = "force-dynamic";
+
+function HelpInner() {
   return (
     <div className="min-h-screen bg-background">
       <PageHeader
@@ -34,9 +38,9 @@ export default function HelpMenuPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild size="lg" className="full">
+              <Button asChild size="lg" className="w-full">
                 <Link
-                  href="/Smart Student Handbook User Manual.pdf"
+                  href="/Smart%20Student%20Handbook%20User%20Manual.pdf"
                   target="_blank"
                   rel="noopener"
                 >
@@ -53,12 +57,10 @@ export default function HelpMenuPage() {
                 <Video className="h-5 w-5 text-primary" />
                 Tutorials
               </CardTitle>
-              <CardDescription>
-                Watch step‑by‑step video guides.
-              </CardDescription>
+              <CardDescription>Watch step-by-step video guides.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild size="lg" className="full">
+              <Button asChild size="lg" className="w-full">
                 <Link href="/tutorials">View Tutorials</Link>
               </Button>
             </CardContent>
@@ -71,12 +73,10 @@ export default function HelpMenuPage() {
                 <HelpCircle className="h-5 w-5 text-primary" />
                 FAQs
               </CardTitle>
-              <CardDescription>
-                Find answers to common questions.
-              </CardDescription>
+              <CardDescription>Find answers to common questions.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild size="lg" className="full">
+              <Button asChild size="lg" className="w-full">
                 <Link href="/faqs">Browse FAQs</Link>
               </Button>
             </CardContent>
@@ -84,5 +84,13 @@ export default function HelpMenuPage() {
         </div>
       </div>
     </div>
-  )
+  );
+}
+
+export default function HelpMenuPage() {
+  return (
+    <Suspense fallback={null /* or a tiny spinner/skeleton */}>
+      <HelpInner />
+    </Suspense>
+  );
 }
