@@ -245,9 +245,9 @@ export default function FlashCardSection({
 
       <CardContent className="h-[calc(100%-4.25rem)] flex flex-col min-h-0">
         {isLoading ? (
-          <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading cards…
-          </div>
+          <p className="text-sm text-muted-foreground flex items-center">
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading  cards…
+          </p>
         ) : flashCards.length > 0 && currentCard ? (
           <div className="flex-1 flex flex-col gap-3 min-h-0">
             <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
@@ -267,7 +267,6 @@ export default function FlashCardSection({
                 {/* Front */}
                 <Card className="absolute inset-0 [backface-visibility:hidden] border bg-background overflow-hidden rounded-2xl">
                   <CardContent className="p-6 sm:p-8 h-full flex flex-col relative">
-                    {/* Header row (no absolute!) */}
                     <div className="flex items-center justify-between mb-2 sm:mb-3">
                       <div className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-md bg-white border text-black shadow-sm max-w-[70%]">
                         <span className="font-semibold text-xs sm:text-sm uppercase tracking-wide truncate">
@@ -287,9 +286,8 @@ export default function FlashCardSection({
                       </div>
                     </div>
 
-                    {/* Content area centers within the remaining space */}
                     <div className="flex-1 w-full px-2 flex items-center justify-center overflow-auto">
-                      <p className="text-center font-semibold leading-relaxed break-words hyphens-auto select-text text-[clamp(14px,2.6vw,22px)] md:text-2xl">
+                      <p className="text-center font-semibold leading-relaxed break-words hyphens-auto select-text text-[clamp(12px,2vw,18px)] md:text-lg">
                         {currentCard.front}
                       </p>
                     </div>
@@ -302,7 +300,6 @@ export default function FlashCardSection({
                   style={{ transform: "rotateY(180deg)" }}
                 >
                   <CardContent className="p-6 sm:p-8 h-full flex flex-col relative">
-                    {/* Header row (no absolute!) */}
                     <div className="flex items-center justify-between mb-2 sm:mb-3">
                       <div className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-md bg-white border text-black shadow-sm">
                         <span className="font-semibold text-xs sm:text-sm uppercase tracking-wide">Answer</span>
@@ -320,9 +317,8 @@ export default function FlashCardSection({
                       </div>
                     </div>
 
-                    {/* Content area centers within the remaining space */}
                     <div className="flex-1 w-full px-2 flex items-center justify-center overflow-auto">
-                      <p className="text-center font-medium leading-relaxed break-words hyphens-auto select-text text-[clamp(14px,2.6vw,22px)] md:text-2xl">
+                      <p className="text-center font-medium leading-relaxed break-words hyphens-auto select-text text-[clamp(12px,2vw,18px)] md:text-lg">
                         {currentCard.back}
                       </p>
                     </div>
@@ -332,13 +328,11 @@ export default function FlashCardSection({
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
-            <p>No flash cards yet.</p>
-            <Button onClick={generateFromAI} disabled={!canGenerate}>
-              {isGenerating ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating…</>) : ("Generate from Note")}
-            </Button>
-          </div>
-        )}
+
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+        
+      </div>
+    )}
       </CardContent>
     </Card>
   )

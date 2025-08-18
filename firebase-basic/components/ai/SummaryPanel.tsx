@@ -23,7 +23,6 @@ type SummaryPanelProps = {
   allowDelete?: boolean
 }
 
-/* ---------------- Firebase callables ---------------- */
 type LoadReq = { orgId: string; noteId: string }
 type LoadRes = {
   success: boolean
@@ -48,7 +47,7 @@ const callDelete = httpsCallable<DeleteReq, DeleteRes>(fns, "deleteSummary")
 /* ---------------- Local helpers ------------------- */
 const MAX_CHARS = 40_000
 const CACHE_VERSION = "v3-plain"
-const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30 // 30 days
+const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30
 
 function clampPlain(input: string): string {
   const t = input.replace(/\s+/g, " ").trim()
@@ -90,16 +89,12 @@ export default function SummaryPanel({
   const [loading, setLoading] = useState(false)
   const [loadingExisting, setLoadingExisting] = useState(false)
 
-  // Prevent stale overwrites when user clicks multiple times
   const runIdRef = useRef(0)
-  // Allow cancellation of in-flight request
   const abortRef = useRef<AbortController | null>(null)
-  // Micro-optimization: avoid recomputing the hash when text hasn't changed
   const lastTextRef = useRef<{ text: string; hash: string } | null>(null)
 
   const canSummarize = !!(sourceText && sourceText.trim()) && !disabled && !loading
 
-  // Load existing summary on mount / note change
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -140,7 +135,6 @@ export default function SummaryPanel({
     const cached = readCache(hash)
     if (cached) {
       setSummary(cached)
-      // Save cached to DB too so it appears on other devices
       try { await callSave({ orgId, noteId, ownerId, text: cached }) } catch {}
       return
     }
@@ -161,7 +155,6 @@ export default function SummaryPanel({
       writeCache(hash, result)
       setSummary(result)
 
-      // Save to DB
       try { await callSave({ orgId, noteId, ownerId, text: result }) } catch (e) {
         console.error("Failed to save summary:", e)
       }
@@ -191,11 +184,6 @@ export default function SummaryPanel({
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">{title}</CardTitle>
         <div className="flex items-center gap-2">
-          {allowDelete && summary && (
-            <Button variant="outline" onClick={handleDelete} disabled={loading || loadingExisting} title="Delete summary">
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </Button>
-          )}
           <Button onClick={handleSummarize} disabled={!canSummarize || loadingExisting}>
             {loading ? (
               <>
@@ -210,16 +198,16 @@ export default function SummaryPanel({
 
       <CardContent>
         {loadingExisting ? (
-          <p className="text-sm text-muted-foreground flex items-center">
+          <div className="text-sm text-muted-foreground flex items-center">
             <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading summary…
-          </p>
+          </div>
         ) : summary ? (
-          <div className="p-4 border rounded-lg bg-neutral-100 dark:bg-neutral-800 text-sm whitespace-pre-wrap">
+          <div className="p-4  rounded-lg bg-white text-base whitespace-pre-wrap">
             {summary}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            {disabled ? "Summary unavailable." : "No summary yet. Generate one to see it here."}
+            {disabled ? "No summary yet. Generate one to see it here." : ""}
           </p>
         )}
       </CardContent>
