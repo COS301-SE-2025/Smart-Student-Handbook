@@ -217,7 +217,6 @@ export default function NotesPage() {
                   {selectedNote?.name}
                 </h2>
               </div>
-
               <div className="flex-1 min-h-0 w-full max-w-6xl border rounded-2xl overflow-hidden bg-white dark:bg-neutral-900 shadow">
                 <Main
                   searchParams={{
