@@ -2,14 +2,14 @@
   {
     "id": "getting-started-signup",
     "question": "How do I sign up?",
-    "answer": "<p>Open the app and go to <strong>Settings → Account</strong>. Enter your email and follow the on‑screen steps.</p>",
+    "answer": "<p>Open the app and go to <strong>Settings → Account</strong>. Enter your email and follow the on-screen steps.</p>",
     "category": "Getting Started",
     "tags": ["account", "signup", "login"]
   },
   {
     "id": "library-create-notes",
     "question": "How do I create a new note?",
-    "answer": "<p>Go to <em>Library</em> and click <strong>New Note</strong>. Give it a title and start typing. Notes auto‑save.</p>",
+    "answer": "<p>Go to <em>Library</em> and click <strong>New Note</strong>. Give it a title and start typing. Notes auto-save.</p>",
     "category": "Library",
     "tags": ["notes", "editor"]
   },
@@ -26,6 +26,75 @@
     "answer": "<p>Organisations let groups collaborate. Go to <strong>Organisations → Create</strong>, name it, and invite members.</p>",
     "category": "Organisations",
     "tags": ["teams", "groups", "collaboration"]
+  },
+  {
+    "id": "profile-update",
+    "question": "How can I update my profile information?",
+    "answer": "<p>Go to <strong>Profile → Edit</strong> to update your name, photo, and other details. Changes save automatically.</p>",
+    "category": "Account",
+    "tags": ["profile", "settings"]
+  },
+  {
+    "id": "notifications-manage",
+    "question": "How do I manage my notifications?",
+    "answer": "<p>Navigate to <strong>Settings → Notifications</strong> and toggle which alerts you want to receive.</p>",
+    "category": "Settings",
+    "tags": ["notifications", "alerts"]
+  },
+  {
+    "id": "notes-export",
+    "question": "Can I export my notes?",
+    "answer": "<p>Yes. Open a note → <strong>Options</strong> → <strong>Export</strong>. Choose PDF or text format.</p>",
+    "category": "Library",
+    "tags": ["notes", "export"]
+  },
+  {
+    "id": "calendar-sync",
+    "question": "Can I sync the calendar with my phone?",
+    "answer": "<p>Yes. Go to <strong>Calendar Settings</strong> and select <em>Sync with Device</em>. Follow the prompts for Android or iOS.</p>",
+    "category": "Calendar",
+    "tags": ["calendar", "sync", "mobile"]
+  },
+  {
+    "id": "orgs-roles",
+    "question": "What roles are available in organisations?",
+    "answer": "<p>There are <strong>Owners</strong>, <strong>Admins</strong>, and <strong>Members</strong>. Each has different permissions for managing the organisation.</p>",
+    "category": "Organisations",
+    "tags": ["roles", "permissions"]
+  },
+  {
+    "id": "login-troubleshoot",
+    "question": "What if I can't log in?",
+    "answer": "<p>Check your internet connection, ensure your email is correct, and reset your password if needed.</p>",
+    "category": "Getting Started",
+    "tags": ["login", "troubleshoot"]
+  },
+  {
+    "id": "dark-mode",
+    "question": "Does the app support dark mode?",
+    "answer": "<p>Yes. Toggle dark mode under <strong>Settings → Appearance</strong>.</p>",
+    "category": "Settings",
+    "tags": ["theme", "dark mode"]
+  },
+  {
+    "id": "data-security",
+    "question": "How is my data kept secure?",
+    "answer": "<p>All data is encrypted in transit and at rest. We follow strict security practices to protect your information.</p>",
+    "category": "Privacy",
+    "tags": ["security", "privacy"]
+  },
+  {
+    "id": "support-contact",
+    "question": "How do I contact support?",
+    "answer": "<p>Go to <strong>Help → Contact Support</strong> and send us a message. We’ll respond within 24 hours.</p>",
+    "category": "Support",
+    "tags": ["help", "support"]
+  },
+  {
+    "id": "app-updates",
+    "question": "How do I get the latest updates?",
+    "answer": "<p>Updates are automatic if you downloaded the app from the store. You can also check <strong>Settings → About</strong> for the version.</p>",
+    "category": "Getting Started",
+    "tags": ["updates", "version"]
   }
 ]
-
