@@ -13,6 +13,8 @@ type Block = {
 };
 
 export function extractNoteTextFromString(jsonString: string): string {
+  if (!jsonString) return ""; // return early if empty string
+
   let blocks: Block[];
 
   try {
