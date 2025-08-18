@@ -1,0 +1,31 @@
+[
+  {
+    "id": "getting-started-signup",
+    "question": "How do I sign up?",
+    "answer": "<p>Open the app and go to <strong>Settings → Account</strong>. Enter your email and follow the on‑screen steps.</p>",
+    "category": "Getting Started",
+    "tags": ["account", "signup", "login"]
+  },
+  {
+    "id": "library-create-notes",
+    "question": "How do I create a new note?",
+    "answer": "<p>Go to <em>Library</em> and click <strong>New Note</strong>. Give it a title and start typing. Notes auto‑save.</p>",
+    "category": "Library",
+    "tags": ["notes", "editor"]
+  },
+  {
+    "id": "calendar-share",
+    "question": "Can I share calendar events?",
+    "answer": "<p>Yes. Open an event → <strong>Share</strong> → choose users or an organisation.</p>",
+    "category": "Calendar",
+    "tags": ["events", "sharing"]
+  },
+  {
+    "id": "orgs-create",
+    "question": "What are organisations and how do I create one?",
+    "answer": "<p>Organisations let groups collaborate. Go to <strong>Organisations → Create</strong>, name it, and invite members.</p>",
+    "category": "Organisations",
+    "tags": ["teams", "groups", "collaboration"]
+  }
+]
+
