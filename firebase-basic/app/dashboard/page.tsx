@@ -3,18 +3,16 @@
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Calendar, FileText, Heart, Plus, Share2, Star, Users as UsersIcon, BookOpen, Clock, TrendingUp } from "lucide-react"
+import { Calendar, FileText, Plus, Star, Users as UsersIcon, BookOpen, Clock, TrendingUp, Users, Lock, Globe } from "lucide-react"
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { CreateOrganizationModal } from "@/components/ui/create-organization-modal"
-import { Users, Lock, Globe } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { httpsCallable } from "firebase/functions"
+import { httpsCallable, httpsCallableFromURL } from "firebase/functions"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { fns } from "@/lib/firebase"
-import { getDatabase, ref, get, onValue } from "firebase/database"
+import { getDatabase, ref, get } from "firebase/database"
 import { useUserId } from "@/hooks/useUserId"
 import { PageHeader } from "@/components/ui/page-header"
-import { format, isToday, isTomorrow, isThisWeek, parseISO } from "date-fns"
+import { format, isToday, isTomorrow, isThisWeek } from "date-fns"
 
 interface Org {
   id: string
@@ -35,7 +33,6 @@ interface CreateOrgInput {
   invitedUserIds: string[]
 }
 
-// Friend interface to match your Firebase Functions
 interface Friend {
   uid: string
   name: string
@@ -43,7 +40,6 @@ interface Friend {
   profilePicture?: string
 }
 
-// Note interface for recent notes
 interface RecentNote {
   id: string
   name: string
@@ -53,17 +49,15 @@ interface RecentNote {
   path: string
 }
 
-// Event interface for upcoming events
 interface UpcomingEvent {
   id: string
   title: string
-  type: 'lecture' | 'exam' | 'assignment' | 'study' | 'other'
+  type: "lecture" | "exam" | "assignment" | "study" | "other"
   date: string
   time?: string
   description?: string
 }
 
-// Study stats interface
 interface StudyStats {
   totalHours: number
   dailyHours: number[]
@@ -72,7 +66,7 @@ interface StudyStats {
 }
 
 export default function DashboardPage() {
-  const { userId, loading: authLoading } = useUserId()
+  const { userId } = useUserId()
   const [userName, setUserName] = useState<string>("")
   const [friends, setFriends] = useState<Friend[]>([])
   const [recentNotes, setRecentNotes] = useState<RecentNote[]>([])
@@ -81,22 +75,24 @@ export default function DashboardPage() {
     totalHours: 0,
     dailyHours: [0, 0, 0, 0, 0, 0, 0],
     notesCount: 0,
-    weeklyGoal: 25
+    weeklyGoal: 25,
   })
-  
+
   const [loadingFriends, setLoadingFriends] = useState(false)
   const [loadingNotes, setLoadingNotes] = useState(false)
   const [loadingEvents, setLoadingEvents] = useState(false)
   const [loadingStats, setLoadingStats] = useState(false)
-  
+
   const [organizations, setOrganizations] = useState<(Org & { joined: boolean; role?: string })[]>([])
   const [favorites, setFavorites] = useState<Record<string, boolean>>({})
   const [loadingOrgs, setLoadingOrgs] = useState(false)
-  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Callable functions
-  const getMyOrgs = useMemo(() => httpsCallable<{}, Org[]>(fns, "getUserOrganizations"), [])
-  const createOrg = useMemo(() => httpsCallable<{ organization: CreateOrgInput }, Org>(fns, "createOrganization"), [])
+  // CHANGED: use same Cloud Run endpoint as Organisations page
+  const getMyOrgs = useMemo(
+    () => httpsCallableFromURL<{}, Org[]>(fns, "https://getuserorganizations-omrwo3ykaa-uc.a.run.app"),
+    []
+  )
   const getFriendsFunc = useMemo(() => httpsCallable<{}, Friend[]>(fns, "getFriends"), [])
   const getEventsFunc = useMemo(() => httpsCallable<{ semesterId?: string }, UpcomingEvent[]>(fns, "getEvents"), [])
   const getSemestersFunc = useMemo(() => httpsCallable<{}, any[]>(fns, "getSemesters"), [])
@@ -136,27 +132,25 @@ export default function DashboardPage() {
     try {
       const notesRef = ref(db, `users/${userId}/notes`)
       const snapshot = await get(notesRef)
-      
+
       if (snapshot.exists()) {
         const notesData = snapshot.val()
         const notesList: RecentNote[] = []
-        
+
         Object.entries(notesData).forEach(([noteId, noteData]: [string, any]) => {
-          if (noteData.type === 'note' && noteData.content) {
-            // Extract plain text from HTML content for preview
-            const textContent = noteData.content.replace(/<[^>]*>/g, '').substring(0, 100)
+          if (noteData.type === "note" && noteData.content) {
+            const textContent = noteData.content.replace(/<[^>]*>/g, "").substring(0, 100)
             notesList.push({
               id: noteId,
-              name: noteData.name || 'Untitled Note',
+              name: noteData.name || "Untitled Note",
               content: textContent,
               lastModified: noteData.lastModified || Date.now(),
               type: noteData.type,
-              path: noteData.parentId ? `${noteData.parentId}/${noteId}` : noteId
+              path: noteData.parentId ? `${noteData.parentId}/${noteId}` : noteId,
             })
           }
         })
-        
-        // Sort by last modified and take top 4
+
         notesList.sort((a, b) => b.lastModified - a.lastModified)
         setRecentNotes(notesList.slice(0, 4))
       } else {
@@ -175,30 +169,25 @@ export default function DashboardPage() {
     if (!userId) return
     setLoadingEvents(true)
     try {
-      // First get active semester
       const semestersResult = await getSemestersFunc({})
       const semesters = Array.isArray(semestersResult.data) ? semestersResult.data : []
-      const activeSemester = semesters.find(s => s.isActive)
-      
+      const activeSemester = semesters.find((s) => s.isActive)
+
       if (activeSemester) {
         const eventsResult = await getEventsFunc({ semesterId: activeSemester.id })
         const events = Array.isArray(eventsResult.data) ? eventsResult.data : []
-        
-        // Filter for upcoming events (today and future)
+
         const now = new Date()
         const upcomingEventsList = events
-          .filter((event: any) => {
-            const eventDate = new Date(event.date)
-            return eventDate >= now
-          })
+          .filter((event: any) => new Date(event.date) >= now)
           .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .slice(0, 3) // Take top 3 upcoming events
+          .slice(0, 3)
           .map((event: any) => ({
             ...event,
             date: event.date,
-            time: event.time || '08:00'
+            time: event.time || "08:00",
           }))
-        
+
         setUpcomingEvents(upcomingEventsList)
       } else {
         setUpcomingEvents([])
@@ -220,29 +209,29 @@ export default function DashboardPage() {
       const notesRef = ref(db, `users/${userId}/notes`)
       const notesSnapshot = await get(notesRef)
       let notesCount = 0
-      
+
       if (notesSnapshot.exists()) {
         const notesData = notesSnapshot.val()
-        notesCount = Object.values(notesData).filter((note: any) => note.type === 'note').length
+        notesCount = Object.values(notesData).filter((note: any) => note.type === "note").length
       }
 
-      // Get study sessions (if you have this data structure)
+      // Get study sessions
       const studySessionsRef = ref(db, `users/${userId}/studySessions`)
       const studySnapshot = await get(studySessionsRef)
-      
+
       let totalHours = 0
       const dailyHours = [0, 0, 0, 0, 0, 0, 0] // Last 7 days
-      
+
       if (studySnapshot.exists()) {
         const sessions = studySnapshot.val()
         const now = new Date()
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        
+
         Object.values(sessions).forEach((session: any) => {
           if (session.date && session.duration) {
             const sessionDate = new Date(session.date)
-            const hours = session.duration / 60 // Convert minutes to hours
-            
+            const hours = session.duration / 60
+
             if (sessionDate >= weekAgo) {
               const dayIndex = Math.floor((now.getTime() - sessionDate.getTime()) / (24 * 60 * 60 * 1000))
               if (dayIndex >= 0 && dayIndex < 7) {
@@ -253,28 +242,27 @@ export default function DashboardPage() {
           }
         })
       } else {
-        // If no study data, generate some sample data based on notes activity
-        const baseHours = Math.min(notesCount * 0.5, 15) // Estimate based on notes
+        // Defaults if no study data
+        const baseHours = Math.min(notesCount * 0.5, 15)
         totalHours = baseHours
         for (let i = 0; i < 7; i++) {
-          dailyHours[i] = Math.random() * 4 + 1 // Random hours between 1-5
+          dailyHours[i] = Math.random() * 4 + 1
         }
       }
 
       setStudyStats({
         totalHours: Math.round(totalHours * 10) / 10,
-        dailyHours: dailyHours.map(h => Math.round(h * 10) / 10),
+        dailyHours: dailyHours.map((h) => Math.round(h * 10) / 10),
         notesCount,
-        weeklyGoal: 25
+        weeklyGoal: 25,
       })
     } catch (error) {
       console.error("❌ Failed to load study stats", error)
-      // Set default stats
       setStudyStats({
         totalHours: 0,
         dailyHours: [2, 3, 1, 4, 2, 5, 3],
         notesCount: 0,
-        weeklyGoal: 25
+        weeklyGoal: 25,
       })
     } finally {
       setLoadingStats(false)
@@ -306,7 +294,7 @@ export default function DashboardPage() {
     }
   }, [userId, getMyOrgs, db])
 
-  // Load all data when userId is available
+  // Load all data
   useEffect(() => {
     if (userId) {
       fetchFriends()
@@ -317,45 +305,31 @@ export default function DashboardPage() {
     }
   }, [userId, fetchFriends, fetchRecentNotes, fetchUpcomingEvents, fetchStudyStats, fetchOrganizations])
 
-  const handleCreateOrganization = async (data: {
-    name: string
-    description: string
-    isPrivate: boolean
-    selectedFriends: string[]
-    organizationImage?: string
-  }) => {
-    try {
-      await createOrg({
-        organization: {
-          name: data.name,
-          description: data.description,
-          isPrivate: data.isPrivate,
-          image: data.organizationImage,
-          invitedUserIds: data.selectedFriends,
-        },
-      })
-      setShowCreateModal(false)
-      await fetchOrganizations()
-    } catch (e) {
-      console.error("Failed to create organization:", e)
+  // CHANGED: re-fetch orgs when tab becomes visible (reflect joins made elsewhere)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && userId) {
+        fetchOrganizations()
+      }
     }
-  }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => document.removeEventListener("visibilitychange", onVisible)
+  }, [userId, fetchOrganizations])
 
-  // Sort organizations with favorites first
+  // Sort organizations with favorites first and then by recency if available
   const sortedOrganizations = useMemo(() => {
-    return organizations.sort((a, b) => {
+    return [...organizations].sort((a, b) => {
       if (favorites[a.id] && !favorites[b.id]) return -1
       if (!favorites[a.id] && favorites[b.id]) return 1
+      if (a.createdAt && b.createdAt) return (b.createdAt || 0) - (a.createdAt || 0)
       return a.name.localeCompare(b.name)
     })
   }, [organizations, favorites])
 
-  // Helper function to get initials
   const getInitials = (name: string, surname: string) => {
-    return `${name?.charAt(0) || ''}${surname?.charAt(0) || ''}`.toUpperCase()
+    return `${name?.charAt(0) || ""}${surname?.charAt(0) || ""}`.toUpperCase()
   }
 
-  // Helper function to format event date
   const formatEventDate = (dateString: string) => {
     try {
       const date = new Date(dateString)
@@ -368,26 +342,12 @@ export default function DashboardPage() {
     }
   }
 
-  // Helper function to get tag type
-  const getTagType = (noteType: string) => {
-    switch (noteType.toLowerCase()) {
-      case 'exam':
-      case 'assignment':
-        return 'important'
-      default:
-        return ''
-    }
-  }
-
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader
-        title={`Welcome ${userName}`}
-        description="Here's an overview of your notebooks, study buddies, events, and more."
-      />
+      <PageHeader title={`Welcome ${userName}`} description="Here's an overview of your notebooks, study buddies, events, and more." />
       <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* My Recent Notes Section */}
+          {/* My Recent Notes */}
           <div className="col-span-1 bg-card p-6 rounded-lg shadow-sm border">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Recent Notes</h2>
@@ -398,13 +358,11 @@ export default function DashboardPage() {
                   </Button>
                 </Link>
                 <Link href="/hardnotes">
-                  <Button variant="ghost" size="sm">
-                    View All
-                  </Button>
+                  <Button variant="ghost" size="sm">View All</Button>
                 </Link>
               </div>
             </div>
-            
+
             {loadingNotes ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -441,13 +399,9 @@ export default function DashboardPage() {
                           <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
                             NOTE
                           </span>
-                          <span>{format(new Date(note.lastModified), 'MMM d, yyyy')}</span>
+                          <span>{format(new Date(note.lastModified), "MMM d, yyyy")}</span>
                         </div>
-                        {note.content && (
-                          <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                            {note.content}
-                          </p>
-                        )}
+                        {note.content && <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{note.content}</p>}
                       </div>
                     </div>
                   </Link>
@@ -456,9 +410,9 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Second Column - Friends and My Organisations */}
+          {/* Friends & My Organisations */}
           <div className="col-span-1 space-y-6">
-            {/* Friends Section */}
+            {/* Friends */}
             <div className="bg-card p-6 rounded-lg shadow-sm border">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Friends</h2>
@@ -468,7 +422,7 @@ export default function DashboardPage() {
                   </Button>
                 </Link>
               </div>
-              
+
               {loadingFriends ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -497,14 +451,16 @@ export default function DashboardPage() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-medium">{friend.name} {friend.surname}</p>
+                            <p className="font-medium">
+                              {friend.name} {friend.surname}
+                            </p>
                             <p className="text-sm text-muted-foreground">Friend</p>
                           </div>
                         </div>
                       </div>
                     </Link>
                   ))}
-                  
+
                   {friends.length > 3 && (
                     <div className="text-center pt-2">
                       <Link href="/friends">
@@ -518,13 +474,10 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* My Organisations Section */}
+            {/* My Organisations */}
             <div className="bg-card p-6 rounded-lg shadow-sm border">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">My Organisations</h2>
-                <Button variant="ghost" size="icon" onClick={() => setShowCreateModal(true)}>
-                  <Plus className="h-5 w-5" />
-                </Button>
               </div>
 
               {loadingOrgs ? (
@@ -542,9 +495,8 @@ export default function DashboardPage() {
                 <div className="space-y-3">
                   {sortedOrganizations.slice(0, 3).map((org) => {
                     const memberCount = Object.keys(org.members).length
-
                     return (
-                      <Link href={`/organisations/${org.id}/notes`} key={org.id}>
+                      <Link href={`/organisations/${org.id}`} key={org.id}>
                         <div className="border rounded-xl p-4 hover:shadow-md hover:border-primary/20 transition-all duration-200 bg-card">
                           <div className="flex items-center gap-3 mb-3">
                             <Avatar className="h-10 w-10 border">
@@ -570,9 +522,7 @@ export default function DashboardPage() {
                             </Badge>
                           </div>
                           {org.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                              {org.description}
-                            </p>
+                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{org.description}</p>
                           )}
                         </div>
                       </Link>
@@ -592,9 +542,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Third Column - Upcoming Events and Study Stats */}
+          {/* Upcoming Events & Study Stats */}
           <div className="col-span-1 space-y-6">
-            {/* Upcoming Events Section */}
+            {/* Upcoming Events */}
             <div className="bg-card p-6 rounded-lg shadow-sm border">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Upcoming Events</h2>
@@ -604,7 +554,7 @@ export default function DashboardPage() {
                   </Button>
                 </Link>
               </div>
-              
+
               {loadingEvents ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -629,9 +579,7 @@ export default function DashboardPage() {
                           <Calendar className="h-5 w-5" />
                         </div>
                         <div>
-                          <p className="font-medium">
-                            {event.title}
-                          </p>
+                          <p className="font-medium">{event.title}</p>
                           <p className="text-sm text-muted-foreground">
                             {formatEventDate(event.date)} {event.time && `at ${event.time}`}
                           </p>
@@ -646,13 +594,13 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Study Statistics Section */}
+            {/* Study Statistics */}
             <div className="bg-card p-6 rounded-lg shadow-sm border">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Study Statistics</h2>
                 <TrendingUp className="h-5 w-5 text-muted-foreground" />
               </div>
-              
+
               {loadingStats ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -670,7 +618,7 @@ export default function DashboardPage() {
                             style={{ height: `${Math.max(hours * 10, 4)}px` }}
                           ></div>
                           <span className="text-xs text-muted-foreground">
-                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'][index]}
+                            {["S", "M", "T", "W", "T", "F", "S"][index]}
                           </span>
                         </div>
                       ))}
@@ -704,10 +652,13 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${Math.min((studyStats.dailyHours.reduce((a, b) => a + b, 0) / studyStats.weeklyGoal) * 100, 100)}%` 
+                        style={{
+                          width: `${Math.min(
+                            (studyStats.dailyHours.reduce((a, b) => a + b, 0) / studyStats.weeklyGoal) * 100,
+                            100
+                          )}%`,
                         }}
                       ></div>
                     </div>
@@ -716,13 +667,8 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+          {/* End Third Column */}
         </div>
-
-        <CreateOrganizationModal
-          open={showCreateModal}
-          onOpenChange={setShowCreateModal}
-          onCreateOrganization={handleCreateOrganization}
-        />
       </div>
     </div>
   )
