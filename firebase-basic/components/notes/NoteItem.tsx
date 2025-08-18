@@ -15,6 +15,7 @@ interface Props {
   onDelete: (id: string) => void;
   activeDragId?: string;
   noteID: string;
+  isSelected?: boolean; // <-- added
 }
 
 export async function searchUsersByName(input: string): Promise<User[]> {
@@ -35,7 +36,7 @@ export async function searchUsersByName(input: string): Promise<User[]> {
   return matches;
 }
 
-export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) {
+export default function NoteItem({ node, onSelect, onRename, onDelete, isSelected }: Props) {
   const [isRenaming, setIsRenaming] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -73,12 +74,16 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
   };
 
   const hoverBgClass = theme === 'dark' ? 'group-hover:bg-gray-1000' : 'group-hover:bg-gray-100';
+  const selectedBgClass = isSelected
+    ? theme === 'dark' ? 'bg-blue-800 text-white' : 'bg-blue-100 text-black'
+    : '';
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 px-3 py-1 rounded cursor-pointer group ${hoverBgClass}`}
+      className={`flex items-center gap-2 px-3 py-1 rounded cursor-pointer group ${hoverBgClass} ${selectedBgClass}`}
+      onClick={() => onSelect(node.id)}
     >
       <div
         {...listeners}
@@ -101,15 +106,13 @@ export default function NoteItem({ node, onSelect, onRename, onDelete }: Props) 
           onBlur={handleRename}
           onKeyDown={(e) => e.key === "Enter" && handleRename()}
           autoFocus
-          className={`border-b border-gray-300 outline-none text-sm bg-transparent ${theme === 'dark' ? 'text-white' : 'text-black'
-            }`}
+          className={`border-b border-gray-300 outline-none text-sm bg-transparent ${theme === 'dark' ? 'text-white' : 'text-black'}`}
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         />
       ) : (
         <span
           className={`text-sm select-none ${theme === 'dark' ? 'text-white' : 'text-black'}`}
-          onClick={() => onSelect(node.id)}
           onDoubleClick={() => setIsRenaming(true)}
         >
           {node.name}
