@@ -212,8 +212,8 @@ export default function NotesPage() {
         <div className="flex-[3] flex flex-col gap-6 items-center">
           {selectedNoteId ? (
             <div className="flex flex-col w-full items-center">
-              <div className="w-full max-w-6xl p-4 mb-6 border rounded-2xl bg-white dark:bg-neutral-800 shadow">
-                <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100">
+              <div className="w-full max-w-6xl p-4 mb-6 border rounded-2xl bg-white dark:bg-blue-950 shadow">
+                <h2 className="text-2xl font-bold text-left text-gray-900 dark:text-gray-100">
                   {selectedNote?.name}
                 </h2>
               </div>

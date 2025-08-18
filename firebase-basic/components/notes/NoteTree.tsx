@@ -85,7 +85,6 @@ export default function NodeTree({ treeData, onSelect, onRename, onDelete, onDro
               onDropNode={onDropNode}
               isExpanded={isExpanded}
               onToggleExpand={() => toggleExpand(node.id)}
-              isSelected={isSelected} // <-- highlight
             />
             {isExpanded && node.children?.map(child => renderNode(child))}
           </>
