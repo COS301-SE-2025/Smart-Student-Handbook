@@ -21,6 +21,9 @@ import {
   deleteNodeInDB,
   renameNodeInDB,
 } from "@/lib/DBTree";
+import { Button } from "@/components/ui/button";
+import { summarizeNote } from "@/lib/gemini";
+import {extractNoteTextFromString } from "@/lib/note/BlockFormat"
 
 export default function NotesPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -29,6 +32,20 @@ export default function NotesPage() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [currentOwnerId, setOwnerID] = useState<string | null>(null);
+
+  const [summary, setSummary] = useState<string | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
+  const handleSummarize = async () => {
+    if (!selectedNote?.content) return;
+
+    setLoadingSummary(true);
+    const result = await extractNoteTextFromString(selectedNote.content);
+    const sum = await summarizeNote(result) ; 
+    setSummary(sum);
+    setLoadingSummary(false);
+  };
+
 
   useEffect(() => {
     const auth = getAuth();
@@ -145,7 +162,7 @@ export default function NotesPage() {
     }
     return null;
   }
-  
+
   return (
     <div className="flex h-screen">
       <div className="w-1/4 border-r p-2 space-y-2">
@@ -192,6 +209,20 @@ export default function NotesPage() {
           />
         ) : (
           <div>Select a note or folder</div>
+        )}
+      </div>
+
+      <div className="w-80 border rounded-xl p-4 bg-white dark:bg-neutral-900 shadow flex flex-col">
+        <h3 className="text-lg font-medium mb-2">Summary</h3>
+        <Button onClick={handleSummarize} disabled={loadingSummary}>
+          {loadingSummary ? "Summarizing..." : "Generate Summary"}
+        </Button>
+
+        {summary && (
+          <div className="mt-4 p-4 border rounded-lg bg-neutral-100 dark:bg-neutral-800 text-sm whitespace-pre-wrap">
+            <strong>Summary:</strong>
+            <div className="mt-2">{summary}</div>
+          </div>
         )}
       </div>
 
