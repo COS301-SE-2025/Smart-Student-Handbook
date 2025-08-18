@@ -22,8 +22,12 @@ import {
   renameNodeInDB,
 } from "@/lib/DBTree";
 import { Button } from "@/components/ui/button";
-import { summarizeNote } from "@/lib/gemini";
-import {extractNoteTextFromString } from "@/lib/note/BlockFormat"
+import { extractNoteTextFromString } from "@/lib/note/BlockFormat"
+
+import SummaryPanel from "@/components/ai/SummaryPanel"
+import FlashCardSection from "@/components/flashcards/FlashCardSection"
+import SimpleSummaryPanel from "@/components/ai/SimpleSummary";
+import SimpleFlashCardSection from "@/components/ai/SimpleFlashcardPanel";
 
 export default function NotesPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -35,17 +39,6 @@ export default function NotesPage() {
 
   const [summary, setSummary] = useState<string | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
-
-  const handleSummarize = async () => {
-    if (!selectedNote?.content) return;
-
-    setLoadingSummary(true);
-    const result = await extractNoteTextFromString(selectedNote.content);
-    const sum = await summarizeNote(result) ; 
-    setSummary(sum);
-    setLoadingSummary(false);
-  };
-
 
   useEffect(() => {
     const auth = getAuth();
@@ -198,34 +191,54 @@ export default function NotesPage() {
         </div>
       </div>
 
-      <div className="flex-1 p-4">
-        {selectedNoteId ? (
-          <Main
-            searchParams={{
-              doc: selectedNoteId,
-              ownerId: currentOwnerId ?? undefined,
-              username: user.displayName ?? undefined,
-            }}
-          />
-        ) : (
-          <div>Select a note or folder</div>
-        )}
-      </div>
+      <div className="flex flex-1 gap-6 p-6">
+        {/* Left panel: Editor */}
+        <div className="flex-[3] flex flex-col gap-6 items-center">
+          {selectedNoteId ? (
+            <div className="flex flex-col w-full items-center">
+              {/* Note Heading */}
+              <div className="w-full max-w-6xl p-4 mb-6 border rounded-2xl bg-white dark:bg-neutral-800 shadow">
+                <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100">
+                  {selectedNote?.name}
+                </h2>
+              </div>
 
-      <div className="w-80 border rounded-xl p-4 bg-white dark:bg-neutral-900 shadow flex flex-col">
-        <h3 className="text-lg font-medium mb-2">Summary</h3>
-        <Button onClick={handleSummarize} disabled={loadingSummary}>
-          {loadingSummary ? "Summarizing..." : "Generate Summary"}
-        </Button>
+              {/* Editor */}
+              <div className="flex-1 min-h-0 w-full max-w-6xl border rounded-2xl overflow-hidden bg-white dark:bg-neutral-900 shadow">
+                <Main
+                  searchParams={{
+                    doc: selectedNoteId,
+                    ownerId: currentOwnerId ?? undefined,
+                    username: user.displayName ?? undefined,
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
+              Select a note or folder
+            </div>
+          )}
+        </div>
 
-        {summary && (
-          <div className="mt-4 p-4 border rounded-lg bg-neutral-100 dark:bg-neutral-800 text-sm whitespace-pre-wrap">
-            <strong>Summary:</strong>
-            <div className="mt-2">{summary}</div>
+        <div className="flex-[2] flex flex-col gap-6 items-center">
+          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
+            <SimpleSummaryPanel
+              sourceText={extractNoteTextFromString(selectedNote?.content)}
+              title="Summary"
+              className="h-full"
+            />
           </div>
-        )}
-      </div>
 
+          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
+            <SimpleFlashCardSection
+              sourceText={extractNoteTextFromString(selectedNote?.content)}
+              className="h-full"
+            />
+          </div>
+        </div>
+      </div>
     </div>
+
   );
 }
