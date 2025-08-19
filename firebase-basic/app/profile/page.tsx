@@ -10,7 +10,7 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { db } from "@/lib/firebase"
-import { onValue, ref, set } from "firebase/database"
+import { onValue, ref } from "firebase/database"
 import { saveUserSettings } from "@/utils/SaveUserSettings"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -28,8 +28,15 @@ import { Textarea } from "@/components/ui/textarea"
 import { PageHeader } from "@/components/ui/page-header"
 import { TrendingUp, Clock, BookOpen, Calendar } from "lucide-react"
 import { toast } from "sonner"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
-/* 🔑 NEW – live seconds from SessionTimerProvider */
+/* 📱 NEW – live seconds from SessionTimerProvider */
 import { useSessionSeconds } from "@/components/providers/SessionTimerProvider"
 
 /* -------------------------------------------------------------------------- */
@@ -70,17 +77,28 @@ const DEFAULT_FORM: FormState = {
   description: "",
 }
 
-// Monday-as-start-of-week helpers (for live thisWeekHours calc)
-function startOfWeek(d: Date) {
-  const copy = new Date(d)
-  const dow = (copy.getDay() + 6) % 7 // Mon=0 … Sun=6
-  copy.setHours(0, 0, 0, 0)
-  copy.setDate(copy.getDate() - dow)
-  return copy
-}
-function isSameWeek(a: Date, b: Date) {
-  return startOfWeek(a).getTime() === startOfWeek(b).getTime()
-}
+const COMMON_DEGREES = [
+  "Computer Science",
+  "Electrical Engineering", 
+  "Mechanical Engineering",
+  "Civil Engineering",
+  "Chemical Engineering",
+  "Biology",
+  "Chemistry",
+  "Physics",
+  "Mathematics",
+  "Business Administration",
+  "Economics",
+  "Psychology",
+  "Political Science",
+  "History",
+  "English Literature",
+  "Art History",
+  "Music",
+  "Philosophy",
+  "Medicine",
+  "Law"
+]
 
 /* -------------------------------------------------------------------------- */
 /*  Component                                                                 */
@@ -184,6 +202,10 @@ export default function ProfilePage() {
   /* ----- account form updates ------------------------------------------ */
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { id, value } = e.target
+    setFormData((prev) => ({ ...prev, [id]: value }))
+  }
+
+  function handleSelectChange(id: string, value: string) {
     setFormData((prev) => ({ ...prev, [id]: value }))
   }
 
@@ -310,7 +332,18 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="degree">Degree Program</Label>
-                    <Input id="degree" value={formData.degree} onChange={handleChange} />
+                    <Select value={formData.degree} onValueChange={(value) => handleSelectChange("degree", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your degree" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMMON_DEGREES.map((degree) => (
+                          <SelectItem key={degree} value={degree}>
+                            {degree}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="occupation">Occupation</Label>
@@ -341,7 +374,7 @@ export default function ProfilePage() {
               </CardContent>
 
               <CardFooter className="flex gap-2">
-                <Button onClick={handleSave} className="ml-auto" disabled={!uid}>
+                <Button onClick={handleSave} className="ml-auto" disabled={!isDirty || !uid}>
                   Save Changes
                 </Button>
               </CardFooter>

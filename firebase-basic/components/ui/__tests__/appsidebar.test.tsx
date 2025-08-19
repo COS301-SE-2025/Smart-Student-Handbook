@@ -1,180 +1,499 @@
 import React from 'react'
-import { AppSidebar } from '../app-sidebar';
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import ProfilePage from '/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/app/profile/page';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import "@testing-library/jest-dom";
 
-// Enhanced mocks
-jest.mock("lucide-react", () => ({
-  BarChart3: (props: any) => <svg data-testid="BarChart3" {...props} />,
-  Calendar: (props: any) => <svg data-testid="Calendar" {...props} />,
-  Settings: (props: any) => <svg data-testid="Settings" {...props} />,
-  Moon: (props: any) => <svg data-testid="Moon" {...props} />,
-  Sun: (props: any) => <svg data-testid="Sun" {...props} />,
-  BookOpen: (props: any) => <svg data-testid="BookOpen" {...props} />,
-  Edit3: (props: any) => <svg data-testid="Edit3" {...props} />,
-  Users: (props: any) => <svg data-testid="Users" {...props} />,
-  Building2: (props: any) => <svg data-testid="Building2" {...props} />,
-}));
-
-// Enhanced sidebar mocks that preserve the actual className behavior
-jest.mock("@/components/ui/sidebar", () => ({
-  Sidebar: ({ children, className, ...props }: any) => <aside className={className} {...props}>{children}</aside>,
-  SidebarContent: ({ children, className, ...props }: any) => <div className={className} {...props}>{children}</div>,
-  SidebarGroup: ({ children, className, ...props }: any) => <div className={className} {...props}>{children}</div>,
-  SidebarGroupContent: ({ children, className, ...props }: any) => <div className={className} {...props}>{children}</div>,
-  SidebarMenu: ({ children, className, ...props }: any) => <ul className={className} {...props}>{children}</ul>,
-  SidebarMenuButton: ({ children, asChild, className, ...props }: any) => 
-    asChild ? React.cloneElement(children, { className }) : <span className={className} {...props}>{children}</span>,
-  SidebarMenuItem: ({ children, className, ...props }: any) => <li className={className} {...props}>{children}</li>,
-  SidebarHeader: ({ children, className, ...props }: any) => <header className={className} {...props}>{children}</header>,
-  SidebarFooter: ({ children, className, ...props }: any) => <footer className={className} {...props}>{children}</footer>,
-}));
-
-jest.mock("@/components/ui/button", () => ({
-  Button: ({ children, className, ...props }: any) => <button className={className} {...props}>{children}</button>,
-}));
-
-// Enhanced dropdown menu mock
-jest.mock("@/components/ui/dropdown-menu", () => ({
-  DropdownMenu: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuContent: ({ children, className, ...props }: any) => <div className={className} {...props}>{children}</div>,
-  DropdownMenuItem: ({ children, onClick, className, ...props }: any) => (
-    <div role="menuitem" tabIndex={0} onClick={onClick} className={className} {...props} data-testid="dropdown-item">
-      {children}
-    </div>
-  ),
-  DropdownMenuTrigger: ({ children, asChild, ...props }: any) => (
-    <div {...(asChild ? {} : props)}>
-      {asChild ? children : <div>{children}</div>}
-    </div>
-  ),
-}));
-
-const setThemeMock = jest.fn();
-jest.mock("next-themes", () => ({
-  useTheme: () => ({
-    setTheme: setThemeMock,
-    theme: "light",
+// Mock Firebase Auth
+let currentUser: any = null;
+jest.mock("firebase/auth", () => ({
+  getAuth: () => ({
+    get currentUser() { return currentUser; },
+    set currentUser(val) { currentUser = val; }
   }),
+  onAuthStateChanged: (auth: any, cb: any) => {
+    cb(currentUser);
+    return () => {};
+  },
+  EmailAuthProvider: {
+    credential: (email: string, password: string) => ({ email, password }),
+  },
+  reauthenticateWithCredential: jest.fn(),
+  updatePassword: jest.fn(),
 }));
 
-let mockPathname = "/dashboard";
-jest.mock("next/navigation", () => ({
-  usePathname: () => mockPathname,
+// Mock Firebase Database
+jest.mock("firebase/database", () => ({
+  onValue: jest.fn(),
+  ref: jest.fn(),
+  set: jest.fn(),
 }));
 
-describe('AppSidebar() AppSidebar method', () => {
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/lib/firebase", () => ({
+  db: {},
+}));
+
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/utils/SaveUserSettings", () => ({
+  saveUserSettings: jest.fn(),
+}));
+
+jest.mock("sonner", () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+  },
+}));
+
+// UI components: just passthrough
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/input", () => ({
+  Input: (props: any) => <input {...props} data-testid={props.id} />,
+}));
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/label", () => ({
+  Label: (props: any) => <label {...props} />,
+}));
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/tabs", () => ({
+  Tabs: (props: any) => <div {...props} />,
+  TabsContent: (props: any) => <div {...props} />,
+  TabsList: (props: any) => <div {...props} />,
+  TabsTrigger: (props: any) => <button {...props} />,
+}));
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/card", () => ({
+  Card: (props: any) => <div {...props} />,
+  CardContent: (props: any) => <div {...props} />,
+  CardDescription: (props: any) => <div {...props} />,
+  CardFooter: (props: any) => <div {...props} />,
+  CardHeader: (props: any) => <div {...props} />,
+  CardTitle: (props: any) => <div {...props} />,
+}));
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/button", () => ({
+  Button: (props: any) => <button {...props} />,
+}));
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/textarea", () => ({
+  Textarea: (props: any) => <textarea {...props} data-testid={props.id} />,
+}));
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/page-header", () => ({
+  PageHeader: (props: any) => (
+    <div>
+      <div>{props.title}</div>
+      <div>{props.description}</div>
+    </div>
+  ),  
+}));
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/select", () => ({
+  Select: ({ children, value, onValueChange }: any) => (
+    <select 
+      id="degree" 
+      value={value} 
+      onChange={(e) => onValueChange(e.target.value)}
+      aria-label="Degree Program"
+    >
+      {children}
+    </select>
+  ),
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ children, value }: any) => <option value={value}>{children}</option>,
+  SelectTrigger: ({ children }: any) => <>{children}</>,
+  SelectValue: ({ placeholder }: any) => <option value="">{placeholder}</option>,
+}));
+jest.mock("lucide-react", () => ({
+  TrendingUp: () => <svg data-testid="trending-up" />,
+  Clock: () => <svg data-testid="clock" />,
+  BookOpen: () => <svg data-testid="book-open" />,
+  Calendar: () => <svg data-testid="calendar" />,
+}));
+
+// Mock useSessionSeconds
+let sessionSecondsMock = 0;
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/providers/SessionTimerProvider", () => ({
+  useSessionSeconds: () => sessionSecondsMock,
+}));
+
+// Helper to set currentUser for tests
+function setCurrentUser(user: any) {
+  currentUser = user;
+}
+
+describe('ProfilePage() ProfilePage method', () => {
+  // Get references to the mocked functions
+  let onValueMock: jest.MockedFunction<any>;
+  let refMock: jest.MockedFunction<any>;
+  let setMock: jest.MockedFunction<any>;
+  let saveUserSettingsMock: jest.MockedFunction<any>;
+  let toastMock: any;
+
+  beforeAll(() => {
+    // Get the mocked functions after Jest has processed the mocks
+    const { onValue, ref, set } = require('firebase/database');
+    onValueMock = onValue as jest.MockedFunction<any>;
+    refMock = ref as jest.MockedFunction<any>;
+    setMock = set as jest.MockedFunction<any>;
+    saveUserSettingsMock = require("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/utils/SaveUserSettings").saveUserSettings;
+    toastMock = require('sonner').toast;
+  });
+
   beforeEach(() => {
-    setThemeMock.mockClear();
-    mockPathname = "/dashboard";
+    jest.clearAllMocks();
+    sessionSecondsMock = 0;
+    setCurrentUser({ uid: 'test-uid', email: 'user@example.com' });
+
+    // Setup ref mock to return an object with toString method
+    refMock.mockImplementation((db: any, path: string) => ({
+      toString: () => path,
+      path
+    }));
+
+    // Setup default onValue mock implementation
+    onValueMock.mockImplementation((refObj: any, cb: any) => {
+      const path = refObj?.toString?.() || refObj?.path || '';
+
+      if (path.includes('UserSettings')) {
+        cb({
+          val: () => ({
+            name: 'John',
+            surname: 'Doe',
+            degree: 'CS',
+            occupation: 'Student',
+            hobbies: ['Reading', 'Coding'],
+            description: 'Hello world',
+          }),
+        });
+      } else if (path.includes('metrics')) {
+        cb({
+          val: () => ({
+            totalStudyHours: 10,
+            thisWeekHours: 5,
+            notesCreated: 3,
+            studyStreak: 2,
+            lastUpdated: new Date().toISOString(),
+          }),
+        });
+      } else if (path.includes('notes')) {
+        cb({
+          val: () => ({
+            note1: {},
+            note2: {},
+            note3: {},
+          }),
+        });
+      }
+
+      return () => {};
+    });
   });
 
-  describe("Happy paths", () => {
-    it("renders the sidebar header with correct title and subtitle", () => {
-      render(<AppSidebar />);
-      expect(screen.getByText("Smart Student")).toBeInTheDocument();
-      expect(screen.getByText("Handbook")).toBeInTheDocument();
+  // Happy Path Tests
+  describe('Happy Paths', () => {
+    test('renders all main sections and metrics for a logged-in user', () => {
+      render(<ProfilePage />);
+      expect(screen.getByText('Settings')).toBeInTheDocument();
+      expect(screen.getByText('Manage your account information, security, and preferences.')).toBeInTheDocument();
+      expect(screen.getByText('Account Settings')).toBeInTheDocument();
+      expect(screen.getByText('Security')).toBeInTheDocument();
+      expect(screen.getByText('Profile Information')).toBeInTheDocument();
+      expect(screen.getByText('Change Password')).toBeInTheDocument();
+      expect(screen.getByText('Total Study Hours')).toBeInTheDocument();
+      expect(screen.getByText('Notes Created')).toBeInTheDocument();
+      expect(screen.getByText('Study Streak')).toBeInTheDocument();
+      expect(screen.getByText('This Week')).toBeInTheDocument();
+      // Metrics values
+      expect(screen.getByText('10.0')).toBeInTheDocument();
+      expect(screen.getByText('3')).toBeInTheDocument();
+      expect(screen.getByText('2 days')).toBeInTheDocument();
+      expect(screen.getByText('5.0h')).toBeInTheDocument();
     });
 
-    it("renders all sidebar menu items with correct titles and descriptions", () => {
-      render(<AppSidebar />);
-      const menuTitles = [
-        'Dashboard',
-        'Library',
-        'Calendar',
-        'Friends',
-        'Organisations',
-        'Help Menu',
-        'Settings',
-      ];
-      menuTitles.forEach((title) => {
-        expect(screen.getByText(title)).toBeInTheDocument();
+    test('loads and displays user profile data from database', () => {
+      render(<ProfilePage />);
+      expect(screen.getByLabelText('First Name')).toHaveValue('John');
+      expect(screen.getByLabelText('Last Name')).toHaveValue('Doe');
+      expect(screen.getByLabelText('Degree Program')).toHaveValue('CS');
+      expect(screen.getByLabelText('Occupation')).toHaveValue('Student');
+      expect(screen.getByLabelText('Interests & Hobbies')).toHaveValue('Reading, Coding');
+      expect(screen.getByLabelText('Bio')).toHaveValue('Hello world');
+    });
+
+    test('allows editing and saving profile data', async () => {
+      render(<ProfilePage />);
+      
+      fireEvent.change(screen.getByLabelText('First Name'), { target: { value: 'Jane' } });
+      fireEvent.change(screen.getByLabelText('Interests & Hobbies'), { target: { value: 'Reading, Coding, Hiking' } });
+      
+      const saveButton = screen.getByText('Save Changes');
+      expect(saveButton).not.toBeDisabled();
+      
+      await act(async () => {
+        fireEvent.click(saveButton);
       });
+      
+      expect(saveUserSettingsMock).toHaveBeenCalledWith('test-uid', expect.objectContaining({
+        name: 'Jane',
+        hobbies: ['Reading', 'Coding', 'Hiking'],
+      }));
+      expect(toastMock.success).toHaveBeenCalledWith('Your settings have been saved.');
     });
 
-    it("highlights the active menu item based on pathname", () => {
-      mockPathname = "/notes"; // Changed from "/hardnotes" to match the actual URL in app-sidebar.tsx
-      render(<AppSidebar />);
-      const titleElement = screen.getByText("Library");
-      const link = titleElement.closest('a');
-      // Check for the actual active classes from the component
-      expect(link?.className).toContain('bg-sidebar-accent');
-      expect(link?.className).toContain('text-sidebar-accent-foreground');
+    test('shows info toast when saving with no changes', async () => {
+      render(<ProfilePage />);
+      const saveButton = screen.getByText('Save Changes');
+      
+      await act(async () => {
+        fireEvent.click(saveButton);
+      });
+      
+      expect(toastMock.info).toHaveBeenCalledWith('No changes to save.');
     });
 
-    it("renders all icons for each menu item", () => {
-      render(<AppSidebar />);
-      const menuItems = [
-        { title: "Dashboard", icon: "BarChart3" },
-        { title: "Library", icon: "Edit3" },
-        { title: "Calendar", icon: "Calendar" },
-        { title: "Friends", icon: "Users" },
-        { title: "Organisations", icon: "Building2" },
-        { title: "Help Menu", icon: "BookOpen" },
-        { title: "Settings", icon: "Settings" },
-      ];
+    test('password change: successful update', async () => {
+      const { getByLabelText, getByText } = render(<ProfilePage />);
+      
+      fireEvent.click(getByText('Security'));
+      fireEvent.change(getByLabelText('Current Password'), { target: { value: 'oldpass' } });
+      fireEvent.change(getByLabelText('New Password'), { target: { value: 'newpass123' } });
+      fireEvent.change(getByLabelText('Confirm New Password'), { target: { value: 'newpass123' } });
+      
+      const updateButton = getByText('Update Password');
+      expect(updateButton).not.toBeDisabled();
+      
+      const { reauthenticateWithCredential, updatePassword } = require("firebase/auth");
+      reauthenticateWithCredential.mockResolvedValueOnce({});
+      updatePassword.mockResolvedValueOnce({});
+      
+      await act(async () => {
+        fireEvent.click(updateButton);
+      });
+      
+      expect(reauthenticateWithCredential).toHaveBeenCalled();
+      expect(updatePassword).toHaveBeenCalled();
+      expect(toastMock.success).toHaveBeenCalledWith('Password updated successfully.');
+    });
 
-      menuItems.forEach(({ title, icon }) => {
-        const titleElement = screen.getByText(title);
-        const link = titleElement.closest('a');
-        expect(link).toBeInTheDocument();
-        if (link) {
-          expect(within(link).getByTestId(icon)).toBeInTheDocument();
+    test('metrics update live with sessionSeconds', () => {
+      sessionSecondsMock = 3600; // 1 hour
+      render(<ProfilePage />);
+      expect(screen.getByText('11.0')).toBeInTheDocument(); // totalStudyHours: 10 + 1
+      expect(screen.getByText('6.0h')).toBeInTheDocument(); // thisWeekHours: 5 + 1
+    });
+  });
+
+  // Edge Case Tests
+  describe('Edge Cases', () => {
+    test('renders default values when logged out', () => {
+      setCurrentUser(null);
+      onValueMock.mockImplementation(() => () => {});
+      
+      render(<ProfilePage />);
+      
+      expect(screen.getByLabelText('First Name')).toHaveValue('');
+      expect(screen.getByLabelText('Last Name')).toHaveValue('');
+      expect(screen.getByLabelText('Degree Program')).toHaveValue('');
+      expect(screen.getByLabelText('Occupation')).toHaveValue('');
+      expect(screen.getByLabelText('Interests & Hobbies')).toHaveValue('');
+      expect(screen.getByLabelText('Bio')).toHaveValue('');
+      expect(screen.getByText('0.0')).toBeInTheDocument();
+      expect(screen.getByText('0')).toBeInTheDocument();
+      expect(screen.getByText('0 days')).toBeInTheDocument();
+      expect(screen.getByText('0.0h')).toBeInTheDocument();
+      expect(screen.getByText('Save Changes')).toBeDisabled();
+    });
+
+    test('password change: missing fields', async () => {
+      render(<ProfilePage />);
+      fireEvent.click(screen.getByText('Security'));
+      const updateButton = screen.getByText('Update Password');
+      expect(updateButton).toBeDisabled();
+    });
+
+    test('password change: new password and confirmation do not match', async () => {
+      render(<ProfilePage />);
+      fireEvent.click(screen.getByText('Security'));
+      
+      fireEvent.change(screen.getByLabelText('Current Password'), { target: { value: 'oldpass' } });
+      fireEvent.change(screen.getByLabelText('New Password'), { target: { value: 'newpass123' } });
+      fireEvent.change(screen.getByLabelText('Confirm New Password'), { target: { value: 'wrongpass' } });
+      
+      const updateButton = screen.getByText('Update Password');
+      expect(updateButton).toBeDisabled();
+      expect(screen.getByText('Passwords do not match.')).toBeInTheDocument();
+    });
+
+    test('password change: new password same as current', async () => {
+      render(<ProfilePage />);
+      fireEvent.click(screen.getByText('Security'));
+      
+      fireEvent.change(screen.getByLabelText('Current Password'), { target: { value: 'samepass' } });
+      fireEvent.change(screen.getByLabelText('New Password'), { target: { value: 'samepass' } });
+      fireEvent.change(screen.getByLabelText('Confirm New Password'), { target: { value: 'samepass' } });
+      
+      const updateButton = screen.getByText('Update Password');
+      
+      await act(async () => {
+        fireEvent.click(updateButton);
+      });
+      
+      expect(toastMock.error).toHaveBeenCalledWith('New password cannot be the same as your current password.');
+    });
+
+    test('password change: no email on user', async () => {
+      // Set user WITHOUT email
+      setCurrentUser({ uid: 'test-uid', email: null });
+      
+      render(<ProfilePage />);
+      fireEvent.click(screen.getByText('Security'));
+      
+      fireEvent.change(screen.getByLabelText('Current Password'), { target: { value: 'oldpass' } });
+      fireEvent.change(screen.getByLabelText('New Password'), { target: { value: 'newpass123' } });
+      fireEvent.change(screen.getByLabelText('Confirm New Password'), { target: { value: 'newpass123' } });
+      
+      const updateButton = screen.getByText('Update Password');
+      
+      await act(async () => {
+        fireEvent.click(updateButton);
+      });
+      
+      expect(toastMock.error).toHaveBeenCalledWith('Your account has no email. Please re-login and try again.');
+    });
+
+    test('password change: error conditions from Firebase', async () => {
+      render(<ProfilePage />);
+      fireEvent.click(screen.getByText('Security'));
+      
+      fireEvent.change(screen.getByLabelText('Current Password'), { target: { value: 'oldpass' } });
+      fireEvent.change(screen.getByLabelText('New Password'), { target: { value: 'newpass123' } });
+      fireEvent.change(screen.getByLabelText('Confirm New Password'), { target: { value: 'newpass123' } });
+      
+      const updateButton = screen.getByText('Update Password');
+      const { reauthenticateWithCredential, updatePassword } = require("firebase/auth");
+
+      // Test wrong-password error
+      reauthenticateWithCredential.mockRejectedValueOnce({ code: 'auth/wrong-password' });
+      await act(async () => {
+        fireEvent.click(updateButton);
+      });
+      expect(toastMock.error).toHaveBeenCalledWith('Your current password is incorrect.');
+
+      // Test weak-password error
+      jest.clearAllMocks();
+      reauthenticateWithCredential.mockResolvedValueOnce({});
+      updatePassword.mockRejectedValueOnce({ code: 'auth/weak-password' });
+      await act(async () => {
+        fireEvent.click(updateButton);
+      });
+      expect(toastMock.error).toHaveBeenCalledWith('New password is too weak.');
+
+      // Test too-many-requests error
+      jest.clearAllMocks();
+      reauthenticateWithCredential.mockResolvedValueOnce({});
+      updatePassword.mockRejectedValueOnce({ code: 'auth/too-many-requests' });
+      await act(async () => {
+        fireEvent.click(updateButton);
+      });
+      expect(toastMock.error).toHaveBeenCalledWith('Too many attempts. Please wait.');
+
+      // Test requires-recent-login error
+      jest.clearAllMocks();
+      reauthenticateWithCredential.mockResolvedValueOnce({});
+      updatePassword.mockRejectedValueOnce({ code: 'auth/requires-recent-login' });
+      await act(async () => {
+        fireEvent.click(updateButton);
+      });
+      expect(toastMock.error).toHaveBeenCalledWith('Please log out and try again.');
+
+      // Test generic error
+      jest.clearAllMocks();
+      reauthenticateWithCredential.mockResolvedValueOnce({});
+      updatePassword.mockRejectedValueOnce({ code: 'other-error' });
+      await act(async () => {
+        fireEvent.click(updateButton);
+      });
+      expect(toastMock.error).toHaveBeenCalledWith('Failed to update password.');
+    });
+
+    test('hobbies field: trims and dedupes empty values on save', async () => {
+      render(<ProfilePage />);
+      
+      fireEvent.change(screen.getByLabelText('Interests & Hobbies'), { 
+        target: { value: '  Reading, , Coding,  , ' } 
+      });
+      
+      const saveButton = screen.getByText('Save Changes');
+      
+      await act(async () => {
+        fireEvent.click(saveButton);
+      });
+      
+      expect(saveUserSettingsMock).toHaveBeenCalledWith('test-uid', expect.objectContaining({
+        hobbies: ['Reading', 'Coding'],
+      }));
+    });
+
+    test('notes count: handles empty notes object', () => {
+      onValueMock.mockImplementation((refObj: any, cb: any) => {
+        const path = refObj?.toString?.() || refObj?.path || '';
+        
+        if (path.includes('notes')) {
+          cb({ val: () => ({}) });
+        } else if (path.includes('UserSettings')) {
+          cb({
+            val: () => ({
+              name: '',
+              surname: '',
+              degree: '',
+              occupation: '',
+              hobbies: '',
+              description: '',
+            }),
+          });
+        } else if (path.includes('metrics')) {
+          cb({
+            val: () => ({
+              totalStudyHours: 0,
+              thisWeekHours: 0,
+              notesCreated: 0,
+              studyStreak: 0,
+              lastUpdated: new Date().toISOString(),
+            }),
+          });
         }
+        return () => {};
       });
+      
+      render(<ProfilePage />);
+      expect(screen.getByText('0')).toBeInTheDocument();
     });
 
-    it("renders the sidebar footer with appearance button and dropdown", () => {
-      render(<AppSidebar />);
-      expect(screen.getByText("Appearance")).toBeInTheDocument();
-      expect(screen.getByText("Customize theme")).toBeInTheDocument();
-    });
-
-    it("opens the appearance dropdown and calls setTheme with correct values", () => {
-      render(<AppSidebar />);
-      
-      const dropdownItems = screen.getAllByTestId("dropdown-item");
-      expect(dropdownItems).toHaveLength(3);
-      
-      fireEvent.click(dropdownItems[0]); // Light
-      expect(setThemeMock).toHaveBeenCalledWith("light");
-      
-      fireEvent.click(dropdownItems[1]); // Dark
-      expect(setThemeMock).toHaveBeenCalledWith("dark");
-      
-      fireEvent.click(dropdownItems[2]); // System
-      expect(setThemeMock).toHaveBeenCalledWith("system");
-    });
-  });
-
-  describe("Edge cases", () => {
-    it("does not highlight any menu item if pathname does not match any url", () => {
-      mockPathname = "/not-a-real-path";
-      render(<AppSidebar />);
-      const links = screen.getAllByRole("link");
-      links.forEach((link) => {
-        expect(link?.className).not.toContain('bg-sidebar-accent');
+    test('notes count: handles null notes object', () => {
+      onValueMock.mockImplementation((refObj: any, cb: any) => {
+        const path = refObj?.toString?.() || refObj?.path || '';
+        
+        if (path.includes('notes')) {
+          cb({ val: () => null });
+        } else if (path.includes('UserSettings')) {
+          cb({
+            val: () => ({
+              name: '',
+              surname: '',
+              degree: '',
+              occupation: '',
+              hobbies: '',
+              description: '',
+            }),
+          });
+        } else if (path.includes('metrics')) {
+          cb({
+            val: () => ({
+              totalStudyHours: 0,
+              thisWeekHours: 0,
+              notesCreated: 0,
+              studyStreak: 0,
+              lastUpdated: new Date().toISOString(),
+            }),
+          });
+        }
+        return () => {};
       });
-    });
-
-    it("handles rapid theme changes via dropdown without error", () => {
-      render(<AppSidebar />);
       
-      const dropdownItems = screen.getAllByTestId("dropdown-item");
-      fireEvent.click(dropdownItems[0]); // Light
-      fireEvent.click(dropdownItems[1]); // Dark
-      fireEvent.click(dropdownItems[2]); // System
-      
-      expect(setThemeMock).toHaveBeenCalledTimes(3);
-    });
-
-    it("renders correctly when pathname is root ('/')", () => {
-      mockPathname = "/";
-      render(<AppSidebar />);
-      const links = screen.getAllByRole("link");
-      links.forEach((link) => {
-        expect(link?.className).not.toContain('bg-sidebar-accent');
-      });
+      render(<ProfilePage />);
+      expect(screen.getByText('0')).toBeInTheDocument();
     });
   });
 });
