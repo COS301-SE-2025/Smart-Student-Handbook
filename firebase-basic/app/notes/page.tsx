@@ -235,7 +235,7 @@ export default function NotesPage() {
         </div>
 
         <div className="flex-[2] flex flex-col gap-6 items-center">
-          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-blue-950 shadow overflow-hidden">
+          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-gray-900 shadow overflow-hidden">
             <SimpleSummaryPanel
               sourceText={extractNoteTextFromString(selectedNote?.content)}
               title="Summary"
@@ -243,7 +243,7 @@ export default function NotesPage() {
             />
           </div>
 
-          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-blue-950 shadow overflow-hidden">
+          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-gray-900 shadow overflow-hidden">
             <SimpleFlashCardSection
               initialText={extractNoteTextFromString(selectedNote?.content)}
             />
