@@ -245,8 +245,7 @@ export default function NotesPage() {
 
           <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
             <SimpleFlashCardSection
-              sourceText={extractNoteTextFromString(selectedNote?.content)}
-              className="h-full"
+              initialText={extractNoteTextFromString(selectedNote?.content)}
             />
           </div>
         </div>
