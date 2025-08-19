@@ -212,12 +212,12 @@ export default function NotesPage() {
         <div className="flex-[3] flex flex-col gap-6 items-center">
           {selectedNoteId ? (
             <div className="flex flex-col w-full items-center">
-              <div className="w-full max-w-6xl p-4 mb-6 border rounded-2xl bg-white dark:bg-blue-950 shadow">
+              <div className="w-full max-w-6xl p-4 mb-6 border rounded-2xl bg-white dark:bg-gray-800 shadow">
                 <h2 className="text-2xl font-bold text-left text-gray-900 dark:text-gray-100">
                   {selectedNote?.name}
                 </h2>
               </div>
-              <div className="flex-1 min-h-0 w-full max-w-6xl border rounded-2xl overflow-hidden bg-white dark:bg-neutral-900 shadow">
+              <div className="flex-1 min-h-0 w-full max-w-6xl border rounded-2xl overflow-hidden bg-white dark:bg-gray-800 shadow p-2">
                 <Main
                   searchParams={{
                     doc: selectedNoteId,
@@ -235,7 +235,7 @@ export default function NotesPage() {
         </div>
 
         <div className="flex-[2] flex flex-col gap-6 items-center">
-          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
+          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-blue-950 shadow overflow-hidden">
             <SimpleSummaryPanel
               sourceText={extractNoteTextFromString(selectedNote?.content)}
               title="Summary"
@@ -243,7 +243,7 @@ export default function NotesPage() {
             />
           </div>
 
-          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
+          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-blue-950 shadow overflow-hidden">
             <SimpleFlashCardSection
               initialText={extractNoteTextFromString(selectedNote?.content)}
             />

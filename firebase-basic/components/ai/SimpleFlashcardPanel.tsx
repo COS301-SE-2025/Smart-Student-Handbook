@@ -174,7 +174,7 @@ export default function FlashcardGenerator({
 
   if (!flashcards.length)
     return (
-      <Card className="flex flex-col items-center p-4">
+      <Card className="flex flex-col items-start p-4">
         <CardHeader>
           <CardTitle className="text-lg font-semibold">
             Generate Flashcards
@@ -185,7 +185,7 @@ export default function FlashcardGenerator({
     );
 
   return (
-    <Card className="flex flex-col items-start">
+    <Card className="flex flex-col items-center">
       <CardHeader className="w-full">
         <CardTitle className="text-lg font-semibold">
           Generate Flashcards
