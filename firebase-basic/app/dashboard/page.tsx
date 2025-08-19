@@ -13,6 +13,7 @@ import { getDatabase, ref, get } from "firebase/database"
 import { useUserId } from "@/hooks/useUserId"
 import { PageHeader } from "@/components/ui/page-header"
 import { format, isToday, isTomorrow, isThisWeek } from "date-fns"
+import { extractNoteTextFromString } from "@/lib/note/BlockFormat"
 
 interface Org {
   id: string
@@ -352,12 +353,12 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Recent Notes</h2>
               <div className="flex gap-2">
-                <Link href="/hardnotes">
+                <Link href="/notes">
                   <Button variant="ghost" size="icon">
                     <Plus className="h-5 w-5" />
                   </Button>
                 </Link>
-                <Link href="/hardnotes">
+                <Link href="/notes">
                   <Button variant="ghost" size="sm">View All</Button>
                 </Link>
               </div>
@@ -371,7 +372,7 @@ export default function DashboardPage() {
               <div className="text-center py-8">
                 <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                 <p className="text-muted-foreground mb-4">No notes yet</p>
-                <Link href="/hardnotes">
+                <Link href="/notes">
                   <Button size="sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Create Your First Note
@@ -381,7 +382,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-4">
                 {recentNotes.map((note) => (
-                  <Link href="/hardnotes" key={note.id}>
+                  <Link href="/notes" key={note.id}>
                     <div className="border-b py-3 hover:bg-muted/50 transition-colors rounded-md px-2">
                       <div className="flex flex-col w-full">
                         <div className="flex items-center justify-between">
@@ -401,7 +402,7 @@ export default function DashboardPage() {
                           </span>
                           <span>{format(new Date(note.lastModified), "MMM d, yyyy")}</span>
                         </div>
-                        {note.content && <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{note.content}</p>}
+                        {(note.content) && <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{note.content}</p>}
                       </div>
                     </div>
                   </Link>
