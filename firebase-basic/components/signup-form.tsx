@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
-import { ref, set } from 'firebase/database'
+import { ref, set, get } from 'firebase/database'
 import { auth, db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,6 @@ export function SignupForm(
 ) {
   const router = useRouter()
 
-  /* ─── Form state ─────────────────────────────────────────────── */
   const [name, setName] = React.useState('')
   const [surname, setSurname] = React.useState('')
   const [email, setEmail] = React.useState('')
@@ -26,16 +25,15 @@ export function SignupForm(
   const [error, setError] = React.useState('')
   const [isLoading, setIsLoading] = React.useState(false)
 
-  /* ─── Handlers ───────────────────────────────────────────────── */
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    const trimmedFirst = name.trim()
+    const trimmedName = name.trim()
     const trimmedSurname = surname.trim()
     const trimmedEmail = email.trim().toLowerCase()
 
-    if (!trimmedFirst || !trimmedSurname) {
+    if (!trimmedName || !trimmedSurname) {
       setError('Please provide both first name and surname.')
       return
     }
@@ -44,7 +42,7 @@ export function SignupForm(
       setError('Password must be at least 6 characters.')
       return
     }
- 
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       setError('Please enter a valid email address.')
       return
@@ -53,28 +51,37 @@ export function SignupForm(
     try {
       setIsLoading(true)
 
-      // 🔑 Create the account in Firebase Auth
-      const { user } = await createUserWithEmailAndPassword(
-        auth,
-        trimmedEmail,
-        password,
-      )
+      // Create the account in Firebase Auth
+      const { user } = await createUserWithEmailAndPassword(auth, trimmedEmail, password)
 
       // Update displayName in Auth
       await updateProfile(user, {
-        displayName: `${trimmedFirst} ${trimmedSurname}`,
-      })
-      
-      // 🟢 Save profile in Realtime Database: /users/{uid}
-      await set(ref(db, `users/${user.uid}`), {
-        name: trimmedFirst,
-        surname: trimmedSurname,
-        role: 'User',
-        email: user.email,
-        createdAt: Date.now(),
+        displayName: `${trimmedName} ${trimmedSurname}`,
       })
 
-      router.push('/dashboard')
+      // Save profile in Realtime Database: /users/{uid}/UserSettings
+      const userSettingsRef = ref(db, `users/${user.uid}/UserSettings`)
+      await set(userSettingsRef, {
+        name: trimmedName,
+        surname: trimmedSurname,
+        email: trimmedEmail, // Explicitly save the email
+        degree: '',
+        occupation: '',
+        hobbies: [],
+        description: '',
+      })
+
+      // Check if user settings are incomplete
+      const userSettingsSnapshot = await get(userSettingsRef)
+      const userSettings = userSettingsSnapshot.val()
+      const isIncomplete = !userSettings.degree || !userSettings.occupation || !userSettings.hobbies.length || !userSettings.description
+
+      // Redirect based on completeness
+      if (isIncomplete) {
+        router.push('/profile') // Redirect to settings page
+      } else {
+        router.push('/dashboard') // Redirect to dashboard
+      }
     } catch (err: any) {
       console.error('Signup error:', err)
       setError(err.message || 'Failed to create account.')
@@ -83,12 +90,11 @@ export function SignupForm(
     }
   }
 
-  /* ─── JSX ────────────────────────────────────────────────────── */
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <Card className="overflow-hidden w-full max-w-3xl">
         <CardContent className="grid p-0 md:grid-cols-2">
-          {/* ── Signup form ── */}
+          {/* Signup form */}
           <form onSubmit={handleSignup} className="p-6 md:p-8">
             <div className="flex flex-col gap-6">
               {/* Header */}
@@ -173,42 +179,23 @@ export function SignupForm(
                   {error}
                 </p>
               )}
-
-              {/* Login link */}
-              <p className="text-center text-sm text-muted-foreground">
-                Already have an account?{' '}
-                <a
-                  href="/login"
-                  className="underline underline-offset-4"
-                >
-                  Log in
-                </a>
-              </p>
             </div>
           </form>
 
-          {/* ── Side image ── */}
-          {/* right: logo panel */}
-            <div className="hidden md:flex items-center justify-center bg-white p-0">
-              <div className="relative w-120 h-120">
-                <Image
-                  src="/sshblogo.png"
-                  alt="Smart Student Handbook Logo"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
+          {/* Side image */}
+          <div className="hidden md:flex items-center justify-center bg-white p-0">
+            <div className="relative w-120 h-120">
+              <Image
+                src="/sshblogo.png"
+                alt="Smart Student Handbook Logo"
+                fill
+                className="object-contain"
+                priority
+              />
             </div>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Footer */}
-      <p className="text-xs text-muted-foreground text-center [&_a]:underline">
-        By signing up, you agree to our{' '}
-        <a href="#">Terms</a> and{' '}
-        <a href="#">Privacy Policy</a>.
-      </p>
     </div>
   )
 }
