@@ -47,7 +47,7 @@ export function YjsBlockNoteEditor({
         collaboration: {
           provider,
           fragment: doc.getXmlFragment("blocknote"),
-          user: { name: username, color: "#ff0000" },
+          user: { name: username, color: "#005ac2ff" },
         },
       }
       : {}

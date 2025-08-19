@@ -15,33 +15,25 @@ interface Props {
   onDropNode: (draggedId: string, targetFolderId: string | null) => void;
 }
 
-export default function NodeTree({
-  treeData,
-  onSelect,
-  onRename,
-  onDelete,
-  onDropNode,
-}: Props) {
+export default function NodeTree({ treeData, onSelect, onRename, onDelete, onDropNode }: Props) {
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [activeDragNode, setActiveDragNode] = useState<FileNode | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light'); // new
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
+  // Watch for dark/light mode changes
   useEffect(() => {
     const root = document.documentElement;
-
     const updateTheme = () => setTheme(root.classList.contains('dark') ? 'dark' : 'light');
     updateTheme();
-
     const observer = new MutationObserver(updateTheme);
     observer.observe(root, { attributes: true, attributeFilter: ['class'] });
-
     return () => observer.disconnect();
   }, []);
 
-
   const toggleExpand = (id: string) => {
-    setExpandedFolderIds((prev) => {
+    setExpandedFolderIds(prev => {
       const newSet = new Set(prev);
       newSet.has(id) ? newSet.delete(id) : newSet.add(id);
       return newSet;
@@ -59,10 +51,9 @@ export default function NodeTree({
     return null;
   };
 
-
   const findParentNode = (nodes: FileNode[], childId: string): FileNode | null => {
     for (const node of nodes) {
-      if (node.children?.some((c) => c.id === childId)) return node;
+      if (node.children?.some(c => c.id === childId)) return node;
       if (node.children) {
         const found = findParentNode(node.children, childId);
         if (found) return found;
@@ -71,10 +62,16 @@ export default function NodeTree({
     return null;
   };
 
+  // ---------------- Highlight Logic ----------------
+  const handleSelectNode = (id: string) => {
+    setSelectedNodeId(id); // highlight selected
+    onSelect(id); // pass to parent callback
+  };
+
   const renderNode = (node: FileNode) => {
     const isFolder = node.type === "folder";
     const isExpanded = expandedFolderIds.has(node.id);
-
+    const isSelected = selectedNodeId === node.id;
 
     return (
       <div key={node.id} className="pl-4 max-w-full overflow-hidden">
@@ -82,28 +79,30 @@ export default function NodeTree({
           <>
             <FolderItem
               node={node}
-              onSelect={onSelect}
+              onSelect={handleSelectNode}
               onRename={onRename}
               onDelete={onDelete}
               onDropNode={onDropNode}
               isExpanded={isExpanded}
               onToggleExpand={() => toggleExpand(node.id)}
             />
-            {isExpanded && node.children?.map((child) => renderNode(child))}
+            {isExpanded && node.children?.map(child => renderNode(child))}
           </>
         ) : (
           <NoteItem
             node={node}
-            onSelect={onSelect}
+            onSelect={handleSelectNode}
             onRename={onRename}
             onDelete={onDelete}
             noteID={node.id}
+            isSelected={isSelected} // <-- highlight
           />
         )}
       </div>
     );
   };
 
+  // ---------------- Drag Logic (unchanged) ----------------
   const handleDragStart = (event: DragStartEvent) => {
     const draggedId = event.active.id as string;
     const draggedNode = findNodeById(treeData, draggedId);
@@ -113,66 +112,48 @@ export default function NodeTree({
     }
   };
 
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setIsDragging(false);
-
     if (!active) return;
 
     const draggedId = String(active.id);
     const targetId = over ? String(over.id) : null;
-
     if (targetId === draggedId) return;
 
     const draggedNode = findNodeById(treeData, draggedId);
     const currentParent = findParentNode(treeData, draggedId);
 
-    if (targetId === "root-drop-zone" || !targetId) {
-      onDropNode(draggedId, null);
-      return;
-    }
-
-    if (!treeData.some((node) => node.id === targetId)) {
+    if (!treeData.some(node => node.id === targetId)) {
       if (currentParent && !currentParent.parentId) {
         onDropNode(draggedId, null);
         return;
       }
     }
 
-    onDropNode(draggedId, targetId);
-
+    onDropNode(draggedId, targetId === "root-drop-zone" || !targetId ? null : targetId);
   };
 
-  const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({
-    id: "root-drop-zone",
-  });
+  const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({ id: "root-drop-zone" });
 
   return (
     <DndContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
       <div
         ref={setRootDropRef}
         className={`dnd-context-container p-4 border rounded
-    ${isDragging
-            ? theme === 'dark'
-              ? "border-blue-500 bg-gray-800"
-              : "border-blue-500 bg-blue-50"
-            : theme === 'dark'
-              ? "border-gray-700 bg-gray-900 text-white"
-              : "border-gray-300 bg-white text-black"
-          }
-    ${isRootOver ? (theme === 'dark' ? "bg-gray-700" : "bg-blue-100") : ""}
-  `}
+          ${isDragging
+            ? theme === 'dark' ? "border-blue-500 bg-gray-800" : "border-blue-500 bg-blue-50"
+            : theme === 'dark' ? "border-gray-700 bg-gray-900 text-white" : "border-gray-300 bg-white text-black"}
+          ${isRootOver ? (theme === 'dark' ? "bg-gray-700" : "bg-blue-100") : ""}`}
         style={{ minHeight: 300 }}
       >
-        <div>{treeData.map((node) => renderNode(node))}</div>
+        {treeData.map(node => renderNode(node))}
       </div>
 
       <DragOverlay dropAnimation={null}>
         {activeDragNode && (
-          <div
-            className={`px-3 py-1 rounded shadow-md opacity-70 flex items-center gap-2 pointer-events-none ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-black'
-              }`}
+          <div className={`px-3 py-1 rounded shadow-md opacity-70 flex items-center gap-2 pointer-events-none
+            ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-black'}`}
           >
             {activeDragNode.type === "folder" ? (
               <Folder className="w-4 h-4 text-yellow-500" />
