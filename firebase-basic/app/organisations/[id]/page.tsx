@@ -14,6 +14,7 @@ import {
   get,
   set,
   remove,
+  push,
 } from "firebase/database"
 import {
   ArrowLeft,
@@ -79,11 +80,11 @@ interface Note {
 interface OrgActivity {
   id: string
   type:
-    | "member_joined"
-    | "member_left"
-    | "note_created"
-    | "note_updated"
-    | "org_updated"
+  | "member_joined"
+  | "member_left"
+  | "note_created"
+  | "note_updated"
+  | "org_updated"
   description: string
   user: string
   timestamp: number
@@ -139,6 +140,8 @@ export default function OrganizationDetailsPage() {
   const [loadingFriends, setLoadingFriends] = useState(false)
   const [selectedFriends, setSelectedFriends] = useState<string[]>([])
 
+  const [creatingNote, setCreatingNote] = useState(false)
+
   const orgId = params.id as string
   const db = getDatabase()
 
@@ -153,6 +156,34 @@ export default function OrganizationDetailsPage() {
       ),
     [],
   )
+
+  const handleAddNote = async () => {
+    try {
+      setCreatingNote(true)
+
+      const notesRef = ref(db, `organizations/${orgId}/notes`)
+      const newNoteRef = push(notesRef)
+      const noteId = newNoteRef.key!
+
+      const newNote: Note = {
+        id: noteId,
+        title: "Untitled Note",
+        content: "",
+        author: "Anonymous",
+        ownerId: orgId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }
+
+      await set(newNoteRef, newNote)
+
+    } catch (err) {
+      console.error("Error adding note:", err)
+    } finally {
+      setCreatingNote(false)
+    }
+  }
+
   const updateOrganization = useMemo(
     () =>
       httpsCallableFromURL<
@@ -222,7 +253,7 @@ export default function OrganizationDetailsPage() {
             continue
           }
         }
-      } catch {/* ignore */}
+      } catch {/* ignore */ }
       out.push(m)
     }
     return out
@@ -245,7 +276,7 @@ export default function OrganizationDetailsPage() {
         const us = snap.val()
         if (us?.name) return us.surname ? `${us.name} ${us.surname}` : us.name
       }
-    } catch {/* ignore */}
+    } catch {/* ignore */ }
     return ""
   }
 
@@ -555,11 +586,10 @@ export default function OrganizationDetailsPage() {
                 filteredFriends.map((fr) => (
                   <div
                     key={fr.id}
-                    className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
-                      selectedFriends.includes(fr.id)
-                        ? "bg-primary/10 border border-primary/20"
-                        : "hover:bg-muted/50"
-                    }`}
+                    className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${selectedFriends.includes(fr.id)
+                      ? "bg-primary/10 border border-primary/20"
+                      : "hover:bg-muted/50"
+                      }`}
                     onClick={() => toggleFriend(fr.id)}
                   >
                     <Avatar className="h-8 w-8">
@@ -787,18 +817,16 @@ export default function OrganizationDetailsPage() {
                         <label className="text-sm font-medium text-muted-foreground">Privacy</label>
                         <div className="flex items-center gap-2 mt-2">
                           <div
-                            className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${
-                              !editIsPrivate ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
-                            }`}
+                            className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${!editIsPrivate ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+                              }`}
                             onClick={() => setEditIsPrivate(false)}
                           >
                             <Globe className="h-4 w-4" />
                             <span>Public</span>
                           </div>
                           <div
-                            className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${
-                              editIsPrivate ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
-                            }`}
+                            className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${editIsPrivate ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+                              }`}
                             onClick={() => setEditIsPrivate(true)}
                           >
                             <Lock className="h-4 w-4" />
@@ -910,10 +938,18 @@ export default function OrganizationDetailsPage() {
 
               {/* Notes */}
               <TabsContent value="notes" className="mt-6">
+
+                <div className="flex justify-end mb-4">
+                  <Button onClick={handleAddNote} disabled={creatingNote} className="gap-2">
+                    {creatingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    New Note
+                  </Button>
+                </div>
+
                 {organization.notes.length === 0 ? (
                   <Card>
                     <CardContent className="py-10 text-center text-muted-foreground">
-                      No notes yet. 
+                      No notes yet.
                     </CardContent>
                   </Card>
                 ) : (
@@ -954,7 +990,6 @@ export default function OrganizationDetailsPage() {
                           <CardContent>
                             <p className="text-muted-foreground text-sm line-clamp-3 mb-4">{note.content}</p>
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              {/* author name here */}
                               <span> {note.author}</span>
                               <span>{new Date(note.updatedAt || note.createdAt).toLocaleDateString()}</span>
                             </div>

@@ -110,7 +110,7 @@ export default function OrganisationsPage() {
       setOrgsData(Array.from(map.values()))
       setFavorites(favObj)
     } catch (e) {
-      console.error("❌ Failed to load organisations", e)
+      console.error("Failed to load organisations", e)
       toast.error("Failed to load organisations.")
     } finally {
       setLoading(false)

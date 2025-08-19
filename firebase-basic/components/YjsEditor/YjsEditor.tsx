@@ -8,7 +8,6 @@ import "@blocknote/mantine/style.css";
 import { useYDoc, useYjsProvider } from "@y-sweet/react";
 import { PartialBlock, Block } from "@blocknote/core";
 import { loadFromStorage, saveToStorage } from "@/lib/storageFunctions";
-import { useTheme } from "next-themes";
 
 interface YjsBlockNoteEditorProps {
   noteID: string;

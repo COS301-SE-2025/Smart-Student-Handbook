@@ -18,8 +18,6 @@ export default function Main({ searchParams }: MainProps) {
   const ownerID = searchParams.ownerId ?? "null";
   const username = searchParams.username ?? "Username";
 
-  console.log("Current docID:", docID, "OwnerID:", ownerID, "Username:", username);
-
   return (
     <YDocProvider
       key={docID}
