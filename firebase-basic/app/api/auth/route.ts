@@ -18,4 +18,3 @@ import { DocumentManager } from '@y-sweet/sdk'
   async function getClientToken(docId : string ) {
     return await manager.getOrCreateDocAndToken(docId);
   }
-

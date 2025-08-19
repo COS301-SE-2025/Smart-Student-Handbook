@@ -1,3 +1,4 @@
+// FlashCardSection.tsx
 "use client"
 
 import { useEffect, useState } from "react"
@@ -265,10 +266,10 @@ export default function FlashCardSection({
                 style={{ transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
               >
                 {/* Front */}
-                <Card className="absolute inset-0 [backface-visibility:hidden] border bg-background overflow-hidden rounded-2xl">
+                <Card className="absolute inset-0 [backface-visibility:hidden] border bg-card overflow-hidden rounded-2xl">
                   <CardContent className="p-6 sm:p-8 h-full flex flex-col relative">
                     <div className="flex items-center justify-between mb-2 sm:mb-3">
-                      <div className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-md bg-white border text-black shadow-sm max-w-[70%]">
+                      <div className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-md bg-card border border-border text-foreground shadow-sm max-w-[70%]">
                         <span className="font-semibold text-xs sm:text-sm uppercase tracking-wide truncate">
                           Question #{currentCard.number}
                         </span>
@@ -296,12 +297,12 @@ export default function FlashCardSection({
 
                 {/* Back */}
                 <Card
-                  className="absolute inset-0 [backface-visibility:hidden] border bg-background overflow-hidden rounded-2xl"
+                  className="absolute inset-0 [backface-visibility:hidden] border bg-card overflow-hidden rounded-2xl"
                   style={{ transform: "rotateY(180deg)" }}
                 >
                   <CardContent className="p-6 sm:p-8 h-full flex flex-col relative">
                     <div className="flex items-center justify-between mb-2 sm:mb-3">
-                      <div className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-md bg-white border text-black shadow-sm">
+                      <div className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-md bg-card border border-border text-foreground shadow-sm">
                         <span className="font-semibold text-xs sm:text-sm uppercase tracking-wide">Answer</span>
                       </div>
                       <div className="flex items-center gap-2">

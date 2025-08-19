@@ -13,6 +13,7 @@ import { getDatabase, ref, get } from "firebase/database"
 import { useUserId } from "@/hooks/useUserId"
 import { PageHeader } from "@/components/ui/page-header"
 import { format, isToday, isTomorrow, isThisWeek } from "date-fns"
+import { extractNoteTextFromString } from "@/lib/note/BlockFormat"
 
 interface Org {
   id: string
@@ -91,6 +92,11 @@ export default function DashboardPage() {
   // CHANGED: use same Cloud Run endpoint as Organisations page
   const getMyOrgs = useMemo(
     () => httpsCallableFromURL<{}, Org[]>(fns, "https://getuserorganizations-omrwo3ykaa-uc.a.run.app"),
+    []
+  )
+  // NEW: fetch public orgs so we can include public orgs the user has already joined
+  const getPublicOrgs = useMemo(
+    () => httpsCallableFromURL<{}, Org[]>(fns, "https://getpublicorganizations-omrwo3ykaa-uc.a.run.app"),
     []
   )
   const getFriendsFunc = useMemo(() => httpsCallable<{}, Friend[]>(fns, "getFriends"), [])
@@ -274,17 +280,33 @@ export default function DashboardPage() {
     if (!userId) return
     setLoadingOrgs(true)
     try {
-      const myRes = await getMyOrgs({})
-      const myOrgs = myRes.data.map((o) => ({
+      // Fetch private orgs (indexed under user) + all public orgs
+      const [myRes, pubRes] = await Promise.all([getMyOrgs({}), getPublicOrgs({})])
+
+      // Private orgs the user is in (already resolved by backend)
+      const privateOrgs = myRes.data.map((o) => ({
         ...o,
         joined: true,
         role: o.members[userId!],
       }))
 
+      // Public orgs that the user has joined (membership is on the org)
+      const publicJoined = (pubRes.data || [])
+        .filter((o) => o.members && o.members[userId!])
+        .map((o) => ({
+          ...o,
+          joined: true,
+          role: o.members[userId!] as "Admin" | "Member",
+        }))
+
+      // Merge & dedupe by id
+      const map = new Map<string, Org & { joined: boolean; role?: string }>()
+      ;[...privateOrgs, ...publicJoined].forEach((o) => map.set(o.id, o))
+
       const favSnap = await get(ref(db, `userFavorites/${userId}`))
       const favObj = (favSnap.val() as Record<string, boolean>) || {}
 
-      setOrganizations(myOrgs)
+      setOrganizations(Array.from(map.values()))
       setFavorites(favObj)
     } catch (e) {
       console.error("❌ Failed to load organizations", e)
@@ -292,7 +314,7 @@ export default function DashboardPage() {
     } finally {
       setLoadingOrgs(false)
     }
-  }, [userId, getMyOrgs, db])
+  }, [userId, getMyOrgs, getPublicOrgs, db])
 
   // Load all data
   useEffect(() => {
@@ -305,7 +327,7 @@ export default function DashboardPage() {
     }
   }, [userId, fetchFriends, fetchRecentNotes, fetchUpcomingEvents, fetchStudyStats, fetchOrganizations])
 
-  // CHANGED: re-fetch orgs when tab becomes visible (reflect joins made elsewhere)
+  // Re-fetch orgs when tab becomes visible (reflect joins made elsewhere)
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible" && userId) {
@@ -352,12 +374,12 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Recent Notes</h2>
               <div className="flex gap-2">
-                <Link href="/hardnotes">
+                <Link href="/notes">
                   <Button variant="ghost" size="icon">
                     <Plus className="h-5 w-5" />
                   </Button>
                 </Link>
-                <Link href="/hardnotes">
+                <Link href="/notes">
                   <Button variant="ghost" size="sm">View All</Button>
                 </Link>
               </div>
@@ -371,7 +393,7 @@ export default function DashboardPage() {
               <div className="text-center py-8">
                 <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                 <p className="text-muted-foreground mb-4">No notes yet</p>
-                <Link href="/hardnotes">
+                <Link href="/notes">
                   <Button size="sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Create Your First Note
@@ -381,7 +403,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-4">
                 {recentNotes.map((note) => (
-                  <Link href="/hardnotes" key={note.id}>
+                  <Link href="/notes" key={note.id}>
                     <div className="border-b py-3 hover:bg-muted/50 transition-colors rounded-md px-2">
                       <div className="flex flex-col w-full">
                         <div className="flex items-center justify-between">
@@ -401,7 +423,7 @@ export default function DashboardPage() {
                           </span>
                           <span>{format(new Date(note.lastModified), "MMM d, yyyy")}</span>
                         </div>
-                        {note.content && <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{note.content}</p>}
+                        {(note.content) && <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{note.content}</p>}
                       </div>
                     </div>
                   </Link>
