@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/dialog"
 import { useUserId } from "@/hooks/useUserId"
 import { toast } from "sonner"
+import { extractNoteTextFromString } from "@/lib/note/BlockFormat"
 
 /* -------------------------------------------------------------------------- */
 /*                                  Types                                     */
@@ -939,7 +940,7 @@ export default function OrganizationDetailsPage() {
               {/* Notes */}
               <TabsContent value="notes" className="mt-6">
 
-                <div className="flex justify-end mb-4">
+                <div className="flex justify-start mb-4">
                   <Button onClick={handleAddNote} disabled={creatingNote} className="gap-2">
                     {creatingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                     New Note
@@ -988,7 +989,7 @@ export default function OrganizationDetailsPage() {
                           </CardHeader>
 
                           <CardContent>
-                            <p className="text-muted-foreground text-sm line-clamp-3 mb-4">{note.content}</p>
+                            <p className="text-muted-foreground text-sm line-clamp-3 mb-4">{extractNoteTextFromString(note.content)}</p>
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
                               <span> {note.author}</span>
                               <span>{new Date(note.updatedAt || note.createdAt).toLocaleDateString()}</span>
