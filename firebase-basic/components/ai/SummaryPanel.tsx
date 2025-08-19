@@ -1,3 +1,4 @@
+// SummaryPanel.tsx
 "use client"
 
 import { useRef, useState, useCallback, useEffect } from "react"
@@ -202,7 +203,7 @@ export default function SummaryPanel({
             <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading summary…
           </div>
         ) : summary ? (
-          <div className="p-4  rounded-lg bg-white text-base whitespace-pre-wrap">
+          <div className="p-4 rounded-lg bg-card text-foreground whitespace-pre-wrap">
             {summary}
           </div>
         ) : (
