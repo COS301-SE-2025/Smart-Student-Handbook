@@ -7,7 +7,6 @@ import { Loader2 } from "lucide-react"
 import { summarizeNote } from "@/lib/gemini"
 
 type SimpleSummaryPanelProps = {
-  /** Plain text to summarize (already stripped by the editor). */
   sourceText: string
   title?: string
   disabled?: boolean
@@ -25,12 +24,10 @@ export default function SimpleSummaryPanel({
   const [summary, setSummary] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Prevent stale overwrites when user clicks multiple times
   const runIdRef = useRef(0)
-  // Allow cancellation of in-flight request
   const abortRef = useRef<AbortController | null>(null)
 
-  const canSummarize = !!(sourceText && sourceText.trim()) && !disabled && !loading
+  const canSummarize = true ; 
 
   const handleSummarize = useCallback(async () => {
     if (!sourceText) return

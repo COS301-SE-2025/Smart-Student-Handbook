@@ -423,7 +423,6 @@ export default function DashboardPage() {
                           </span>
                           <span>{format(new Date(note.lastModified), "MMM d, yyyy")}</span>
                         </div>
-                        {(note.content) && <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{note.content}</p>}
                       </div>
                     </div>
                   </Link>
