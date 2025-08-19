@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged, User } from "@firebase/auth";
-import { ref, update } from "@firebase/database";
+import { get, ref, update } from "@firebase/database";
 import { db } from "@/lib";
 import NoteTree from "@/components/notes/NoteTree";
 import Main from "@/components/YjsEditor/EditorMain";
@@ -29,6 +29,7 @@ import { toast } from "sonner";
 
 export default function NotesPage() {
   const [user, setUser] = useState<User | null>(null);
+  const [displayname , setDisplayName] = useState<string | null>(null) ; 
   const [tree, setTree] = useState<FileNode[]>([]);
   const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -37,8 +38,20 @@ export default function NotesPage() {
 
   useEffect(() => {
     const auth = getAuth();
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+
+    setUser(firebaseUser);
+
+    const names = ref(db , `users/${user?.uid}/UserSettings`) ; 
+    const snapshot = await get(names) ; 
+
+    const data = snapshot.val() ; 
+    setDisplayName(data.name) ; 
+
+
+    console.log("User Names:" , displayname) ; 
+
+    
     });
     return () => unsub();
   }, []);
@@ -216,7 +229,7 @@ export default function NotesPage() {
                   searchParams={{
                     doc: selectedNoteId,
                     ownerId: currentOwnerId ?? undefined,
-                    username: user.displayName ?? undefined,
+                    username: displayname ?? undefined,
                   }}
                 />
               </div>
