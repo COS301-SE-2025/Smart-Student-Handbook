@@ -93,6 +93,11 @@ export default function DashboardPage() {
     () => httpsCallableFromURL<{}, Org[]>(fns, "https://getuserorganizations-omrwo3ykaa-uc.a.run.app"),
     []
   )
+  // NEW: fetch public orgs so we can include public orgs the user has already joined
+  const getPublicOrgs = useMemo(
+    () => httpsCallableFromURL<{}, Org[]>(fns, "https://getpublicorganizations-omrwo3ykaa-uc.a.run.app"),
+    []
+  )
   const getFriendsFunc = useMemo(() => httpsCallable<{}, Friend[]>(fns, "getFriends"), [])
   const getEventsFunc = useMemo(() => httpsCallable<{ semesterId?: string }, UpcomingEvent[]>(fns, "getEvents"), [])
   const getSemestersFunc = useMemo(() => httpsCallable<{}, any[]>(fns, "getSemesters"), [])
@@ -274,17 +279,33 @@ export default function DashboardPage() {
     if (!userId) return
     setLoadingOrgs(true)
     try {
-      const myRes = await getMyOrgs({})
-      const myOrgs = myRes.data.map((o) => ({
+      // Fetch private orgs (indexed under user) + all public orgs
+      const [myRes, pubRes] = await Promise.all([getMyOrgs({}), getPublicOrgs({})])
+
+      // Private orgs the user is in (already resolved by backend)
+      const privateOrgs = myRes.data.map((o) => ({
         ...o,
         joined: true,
         role: o.members[userId!],
       }))
 
+      // Public orgs that the user has joined (membership is on the org)
+      const publicJoined = (pubRes.data || [])
+        .filter((o) => o.members && o.members[userId!])
+        .map((o) => ({
+          ...o,
+          joined: true,
+          role: o.members[userId!] as "Admin" | "Member",
+        }))
+
+      // Merge & dedupe by id
+      const map = new Map<string, Org & { joined: boolean; role?: string }>()
+      ;[...privateOrgs, ...publicJoined].forEach((o) => map.set(o.id, o))
+
       const favSnap = await get(ref(db, `userFavorites/${userId}`))
       const favObj = (favSnap.val() as Record<string, boolean>) || {}
 
-      setOrganizations(myOrgs)
+      setOrganizations(Array.from(map.values()))
       setFavorites(favObj)
     } catch (e) {
       console.error("❌ Failed to load organizations", e)
@@ -292,7 +313,7 @@ export default function DashboardPage() {
     } finally {
       setLoadingOrgs(false)
     }
-  }, [userId, getMyOrgs, db])
+  }, [userId, getMyOrgs, getPublicOrgs, db])
 
   // Load all data
   useEffect(() => {
@@ -305,7 +326,7 @@ export default function DashboardPage() {
     }
   }, [userId, fetchFriends, fetchRecentNotes, fetchUpcomingEvents, fetchStudyStats, fetchOrganizations])
 
-  // CHANGED: re-fetch orgs when tab becomes visible (reflect joins made elsewhere)
+  // Re-fetch orgs when tab becomes visible (reflect joins made elsewhere)
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible" && userId) {

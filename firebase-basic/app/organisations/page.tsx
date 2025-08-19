@@ -52,8 +52,8 @@ export default function OrganisationsPage() {
   const searchParams = useSearchParams()
   const [orgsData, setOrgsData] = useState<(Org & { joined: boolean })[]>([])
   const [favorites, setFavorites] = useState<Record<string, boolean>>({})
-  const [loading, setLoading] = useState(false)           // data fetch status (not used for page spinner)
-  const [hasLoaded, setHasLoaded] = useState(false)       // first fetch completed?
+  const [loading, setLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [filter, setFilter] = useState<Filter>("all")
   const [showCreate, setShowCreate] = useState(false)
   const [joiningOrgs, setJoiningOrgs] = useState<Set<string>>(new Set())
@@ -114,7 +114,7 @@ export default function OrganisationsPage() {
       toast.error("Failed to load organisations.")
     } finally {
       setLoading(false)
-      setHasLoaded(true) // mark that we completed 1 fetch (success or fail)
+      setHasLoaded(true)
     }
   }, [userId, getPublicOrgs, getPrivateOrgs, db])
 
@@ -312,7 +312,7 @@ export default function OrganisationsPage() {
               return (
                 <div
                   key={o.id}
-                  className={`border-2 bg-white dark:bg-neutral-900 rounded-2xl p-8 hover:shadow-xl transition-all relative min-h-[360px] group ${
+                  className={`border-2 bg-white dark:bg-card rounded-2xl p-8 hover:shadow-xl transition-all relative min-h-[360px] group ${
                     isJoining || isLeaving ? "opacity-75" : ""
                   }`}
                 >
@@ -320,7 +320,7 @@ export default function OrganisationsPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm dark:bg-black/80 dark:hover:bg-black z-10"
+                    className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm dark:bg-muted/80 dark:hover:bg-muted z-10"
                     onClick={() => handleToggleFav(o.id)}
                     disabled={isJoining || isLeaving}
                   >
@@ -333,8 +333,8 @@ export default function OrganisationsPage() {
 
                   {/* header */}
                   <div className="flex items-start gap-4 mb-6">
-                    <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-black">
-                      <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-black">
+                    <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-border">
+                      <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-background">
                         {o.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -343,7 +343,7 @@ export default function OrganisationsPage() {
                       <div className="flex items-center gap-2 text-sm">
                         <Badge
                           variant="secondary"
-                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
+                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-muted/80 dark:text-muted-foreground dark:border-border"
                         >
                           <Users className="h-3 w-3" />{" "}
                           <span>
@@ -352,7 +352,7 @@ export default function OrganisationsPage() {
                         </Badge>
                         <Badge
                           variant="secondary"
-                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
+                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-muted/80 dark:text-muted-foreground dark:border-border"
                         >
                           {o.isPrivate ? (
                             <>
@@ -403,7 +403,7 @@ export default function OrganisationsPage() {
                   </div>
 
                   {/* actions */}
-                  <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-black/30 relative z-10">
+                  <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-border relative z-10">
                     {o.joined && !isLeaving ? (
                       <Button
                         size="lg"
@@ -455,7 +455,6 @@ export default function OrganisationsPage() {
             })}
           </div>
         ) : hasLoaded ? (
-          // true empty state AFTER first fetch completes
           <div className="flex items-center justify-center min-h-[500px]">
             <div className="text-center py-20 px-8 max-w-2xl mx-auto">
               <div className="bg-gradient-to-br from-muted/30 to-muted/50 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-8 shadow-lg">
@@ -478,7 +477,6 @@ export default function OrganisationsPage() {
             </div>
           </div>
         ) : (
-          // before first fetch completes: render a neutral spacer (no spinner, no empty flash)
           <div className="min-h-[300px]" />
         )}
       </div>

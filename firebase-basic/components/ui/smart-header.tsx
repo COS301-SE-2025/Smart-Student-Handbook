@@ -467,7 +467,7 @@ export function SmartHeader() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-background/95 backdrop-blur border-b border-border">
+    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
       <div className="flex h-full items-center justify-between px-4">
         {/* Left: Sidebar + Title */}
         <div className="flex items-center gap-3">
@@ -479,7 +479,7 @@ export function SmartHeader() {
             >
               {pageInfo.icon}
               <span>{pageInfo.title}</span>
-          </Link>
+            </Link>
           </div>
         </div>
 
