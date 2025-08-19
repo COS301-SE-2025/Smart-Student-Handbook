@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { get, ref } from "firebase/database";
-// If your DB export is in "@/lib/firebase", use that path:
 import { db } from "@/lib/firebase";
 import NotesGrid from "@/components/NotesGrid";
 
