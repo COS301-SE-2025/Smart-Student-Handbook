@@ -239,7 +239,7 @@ export default function OrganisationsPage() {
   /* ---------------------------------------------------------------------- */
   /*                             JSX                                         */
   /* ---------------------------------------------------------------------- */
-  if (authLoading) return null
+  if (authLoading) return <div>Loading...</div>
 
   return (
     <div className="min-h-screen bg-background">
@@ -301,7 +301,14 @@ export default function OrganisationsPage() {
 
       {/* Organisation Cards */}
       <div className="p-8">
-        {orgs.length > 0 ? (
+        {loading && !hasLoaded ? (
+          <div className="flex items-center justify-center min-h-[300px]">
+            <div className="text-center">
+              <Loader2 className="h-16 w-16 animate-spin mx-auto mb-4 text-muted-foreground" />
+              <p className="text-lg text-muted-foreground">Loading...</p>
+            </div>
+          </div>
+        ) : orgs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {orgs.map((o) => {
               const isFav = !!favorites[o.id]
@@ -408,7 +415,6 @@ export default function OrganisationsPage() {
                       <Button
                         size="lg"
                         className="shadow-md flex-1 basis-1/2"
-                        asChild
                         disabled={isJoining || isLeaving}
                       >
                         <Link href={`/organisations/${o.id}`}>View Organisation</Link>

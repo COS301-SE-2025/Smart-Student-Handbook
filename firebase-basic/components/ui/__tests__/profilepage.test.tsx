@@ -3,6 +3,9 @@ import ProfilePage from '/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-b
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import "@testing-library/jest-dom";
 
+// Create a mock function for onValue BEFORE using it
+const onValueMock = jest.fn()
+
 // Mocks for hooks and modules
 jest.mock("firebase/auth", () => {
   // getAuth returns a mock auth object
@@ -23,9 +26,6 @@ jest.mock("firebase/auth", () => {
     updatePassword: jest.fn(),
   }
 })
-
-// Create a mock function for onValue
-const onValueMock = jest.fn()
 
 jest.mock("firebase/database", () => ({
   onValue: onValueMock,
@@ -79,6 +79,17 @@ jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/component
 jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/page-header", () => ({
   PageHeader: (props: any) => <div>{props.title}{props.description}</div>,
 }))
+jest.mock("/Users/mpumenjamela/Smart-Student-Handbook-1/firebase-basic/components/ui/select", () => ({
+  Select: ({ children, onValueChange, value }: any) => (
+    <select onChange={(e) => onValueChange && onValueChange(e.target.value)} value={value}>
+      {children}
+    </select>
+  ),
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ children, value }: any) => <option value={value}>{children}</option>,
+  SelectTrigger: ({ children, className }: any) => <div className={className}>{children}</div>,
+  SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
+}))
 jest.mock("lucide-react", () => ({
   TrendingUp: () => <svg data-testid="trending-up" />,
   Clock: () => <svg data-testid="clock" />,
@@ -110,7 +121,7 @@ describe('ProfilePage() ProfilePage method', () => {
     })
     onValueMock.mockImplementation((ref: any, cb: any) => {
       // Simulate DB listeners for settings, metrics, notes
-      if (ref.includes('UserSettings')) {
+      if (ref.includes && ref.includes('UserSettings')) {
         cb({
           val: () => ({
             name: 'John',
@@ -121,7 +132,7 @@ describe('ProfilePage() ProfilePage method', () => {
             description: 'Hello world',
           }),
         })
-      } else if (ref.includes('metrics')) {
+      } else if (ref.includes && ref.includes('metrics')) {
         cb({
           val: () => ({
             totalStudyHours: 10,
@@ -131,7 +142,7 @@ describe('ProfilePage() ProfilePage method', () => {
             lastUpdated: new Date().toISOString(),
           }),
         })
-      } else if (ref.includes('notes')) {
+      } else if (ref.includes && ref.includes('notes')) {
         cb({
           val: () => ({
             note1: {},
@@ -377,9 +388,9 @@ describe('ProfilePage() ProfilePage method', () => {
     test('notes count: handles empty notes object', () => {
       // This test ensures that notes count is zero when notes object is empty.
       onValueMock.mockImplementation((ref: any, cb: any) => {
-        if (ref.includes('notes')) {
+        if (ref.includes && ref.includes('notes')) {
           cb({ val: () => ({}) })
-        } else if (ref.includes('UserSettings')) {
+        } else if (ref.includes && ref.includes('UserSettings')) {
           cb({
             val: () => ({
               name: '',
@@ -390,7 +401,7 @@ describe('ProfilePage() ProfilePage method', () => {
               description: '',
             }),
           })
-        } else if (ref.includes('metrics')) {
+        } else if (ref.includes && ref.includes('metrics')) {
           cb({
             val: () => ({
               totalStudyHours: 0,

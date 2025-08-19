@@ -50,7 +50,11 @@ export default function FriendsPage() {
   )
 
   const loadFriendsData = async () => {
-    if (!userId) return
+    if (!userId) {
+      // If no userId, set loading to false and keep empty arrays
+      setLoading(false)
+      return
+    }
     try {
       setLoading(true)
       const [friendsResult, requestsResult] = await Promise.all([getFriendsFunc({}), getFriendRequestsFunc({})])
@@ -103,17 +107,11 @@ export default function FriendsPage() {
     }
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
   const getInitials = (name: string, surname: string) => {
     const first = name?.[0] || '';
     const last = surname?.[0] || '';
     return `${first}${last}`.toUpperCase();
-=======
-  const getInitials = (name: string, surname: string) => `${name[0] || ''}${surname[0] || ''}`.toUpperCase()
-=======
-  const getInitials = (name: string, surname: string) => `${name[0] || ""}${surname[0] || ""}`.toUpperCase()
->>>>>>> dev
+  };
 
   if (loading) {
     return (
@@ -123,8 +121,7 @@ export default function FriendsPage() {
           <p className="text-muted-foreground">Loading friends...</p>
         </div>
       </div>
-    )
->>>>>>> dev
+    );
   }
 
   return (

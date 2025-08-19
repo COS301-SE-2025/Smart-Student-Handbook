@@ -1,49 +1,90 @@
 import React from 'react'
 import FriendsPage from '@/app/friends/page';
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
-// Mocks for Firebase and other dependencies
-jest.mock("firebase/auth", () => ({
-  getAuth: jest.fn(),
+// Mock the useUserId hook directly
+jest.mock("@/hooks/useUserId", () => ({
+  useUserId: jest.fn(() => ({
+    userId: "user1",
+    loading: false
+  }))
 }));
+
+// Mock Firebase Functions
+const mockGetFriends = jest.fn();
+const mockGetFriendRequests = jest.fn();
+const mockAcceptFriendRequest = jest.fn();
+const mockRejectFriendRequest = jest.fn();
+const mockCancelFriendRequest = jest.fn();
+
+jest.mock("firebase/functions", () => ({
+  httpsCallable: jest.fn((fns, functionName) => {
+    switch (functionName) {
+      case "getFriends":
+        return mockGetFriends;
+      case "getFriendRequests":
+        return mockGetFriendRequests;
+      case "acceptFriendRequest":
+        return mockAcceptFriendRequest;
+      case "rejectFriendRequest":
+        return mockRejectFriendRequest;
+      case "cancelFriendRequest":
+        return mockCancelFriendRequest;
+      default:
+        return jest.fn();
+    }
+  }),
+}));
+
+// Mock Firebase lib
 jest.mock("@/lib/firebase", () => ({
-  db: {},
+  fns: {},
 }));
-jest.mock("firebase/database", () => ({
-  ref: jest.fn(),
-  get: jest.fn(),
-  onValue: jest.fn(),
-  remove: jest.fn(),
-  set: jest.fn(),
+
+// Mock toast
+jest.mock("sonner", () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+  },
 }));
+
+// Mock UI components
 jest.mock("@/components/ui/button", () => ({
   Button: (props: any) => <button {...props} />,
 }));
+
 jest.mock("@/components/ui/card", () => ({
   Card: (props: any) => <div {...props}>{props.children}</div>,
   CardContent: (props: any) => <div {...props}>{props.children}</div>,
   CardHeader: (props: any) => <div {...props}>{props.children}</div>,
   CardTitle: (props: any) => <div {...props}>{props.children}</div>,
 }));
+
 jest.mock("@/components/ui/avatar", () => ({
   Avatar: (props: any) => <div {...props}>{props.children}</div>,
   AvatarFallback: (props: any) => <div {...props}>{props.children}</div>,
   AvatarImage: (props: any) => <img src={props.src} alt="avatar" />,
 }));
+
 jest.mock("@/components/ui/badge", () => ({
   Badge: (props: any) => <span {...props}>{props.children}</span>,
 }));
+
 jest.mock("next/link", () => {
   return ({ href, children }: any) => <a href={href}>{children}</a>;
 });
+
 jest.mock("lucide-react", () => ({
   Users: () => <svg data-testid="users-icon" />,
   Mail: () => <svg data-testid="mail-icon" />,
   Check: () => <svg data-testid="check-icon" />,
   X: () => <svg data-testid="x-icon" />,
 }));
+
 jest.mock("@/components/ui/addfriendmodal", () => () => <div>AddFriendModal</div>);
+
 jest.mock("@/components/ui/page-header", () => ({
   PageHeader: (props: any) => (
     <header>
@@ -53,67 +94,45 @@ jest.mock("@/components/ui/page-header", () => ({
   ),
 }));
 
-// Helper to flush promises
-const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
-
 describe('FriendsPage() FriendsPage method', () => {
-  // Shared mocks
-  let mockCurrentUser: any;
-  let mockOnValueCallback: any;
-  let mockGet: jest.Mock;
-  let mockSet: jest.Mock;
-  let mockRemove: jest.Mock;
+  // Get reference to the mocked useUserId function
+  const mockUseUserId = jest.mocked(require("@/hooks/useUserId").useUserId);
 
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Mock getAuth
-    mockCurrentUser = { uid: "user1" };
-    const getAuth = require("firebase/auth").getAuth;
-    getAuth.mockReturnValue({ currentUser: mockCurrentUser });
-
-    // Mock ref
-    const ref = require("firebase/database").ref;
-    ref.mockImplementation((db: any, path: string) => ({ db, path }));
-
-    // Mock onValue
-    const onValue = require("firebase/database").onValue;
-    onValue.mockImplementation((refObj: any, cb: any) => {
-      mockOnValueCallback = cb;
-      return () => {}; // unsubscribe
+    
+    // Reset useUserId mock to default values
+    mockUseUserId.mockReturnValue({
+      userId: "user1",
+      loading: false
     });
-
-    // Mock get with better handling
-    mockGet = require("firebase/database").get;
-    mockGet.mockResolvedValue({
-      exists: () => false,
-      val: () => null
+    
+    // Reset all function mocks to return empty data by default
+    mockGetFriends.mockResolvedValue({ data: [] });
+    mockGetFriendRequests.mockResolvedValue({ 
+      data: { incoming: [], sent: [] } 
     });
-
-    // Mock set
-    mockSet = require("firebase/database").set;
-    mockSet.mockResolvedValue(undefined);
-
-    // Mock remove
-    mockRemove = require("firebase/database").remove;
-    mockRemove.mockResolvedValue(undefined);
+    mockAcceptFriendRequest.mockResolvedValue({
+      data: { success: true, message: "Friend request accepted!" }
+    });
+    mockRejectFriendRequest.mockResolvedValue({
+      data: { success: true, message: "Friend request rejected!" }
+    });
+    mockCancelFriendRequest.mockResolvedValue({
+      data: { success: true, message: "Friend request cancelled!" }
+    });
   });
 
   // ------------------- Happy Paths -------------------
   describe("Happy paths", () => {
     test("renders FriendsPage with no friends, no requests", async () => {
-      render(<FriendsPage />);
-      
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: {},
-            incomingRequests: {},
-            sentRequests: {},
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
       expect(screen.getByText("Friends")).toBeInTheDocument();
@@ -126,56 +145,45 @@ describe('FriendsPage() FriendsPage method', () => {
     });
 
     test("renders FriendsPage with friends, incoming and sent requests", async () => {
-      // Set up sequential mock responses for the get calls
-      const mockGetResponses = [
-        // First call for friend1 UserSettings
+      const mockFriends = [
         {
-          exists: () => true,
-          val: () => ({
-            name: "Alice",
-            surname: "Smith",
-            profilePicture: "alice.jpg",
-          }),
-        },
-        // Second call for incoming1 UserSettings  
+          uid: "friend1",
+          name: "Alice",
+          surname: "Smith",
+          profilePicture: "alice.jpg"
+        }
+      ];
+      
+      const mockIncoming = [
         {
-          exists: () => true,
-          val: () => ({
-            name: "Bob", 
-            surname: "Brown",
-            profilePicture: "bob.jpg",
-          }),
-        },
-        // Third call for sent1 UserSettings
+          uid: "incoming1",
+          name: "Bob",
+          surname: "Brown",
+          profilePicture: "bob.jpg"
+        }
+      ];
+      
+      const mockSent = [
         {
-          exists: () => true,
-          val: () => ({
-            name: "Carol",
-            surname: "Jones", 
-            profilePicture: "carol.jpg",
-          }),
-        },
+          uid: "sent1",
+          name: "Carol",
+          surname: "Jones",
+          profilePicture: "carol.jpg"
+        }
       ];
 
-      let callCount = 0;
-      mockGet.mockImplementation(() => {
-        const response = mockGetResponses[callCount] || mockGetResponses[mockGetResponses.length - 1];
-        callCount++;
-        return Promise.resolve(response);
+      mockGetFriends.mockResolvedValue({ data: mockFriends });
+      mockGetFriendRequests.mockResolvedValue({ 
+        data: { incoming: mockIncoming, sent: mockSent } 
       });
 
-      render(<FriendsPage />);
-      
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: { friend1: true },
-            incomingRequests: { incoming1: true },
-            sentRequests: { sent1: true },
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
       expect(screen.getByText("Alice Smith")).toBeInTheDocument();
@@ -188,149 +196,132 @@ describe('FriendsPage() FriendsPage method', () => {
     });
 
     test("accepts an incoming friend request", async () => {
-      mockGet.mockResolvedValue({
-        exists: () => true,
-        val: () => ({
+      const mockIncoming = [
+        {
+          uid: "incoming1",
           name: "Bob",
           surname: "Brown",
-          profilePicture: "",
-        }),
+          profilePicture: ""
+        }
+      ];
+
+      mockGetFriendRequests.mockResolvedValue({ 
+        data: { incoming: mockIncoming, sent: [] } 
       });
 
-      render(<FriendsPage />);
-      
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: {},
-            incomingRequests: { incoming1: true },
-            sentRequests: {},
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
       const acceptBtn = screen.getByText("Accept");
+      
       await act(async () => {
         fireEvent.click(acceptBtn);
-        await flushPromises();
       });
 
-      expect(mockSet).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "users/user1/friends/incoming1" }),
-        true
-      );
-      expect(mockSet).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "users/incoming1/friends/user1" }),
-        true
-      );
-      expect(mockRemove).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "users/user1/incomingRequests/incoming1" })
-      );
-      expect(mockRemove).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "users/incoming1/sentRequests/user1" })
-      );
+      await waitFor(() => {
+        expect(mockAcceptFriendRequest).toHaveBeenCalledWith({
+          targetUserId: "incoming1"
+        });
+      });
     });
 
     test("rejects an incoming friend request", async () => {
-      mockGet.mockResolvedValue({
-        exists: () => true,
-        val: () => ({
+      const mockIncoming = [
+        {
+          uid: "incoming1",
           name: "Bob",
           surname: "Brown",
-          profilePicture: "",
-        }),
+          profilePicture: ""
+        }
+      ];
+
+      mockGetFriendRequests.mockResolvedValue({ 
+        data: { incoming: mockIncoming, sent: [] } 
       });
 
-      render(<FriendsPage />);
-      
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: {},
-            incomingRequests: { incoming1: true },
-            sentRequests: {},
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
       const rejectBtn = screen.getByText("Reject");
+      
       await act(async () => {
         fireEvent.click(rejectBtn);
-        await flushPromises();
       });
 
-      expect(mockRemove).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "users/user1/incomingRequests/incoming1" })
-      );
-      expect(mockRemove).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "users/incoming1/sentRequests/user1" })
-      );
+      await waitFor(() => {
+        expect(mockRejectFriendRequest).toHaveBeenCalledWith({
+          targetUserId: "incoming1"
+        });
+      });
     });
 
     test("cancels a sent friend request", async () => {
-      mockGet.mockResolvedValue({
-        exists: () => true,
-        val: () => ({
+      const mockSent = [
+        {
+          uid: "sent1",
           name: "Carol",
           surname: "Jones",
-          profilePicture: "",
-        }),
+          profilePicture: ""
+        }
+      ];
+
+      mockGetFriendRequests.mockResolvedValue({ 
+        data: { incoming: [], sent: mockSent } 
       });
 
-      render(<FriendsPage />);
-      
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: {},
-            incomingRequests: {},
-            sentRequests: { sent1: true },
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
       const cancelBtn = screen.getByText("Cancel");
+      
       await act(async () => {
         fireEvent.click(cancelBtn);
-        await flushPromises();
       });
 
-      expect(mockRemove).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "users/user1/sentRequests/sent1" })
-      );
-      expect(mockRemove).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "users/sent1/incomingRequests/user1" })
-      );
+      await waitFor(() => {
+        expect(mockCancelFriendRequest).toHaveBeenCalledWith({
+          targetUserId: "sent1"
+        });
+      });
     });
 
     test("renders friend initials in AvatarFallback", async () => {
-      mockGet.mockResolvedValue({
-        exists: () => true,
-        val: () => ({
+      const mockFriends = [
+        {
+          uid: "friend1",
           name: "Bob",
           surname: "Brown",
-          profilePicture: "",
-        }),
-      });
+          profilePicture: ""
+        }
+      ];
 
-      render(<FriendsPage />);
-      
+      mockGetFriends.mockResolvedValue({ data: mockFriends });
+
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: { friend1: true },
-            incomingRequests: {},
-            sentRequests: {},
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
       expect(screen.getByText("BB")).toBeInTheDocument();
@@ -340,110 +331,101 @@ describe('FriendsPage() FriendsPage method', () => {
   // ------------------- Edge Cases -------------------
   describe("Edge cases", () => {
     test("does not render friends/requests if user is not authenticated", async () => {
-      const getAuth = require("firebase/auth").getAuth;
-      getAuth.mockReturnValue({ currentUser: undefined });
+      mockUseUserId.mockReturnValue({
+        userId: null,
+        loading: false
+      });
 
-      render(<FriendsPage />);
+      await act(async () => {
+        render(<FriendsPage />);
+      });
+      
+      // Since userId is null, the component should render immediately without calling Firebase functions
       expect(screen.getByText("Friends")).toBeInTheDocument();
       expect(screen.getByText("Your Friends")).toBeInTheDocument();
       expect(screen.getByText("Friend Requests")).toBeInTheDocument();
-      expect(screen.queryByText("Accept")).not.toBeInTheDocument();
-      expect(screen.queryByText("Reject")).not.toBeInTheDocument();
-      expect(screen.queryByText("Cancel")).not.toBeInTheDocument();
+      expect(screen.getByText("No friends yet")).toBeInTheDocument();
+      expect(screen.getByText("No incoming requests")).toBeInTheDocument();
+      expect(screen.getByText("No sent requests")).toBeInTheDocument();
+      
+      // Firebase functions should not be called when userId is null
+      expect(mockGetFriends).not.toHaveBeenCalled();
+      expect(mockGetFriendRequests).not.toHaveBeenCalled();
     });
 
     test("handles missing UserSettings gracefully in loadUsers", async () => {
-      mockGet.mockResolvedValue({
-        exists: () => false,
-        val: () => null
-      });
-
-      render(<FriendsPage />);
-      
+      // This test is now handled by the Firebase Functions mock
+      // If the backend returns empty arrays, the UI should show "No friends yet"
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: { friend1: true },
-            incomingRequests: {},
-            sentRequests: {},
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
-      // When UserSettings doesn't exist, the friend should not be displayed
       expect(screen.getByText("No friends yet")).toBeInTheDocument();
     });
 
     test("handles empty name/surname for initials", async () => {
-      mockGet.mockResolvedValue({
-        exists: () => true,
-        val: () => ({
+      const mockFriends = [
+        {
+          uid: "friend1",
           name: "",
           surname: "",
-          profilePicture: "",
-        }),
-      });
+          profilePicture: ""
+        }
+      ];
 
-      render(<FriendsPage />);
-      
+      mockGetFriends.mockResolvedValue({ data: mockFriends });
+
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: { friend1: true },
-            incomingRequests: {},
-            sentRequests: {},
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
-      // Should render without crashing - friend should still appear
+      // Should render without crashing - friend should still appear with empty initials
       expect(screen.getByText("Friend")).toBeInTheDocument();
     });
 
     test("handles user with single-letter name/surname for initials", async () => {
-      mockGet.mockResolvedValue({
-        exists: () => true,
-        val: () => ({
+      const mockFriends = [
+        {
+          uid: "friend1",
           name: "A",
           surname: "B",
-          profilePicture: "",
-        }),
-      });
+          profilePicture: ""
+        }
+      ];
 
-      render(<FriendsPage />);
-      
+      mockGetFriends.mockResolvedValue({ data: mockFriends });
+
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: { friend1: true },
-            incomingRequests: {},
-            sentRequests: {},
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
-      expect(await screen.findByText("AB")).toBeInTheDocument();
+      expect(screen.getByText("AB")).toBeInTheDocument();
     });
 
     test("handles empty friends, incomingRequests, sentRequests objects", async () => {
-      render(<FriendsPage />);
-      
+      // Default mocks already return empty arrays
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({
-            friends: {},
-            incomingRequests: {},
-            sentRequests: {},
-          }),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
       expect(screen.getByText("No friends yet")).toBeInTheDocument();
@@ -452,14 +434,14 @@ describe('FriendsPage() FriendsPage method', () => {
     });
 
     test("handles missing friends, incomingRequests, sentRequests fields", async () => {
-      render(<FriendsPage />);
-      
+      // Default mocks already return empty arrays
       await act(async () => {
-        mockOnValueCallback({
-          exists: () => true,
-          val: () => ({}),
-        });
-        await flushPromises();
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
       });
 
       expect(screen.getByText("No friends yet")).toBeInTheDocument();
@@ -467,17 +449,86 @@ describe('FriendsPage() FriendsPage method', () => {
       expect(screen.getByText("No sent requests")).toBeInTheDocument();
     });
 
-    test("does not call Firebase methods if user is not authenticated on accept/reject/cancel", async () => {
-      const getAuth = require("firebase/auth").getAuth;
-      getAuth.mockReturnValue({ currentUser: undefined });
+    test("handles Firebase function errors gracefully", async () => {
+      mockGetFriends.mockRejectedValue(new Error("Network error"));
+      mockGetFriendRequests.mockRejectedValue(new Error("Network error"));
 
-      const mockHandleAccept = jest.fn().mockResolvedValue(undefined);
-      const mockHandleReject = jest.fn().mockResolvedValue(undefined);
-      const mockHandleCancel = jest.fn().mockResolvedValue(undefined);
+      await act(async () => {
+        render(<FriendsPage />);
+      });
       
-      await expect(mockHandleAccept("anyid")).resolves.toBeUndefined();
-      await expect(mockHandleReject("anyid")).resolves.toBeUndefined();
-      await expect(mockHandleCancel("anyid")).resolves.toBeUndefined();
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
+      });
+
+      // Component should still render even if Firebase functions fail
+      expect(screen.getByText("Friends")).toBeInTheDocument();
+    });
+
+    test("shows loading state initially", async () => {
+      // Make Firebase functions take some time to resolve
+      mockGetFriends.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ data: [] }), 100)));
+      mockGetFriendRequests.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ data: { incoming: [], sent: [] } }), 100)));
+
+      mockUseUserId.mockReturnValue({
+        userId: "user1",
+        loading: false
+      });
+
+      await act(async () => {
+        render(<FriendsPage />);
+      });
+
+      // Should show loading state while Firebase functions are being called
+      expect(screen.getByText("Loading friends...")).toBeInTheDocument();
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
+      }, { timeout: 2000 });
+    });
+
+    test("handles accept friend request error", async () => {
+      const mockIncoming = [
+        {
+          uid: "incoming1",
+          name: "Bob",
+          surname: "Brown",
+          profilePicture: ""
+        }
+      ];
+
+      mockGetFriendRequests.mockResolvedValue({ 
+        data: { incoming: mockIncoming, sent: [] } 
+      });
+      
+      mockAcceptFriendRequest.mockRejectedValue(new Error("Failed to accept"));
+
+      await act(async () => {
+        render(<FriendsPage />);
+      });
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Loading friends...")).not.toBeInTheDocument();
+      });
+
+      const acceptBtn = screen.getByText("Accept");
+      
+      await act(async () => {
+        fireEvent.click(acceptBtn);
+      });
+
+      await waitFor(() => {
+        expect(mockAcceptFriendRequest).toHaveBeenCalledWith({
+          targetUserId: "incoming1"
+        });
+      });
+      
+      // Toast error should be called
+      const { toast } = require("sonner");
+      expect(toast.error).toHaveBeenCalled();
     });
   });
 });

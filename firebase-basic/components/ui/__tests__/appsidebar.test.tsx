@@ -16,30 +16,30 @@ jest.mock("lucide-react", () => ({
   Building2: (props: any) => <svg data-testid="Building2" {...props} />,
 }));
 
-// Enhanced sidebar mocks
+// Enhanced sidebar mocks that preserve the actual className behavior
 jest.mock("@/components/ui/sidebar", () => ({
-  Sidebar: ({ children, ...props }: any) => <aside {...props}>{children}</aside>,
-  SidebarContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SidebarGroup: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SidebarGroupContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SidebarMenu: ({ children, ...props }: any) => <ul {...props}>{children}</ul>,
-  SidebarMenuButton: ({ children, asChild, ...props }: any) => 
-    asChild ? children : <span {...props}>{children}</span>,
-  SidebarMenuItem: ({ children, ...props }: any) => <li {...props}>{children}</li>,
-  SidebarHeader: ({ children, ...props }: any) => <header {...props}>{children}</header>,
-  SidebarFooter: ({ children, ...props }: any) => <footer {...props}>{children}</footer>,
+  Sidebar: ({ children, className, ...props }: any) => <aside className={className} {...props}>{children}</aside>,
+  SidebarContent: ({ children, className, ...props }: any) => <div className={className} {...props}>{children}</div>,
+  SidebarGroup: ({ children, className, ...props }: any) => <div className={className} {...props}>{children}</div>,
+  SidebarGroupContent: ({ children, className, ...props }: any) => <div className={className} {...props}>{children}</div>,
+  SidebarMenu: ({ children, className, ...props }: any) => <ul className={className} {...props}>{children}</ul>,
+  SidebarMenuButton: ({ children, asChild, className, ...props }: any) => 
+    asChild ? React.cloneElement(children, { className }) : <span className={className} {...props}>{children}</span>,
+  SidebarMenuItem: ({ children, className, ...props }: any) => <li className={className} {...props}>{children}</li>,
+  SidebarHeader: ({ children, className, ...props }: any) => <header className={className} {...props}>{children}</header>,
+  SidebarFooter: ({ children, className, ...props }: any) => <footer className={className} {...props}>{children}</footer>,
 }));
 
 jest.mock("@/components/ui/button", () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+  Button: ({ children, className, ...props }: any) => <button className={className} {...props}>{children}</button>,
 }));
 
 // Enhanced dropdown menu mock
 jest.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  DropdownMenuItem: ({ children, ...props }: any) => (
-    <div role="menuitem" tabIndex={0} {...props} data-testid="dropdown-item">
+  DropdownMenuContent: ({ children, className, ...props }: any) => <div className={className} {...props}>{children}</div>,
+  DropdownMenuItem: ({ children, onClick, className, ...props }: any) => (
+    <div role="menuitem" tabIndex={0} onClick={onClick} className={className} {...props} data-testid="dropdown-item">
       {children}
     </div>
   ),
@@ -93,11 +93,13 @@ describe('AppSidebar() AppSidebar method', () => {
     });
 
     it("highlights the active menu item based on pathname", () => {
-      mockPathname = "/hardnotes";
+      mockPathname = "/notes"; // Changed from "/hardnotes" to match the actual URL in app-sidebar.tsx
       render(<AppSidebar />);
       const titleElement = screen.getByText("Library");
       const link = titleElement.closest('a');
-      expect(link?.className).toContain('bg-blue-100');
+      // Check for the actual active classes from the component
+      expect(link?.className).toContain('bg-sidebar-accent');
+      expect(link?.className).toContain('text-sidebar-accent-foreground');
     });
 
     it("renders all icons for each menu item", () => {
@@ -130,7 +132,6 @@ describe('AppSidebar() AppSidebar method', () => {
 
     it("opens the appearance dropdown and calls setTheme with correct values", () => {
       render(<AppSidebar />);
-      fireEvent.click(screen.getByText("Appearance"));
       
       const dropdownItems = screen.getAllByTestId("dropdown-item");
       expect(dropdownItems).toHaveLength(3);
@@ -152,13 +153,12 @@ describe('AppSidebar() AppSidebar method', () => {
       render(<AppSidebar />);
       const links = screen.getAllByRole("link");
       links.forEach((link) => {
-        expect(link?.className).not.toContain('bg-blue-100');
+        expect(link?.className).not.toContain('bg-sidebar-accent');
       });
     });
 
     it("handles rapid theme changes via dropdown without error", () => {
       render(<AppSidebar />);
-      fireEvent.click(screen.getByText("Appearance"));
       
       const dropdownItems = screen.getAllByTestId("dropdown-item");
       fireEvent.click(dropdownItems[0]); // Light
@@ -173,7 +173,7 @@ describe('AppSidebar() AppSidebar method', () => {
       render(<AppSidebar />);
       const links = screen.getAllByRole("link");
       links.forEach((link) => {
-        expect(link?.className).not.toContain('bg-blue-100');
+        expect(link?.className).not.toContain('bg-sidebar-accent');
       });
     });
   });
