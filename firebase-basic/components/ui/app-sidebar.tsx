@@ -98,16 +98,16 @@ export function AppSidebar() {
                         <item.icon
                           className={`h-4 w-4 transition-colors ${
                             isActive
-                              ? "text-primary"
+                              ? "text-blue-600 dark:text-blue-300"
                               : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
                           }`}
                         />
                         <div className="flex flex-col space y-4 group-data-[collapsible=icon]:hidden">
-                          <span className={`font-medium text-base ${isActive ? "text-primary" : ""}`}>{item.title}</span>
+                          <span className={`font-medium text-base ${isActive ? "text-blue-700 dark:text-blue-300" : ""}`}>{item.title}</span>
                           <span
                             className={`text-xs transition-colors ${
                               isActive
-                                ? "text-primary"
+                                ? "text-blue-500 dark:text-blue-400"
                                 : "text-muted-foreground group-hover:text-sidebar-accent-foreground/80"
                             }`}
                           >
