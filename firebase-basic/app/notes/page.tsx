@@ -21,6 +21,14 @@ import {
   deleteNodeInDB,
   renameNodeInDB,
 } from "@/lib/DBTree";
+import { Button } from "@/components/ui/button";
+import { extractNoteTextFromString } from "@/lib/note/BlockFormat"
+
+import SummaryPanel from "@/components/ai/SummaryPanel"
+import FlashCardSection from "@/components/flashcards/FlashCardSection"
+import SimpleSummaryPanel from "@/components/ai/SimpleSummary";
+import SimpleFlashCardSection from "@/components/ai/SimpleFlashcardPanel";
+import { toast } from "sonner";
 
 export default function NotesPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -29,6 +37,9 @@ export default function NotesPage() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [currentOwnerId, setOwnerID] = useState<string | null>(null);
+
+  const [summary, setSummary] = useState<string | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   useEffect(() => {
     const auth = getAuth();
@@ -71,11 +82,14 @@ export default function NotesPage() {
     let newNode;
     if (type === "folder") {
       newNode = await createFolderInDB(user.uid, "New Folder", null);
+      toast.success(`Folder created!`);
     } else {
       newNode = await createNoteInDB(user.uid, "Untitled Note", null);
+      toast.success(`Note created!`);
     }
     setTree((prev) => addNode(prev, null, type, newNode.id, newNode.name));
   };
+
 
   const handleMove = (draggedId: string, targetFolderId: string | null) => {
     setTree((prev) => {
@@ -145,13 +159,26 @@ export default function NotesPage() {
     }
     return null;
   }
-  
+
   return (
     <div className="flex h-screen">
       <div className="w-1/4 border-r p-2 space-y-2">
         <div className="flex gap-2">
-          <button onClick={() => handleAdd("note")} className="...">+ Note</button>
-          <button onClick={() => handleAdd("folder")} className="...">+ Folder</button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleAdd("note")}
+              className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition-colors duration-200"
+            >
+              + Note
+            </button>
+
+            <button
+              onClick={() => handleAdd("folder")}
+              className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition-colors duration-200"
+            >
+              + Folder
+            </button>
+          </div>
         </div>
 
         <div onDragOver={(e) => e.preventDefault()} className="drop-root-zone">
@@ -181,20 +208,49 @@ export default function NotesPage() {
         </div>
       </div>
 
-      <div className="flex-1 p-4">
-        {selectedNoteId ? (
-          <Main
-            searchParams={{
-              doc: selectedNoteId,
-              ownerId: currentOwnerId ?? undefined,
-              username: user.displayName ?? undefined,
-            }}
-          />
-        ) : (
-          <div>Select a note or folder</div>
-        )}
-      </div>
+      <div className="flex flex-1 gap-6 p-6">
+        <div className="flex-[3] flex flex-col gap-6 items-center">
+          {selectedNoteId ? (
+            <div className="flex flex-col w-full items-center">
+              <div className="w-full max-w-6xl p-4 mb-6 border rounded-2xl bg-white dark:bg-gray-800 shadow">
+                <h2 className="text-2xl font-bold text-left text-gray-900 dark:text-gray-100">
+                  {selectedNote?.name}
+                </h2>
+              </div>
+              <div className="flex-1 min-h-0 w-full max-w-6xl border rounded-2xl overflow-hidden bg-white dark:bg-gray-800 shadow p-2">
+                <Main
+                  searchParams={{
+                    doc: selectedNoteId,
+                    ownerId: currentOwnerId ?? undefined,
+                    username: user.displayName ?? undefined,
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
+              Select a note or folder
+            </div>
+          )}
+        </div>
 
+        <div className="flex-[2] flex flex-col gap-6 items-center">
+          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-gray-900 shadow overflow-hidden">
+            <SimpleSummaryPanel
+              sourceText={extractNoteTextFromString(selectedNote?.content)}
+              title="Summary"
+              className="h-full"
+            />
+          </div>
+
+          <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-gray-900 shadow overflow-hidden">
+            <SimpleFlashCardSection
+              initialText={extractNoteTextFromString(selectedNote?.content)}
+            />
+          </div>
+        </div>
+      </div>
     </div>
+
   );
 }

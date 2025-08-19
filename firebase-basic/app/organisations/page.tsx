@@ -52,8 +52,8 @@ export default function OrganisationsPage() {
   const searchParams = useSearchParams()
   const [orgsData, setOrgsData] = useState<(Org & { joined: boolean })[]>([])
   const [favorites, setFavorites] = useState<Record<string, boolean>>({})
-  const [loading, setLoading] = useState(false)           // data fetch status (not used for page spinner)
-  const [hasLoaded, setHasLoaded] = useState(false)       // first fetch completed?
+  const [loading, setLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [filter, setFilter] = useState<Filter>("all")
   const [showCreate, setShowCreate] = useState(false)
   const [joiningOrgs, setJoiningOrgs] = useState<Set<string>>(new Set())
@@ -114,7 +114,7 @@ export default function OrganisationsPage() {
       toast.error("Failed to load organisations.")
     } finally {
       setLoading(false)
-      setHasLoaded(true) // mark that we completed 1 fetch (success or fail)
+      setHasLoaded(true)
     }
   }, [userId, getPublicOrgs, getPrivateOrgs, db])
 
@@ -239,8 +239,6 @@ export default function OrganisationsPage() {
   /* ---------------------------------------------------------------------- */
   /*                             JSX                                         */
   /* ---------------------------------------------------------------------- */
-  // IMPORTANT: while auth is resolving, render nothing here.
-  // The universal layout shows its own loader, and it will stop once auth resolves.
   if (authLoading) return null
 
   return (
@@ -303,7 +301,6 @@ export default function OrganisationsPage() {
 
       {/* Organisation Cards */}
       <div className="p-8">
-        {/* No page-level spinner. Show cards if we have any. */}
         {orgs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {orgs.map((o) => {
@@ -313,168 +310,151 @@ export default function OrganisationsPage() {
               const isLeaving = leavingOrgs.has(o.id)
 
               return (
-                <Link href={`/organisations/${o.id}`} key={o.id}>
-                  <div
-                    className={`border-2 bg-white dark:bg-neutral-900 rounded-2xl p-8 hover:shadow-xl transition-all relative min-h-[360px] group hover:scale-[1.02] ${
-                      isJoining || isLeaving ? "opacity-75" : ""
-                    } cursor-pointer`}
+                <div
+                  key={o.id}
+                  className={`border-2 bg-white dark:bg-card rounded-2xl p-8 hover:shadow-xl transition-all relative min-h-[360px] group ${
+                    isJoining || isLeaving ? "opacity-75" : ""
+                  }`}
+                >
+                  {/* fav button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm dark:bg-muted/80 dark:hover:bg-muted z-10"
+                    onClick={() => handleToggleFav(o.id)}
+                    disabled={isJoining || isLeaving}
                   >
-                    {/* fav button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/80 hover:bg-white shadow-sm dark:bg-black/80 dark:hover:bg-black z-10"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        handleToggleFav(o.id)
-                      }}
-                      disabled={isJoining || isLeaving}
-                    >
-                      <Heart
-                        className={`h-5 w-5 transition-colors ${
-                          isFav ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500"
-                        }`}
-                      />
-                    </Button>
+                    <Heart
+                      className={`h-5 w-5 transition-colors ${
+                        isFav ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500"
+                      }`}
+                    />
+                  </Button>
 
-                    {/* header */}
-                    <div className="flex items-start gap-4 mb-6">
-                      <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-black">
-                        <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-black">
-                          {o.name.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-xl truncate mb-2">{o.name}</h3>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Badge
-                            variant="secondary"
-                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
-                          >
-                            <Users className="h-3 w-3" />{" "}
-                            <span>
-                              {memberCount} member{memberCount !== 1 ? "s" : ""}
-                            </span>
-                          </Badge>
-                          <Badge
-                            variant="secondary"
-                            className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-black/80 dark:text-gray-300 dark:border-gray-700"
-                          >
-                            {o.isPrivate ? (
-                              <>
-                                <Lock className="h-3 w-3" /> <span>Private</span>
-                              </>
-                            ) : (
-                              <>
-                                <Globe className="h-3 w-3" /> <span>Public</span>
-                              </>
-                            )}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* description */}
-                    <p className="text-muted-foreground leading-relaxed line-clamp-3 min-h-[72px]">
-                      {o.description || "No description provided for this organization."}
-                    </p>
-
-                    {/* badges */}
-                    <div className="flex flex-wrap gap-2 mb-6 mt-4">
-                      {o.joined && !isLeaving && (
-                        <Badge className="px-3 py-1 bg-green-500 text-white">
-                          <UserCheck className="h-3 w-3 inline-block mr-1" /> Joined
-                        </Badge>
-                      )}
-                      {isJoining && (
-                        <Badge className="px-3 py-1 bg-blue-500 text-white">
-                          <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Joining...
-                        </Badge>
-                      )}
-                      {isLeaving && (
-                        <Badge className="px-3 py-1 bg-orange-500 text-white">
-                          <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Leaving...
-                        </Badge>
-                      )}
-                      {isFav && (
-                        <Badge className="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                          <Heart className="h-3 w-3 inline-block mr-1" /> Favorite
-                        </Badge>
-                      )}
-                      {o.role === "Admin" && !isLeaving && (
-                        <Badge className="px-3 py-1 bg-amber-500 text-white">
-                          <Crown className="h-3 w-3 inline-block mr-1" /> Admin
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* actions */}
-                    <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-black/30 relative z-10">
-                      {o.joined && !isLeaving ? (
-                        <Button
-                          size="lg"
-                          className="shadow-md"
-                          disabled={isJoining || isLeaving}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            window.location.href = `/organisations/${o.id}/notes`
-                          }}
+                  {/* header */}
+                  <div className="flex items-start gap-4 mb-6">
+                    <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-border">
+                      <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-background">
+                        {o.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-xl truncate mb-2">{o.name}</h3>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge
+                          variant="secondary"
+                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-muted/80 dark:text-muted-foreground dark:border-border"
                         >
-                          View Notes
-                        </Button>
-                      ) : (
-                        !o.isPrivate &&
-                        !o.joined && (
-                          <Button
-                            size="lg"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleJoin(o.id)
-                            }}
-                            className="shadow-md"
-                            disabled={isJoining || isLeaving}
-                          >
-                            {isJoining ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Joining...
-                              </>
-                            ) : (
-                              "Join Organisation"
-                            )}
-                          </Button>
-                        )
-                      )}
-                      {o.joined && !isLeaving && (
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleLeave(o.id)
-                          }}
-                          disabled={isJoining || isLeaving}
+                          <Users className="h-3 w-3" />{" "}
+                          <span>
+                            {memberCount} member{memberCount !== 1 ? "s" : ""}
+                          </span>
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className="px-2 py-1 bg-white/80 text-gray-700 border border-gray-200 rounded-full flex items-center gap-1 dark:bg-muted/80 dark:text-muted-foreground dark:border-border"
                         >
-                          {isLeaving ? (
+                          {o.isPrivate ? (
                             <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Leaving...
+                              <Lock className="h-3 w-3" /> <span>Private</span>
                             </>
                           ) : (
-                            "Leave"
+                            <>
+                              <Globe className="h-3 w-3" /> <span>Public</span>
+                            </>
                           )}
-                        </Button>
-                      )}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                </Link>
+
+                  {/* description */}
+                  <p className="text-muted-foreground leading-relaxed line-clamp-3 min-h-[72px]">
+                    {o.description || "No description provided for this organization."}
+                  </p>
+
+                  {/* badges */}
+                  <div className="flex flex-wrap gap-2 mb-6 mt-4">
+                    {o.joined && !isLeaving && (
+                      <Badge className="px-3 py-1 bg-green-500 text-white">
+                        <UserCheck className="h-3 w-3 inline-block mr-1" /> Joined
+                      </Badge>
+                    )}
+                    {isJoining && (
+                      <Badge className="px-3 py-1 bg-blue-500 text-white">
+                        <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Joining...
+                      </Badge>
+                    )}
+                    {isLeaving && (
+                      <Badge className="px-3 py-1 bg-orange-500 text-white">
+                        <Loader2 className="h-3 w-3 inline-block mr-1 animate-spin" /> Leaving...
+                      </Badge>
+                    )}
+                    {isFav && (
+                      <Badge className="px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                        <Heart className="h-3 w-3 inline-block mr-1" /> Favorite
+                      </Badge>
+                    )}
+                    {o.role === "Admin" && !isLeaving && (
+                      <Badge className="px-3 py-1 bg-amber-500 text-white">
+                        <Crown className="h-3 w-3 inline-block mr-1" /> Admin
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* actions */}
+                  <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-border relative z-10">
+                    {o.joined && !isLeaving ? (
+                      <Button
+                        size="lg"
+                        className="shadow-md flex-1 basis-1/2"
+                        asChild
+                        disabled={isJoining || isLeaving}
+                      >
+                        <Link href={`/organisations/${o.id}`}>View Organisation</Link>
+                      </Button>
+                    ) : (
+                      !o.isPrivate &&
+                      !o.joined && (
+                        <Button
+                          size="lg"
+                          onClick={() => handleJoin(o.id)}
+                          className="shadow-md w-full"
+                          disabled={isJoining || isLeaving}
+                        >
+                          {isJoining ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Joining...
+                            </>
+                          ) : (
+                            "Join Organisation"
+                          )}
+                        </Button>
+                      )
+                    )}
+                    {o.joined && !isLeaving && (
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="flex-1 basis-1/2"
+                        onClick={() => handleLeave(o.id)}
+                        disabled={isJoining || isLeaving}
+                      >
+                        {isLeaving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Leaving...
+                          </>
+                        ) : (
+                          "Leave"
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               )
             })}
           </div>
         ) : hasLoaded ? (
-          // true empty state AFTER first fetch completes
           <div className="flex items-center justify-center min-h-[500px]">
             <div className="text-center py-20 px-8 max-w-2xl mx-auto">
               <div className="bg-gradient-to-br from-muted/30 to-muted/50 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-8 shadow-lg">
@@ -497,7 +477,6 @@ export default function OrganisationsPage() {
             </div>
           </div>
         ) : (
-          // before first fetch completes: render a neutral spacer (no spinner, no empty flash)
           <div className="min-h-[300px]" />
         )}
       </div>

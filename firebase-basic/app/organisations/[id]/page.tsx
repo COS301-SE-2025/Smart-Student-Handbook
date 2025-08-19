@@ -236,7 +236,7 @@ export default function OrganizationDetailsPage() {
     (html || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
 
   const resolveName = async (uid?: string, members?: Member[]) => {
-    if (!uid) return "Unknown"
+    if (!uid) return ""
     const m = members?.find((mm) => mm.id === uid)
     if (m) return m.name
     try {
@@ -246,7 +246,7 @@ export default function OrganizationDetailsPage() {
         if (us?.name) return us.surname ? `${us.name} ${us.surname}` : us.name
       }
     } catch {/* ignore */}
-    return "Unknown"
+    return ""
   }
 
   const loadOrgNotes = async (orgId: string, members: Member[]): Promise<Note[]> => {
@@ -913,7 +913,7 @@ export default function OrganizationDetailsPage() {
                 {organization.notes.length === 0 ? (
                   <Card>
                     <CardContent className="py-10 text-center text-muted-foreground">
-                      No notes yet. Open the Notes Workspace to create your first note.
+                      No notes yet. 
                     </CardContent>
                   </Card>
                 ) : (
@@ -954,7 +954,8 @@ export default function OrganizationDetailsPage() {
                           <CardContent>
                             <p className="text-muted-foreground text-sm line-clamp-3 mb-4">{note.content}</p>
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>By {note.author}</span>
+                              {/* author name here */}
+                              <span> {note.author}</span>
                               <span>{new Date(note.updatedAt || note.createdAt).toLocaleDateString()}</span>
                             </div>
                           </CardContent>

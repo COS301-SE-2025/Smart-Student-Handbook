@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -42,6 +42,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+export const dynamic = "force-dynamic"; // ← prevents static pre-render (CSR bailout)
 
 type Note = {
   ownerId: string;
@@ -755,12 +757,12 @@ export default function NotePage() {
                               setSelectedNote((prev) =>
                                 prev
                                   ? {
-                                    ...prev,
-                                    collaborators: {
-                                      ...prev.collaborators,
-                                      [user.uid]: false,
-                                    },
-                                  }
+                                      ...prev,
+                                      collaborators: {
+                                        ...prev.collaborators,
+                                        [user.uid]: false,
+                                      },
+                                    }
                                   : null
                               );
                             } catch (err) {
@@ -779,28 +781,29 @@ export default function NotePage() {
                 )}
               </DialogContent>
             </Dialog>
-
           </div>
         );
       }
     });
 
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader
-        title="Library"
-        description="Browse, organize, and edit your personal and shared notes all in one place."
-      />
+    <Suspense fallback={null}>
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          title="Library"
+          description="Browse, organize, and edit your personal and shared notes all in one place."
+        />
 
-      <div className="relative h-[calc(100vh-3.5rem)] flex bg-background">
-
-        {/* Sidebar */}
-        <div className={`
-            ${isSidebarOpen ? "w-80 border-r" : "w-0"} 
-            border-border bg-card/30 flex flex-col 
-            transition-all duration-200 overflow-hidden
-          `}>
-          <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="relative h-[calc(100vh-3.5rem)] flex bg-background">
+          {/* Sidebar */}
+          <div
+            className={`
+              ${isSidebarOpen ? "w-80 border-r" : "w-0"} 
+              border-border bg-card/30 flex flex-col 
+              transition-all duration-200 overflow-hidden
+            `}
+          >
+            <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
               {/* Left: Folder & Note */}
               <div className="flex gap-2">
                 <Button onClick={addFolder} size="sm" variant="outline" className="flex-1 gap-2">
@@ -809,110 +812,105 @@ export default function NotePage() {
                 <Button onClick={addNote} size="sm" className="flex-1 gap-2">
                   <Plus className="h-4 w-4" /> Note
                 </Button>
-            </div>
-          </div>
-
-         <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-1">
-              {testTree.length > 0 ? (
-                renderTree(testTree)
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No notes yet</p>
-                  <p className="text-xs">Create your first note or folder</p>
-                </div>
-              )}
-
-              {sharedTree.length > 0 && (
-                <>
-                  <h4 className="text-sm text-muted-foreground pl-2 mb-1">
-                    Shared
-                  </h4>
-                  {renderTree(sharedTree)}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/** toggle button**/}
-        <button
-          onClick={() => setIsSidebarOpen(v => !v)}
-          title={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
-          className={`
-            absolute top-4 
-            ${isSidebarOpen ? "left-80" : "left-0"}   /* 80 = 20rem */
-            ml-1                                      /* tiny gap */
-            p-1 bg-transparent rounded hover:bg-muted/10 transition
-            z-20
-          `}
-        >
-          {isSidebarOpen 
-            ? <ChevronLeft className="h-5 w-5 text-muted-foreground"/>
-            : <ChevronRight className="h-5 w-5 text-muted-foreground"/>}
-        </button>
-        
-
-        {/* Main content area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {selectedNote ? (
-            <>
-              <div className="p-6 border-b border-border bg-background/80 backdrop-blur-sm">
-                <input
-                  type="text"
-                  value={selectedNote.name}
-                  onChange={(e) =>
-                    handleNoteChange(selectedNote.id, "name", e.target.value)
-                  }
-                  placeholder="Untitled Note"
-                  className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 w-full placeholder:text-muted-foreground"
-                />
               </div>
+            </div>
 
-              <div className="flex-1 overflow-hidden">
-                <div className="h-full p-6">
-                  <div className="h-full max-w-4xl mx-auto">
-                    <div className="h-full [&_.ql-container]:h-[calc(100%-42px)] [&_.ql-editor]:h-full">
-                      <QuillEditor
-                        key={selectedNote.id}
-                        value={selectedNote.content}
-                        readOnly={permission === "read"}
-                        onChange={(newContent) =>
-                          handleNoteChange(selectedNote.id, "content", newContent)
-                        }
-                      />
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-1">
+                {testTree.length > 0 ? (
+                  renderTree(testTree)
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No notes yet</p>
+                    <p className="text-xs">Create your first note or folder</p>
+                  </div>
+                )}
+
+                {sharedTree.length > 0 && (
+                  <>
+                    <h4 className="text-sm text-muted-foreground pl-2 mb-1">Shared</h4>
+                    {renderTree(sharedTree)}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* toggle button */}
+          <button
+            onClick={() => setIsSidebarOpen((v) => !v)}
+            title={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            className={`
+              absolute top-4 
+              ${isSidebarOpen ? "left-80" : "left-0"}   /* 80 = 20rem */
+              ml-1                                      /* tiny gap */
+              p-1 bg-transparent rounded hover:bg-muted/10 transition
+              z-20
+            `}
+          >
+            {isSidebarOpen ? (
+              <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            )}
+          </button>
+
+          {/* Main content area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {selectedNote ? (
+              <>
+                <div className="p-6 border-b border-border bg-background/80 backdrop-blur-sm">
+                  <input
+                    type="text"
+                    value={selectedNote.name}
+                    onChange={(e) => handleNoteChange(selectedNote.id, "name", e.target.value)}
+                    placeholder="Untitled Note"
+                    className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 w-full placeholder:text-muted-foreground"
+                  />
+                </div>
+
+                <div className="flex-1 overflow-hidden">
+                  <div className="h-full p-6">
+                    <div className="h-full max-w-4xl mx-auto">
+                      <div className="h-full [&_.ql-container]:h-[calc(100%-42px)] [&_.ql-editor]:h-full">
+                        <QuillEditor
+                          key={selectedNote.id}
+                          value={selectedNote.content}
+                          readOnly={permission === "read"}
+                          onChange={(newContent) => handleNoteChange(selectedNote.id, "content", newContent)}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-muted/20">
-              <div className="text-center max-w-md">
-                <FileText className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-muted-foreground mb-2">
-                  Select a note to start writing
-                </h3>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Choose a note from the sidebar or create a new one to begin
-                  taking notes
-                </p>
-                <div className="flex gap-2 justify-center">
-                  <Button onClick={addNote} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create Note
-                  </Button>
-                  <Button onClick={addFolder} variant="outline" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create Folder
-                  </Button>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center bg-muted/20">
+                <div className="text-center max-w-md">
+                  <FileText className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                    Select a note to start writing
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Choose a note from the sidebar or create a new one to begin taking notes
+                  </p>
+                  <div className="flex gap-2 justify-center">
+                    <Button onClick={addNote} className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create Note
+                    </Button>
+                    <Button onClick={addFolder} variant="outline" className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create Folder
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </Suspense>
   );
 }
