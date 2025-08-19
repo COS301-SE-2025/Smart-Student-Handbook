@@ -5,20 +5,12 @@
   "database": {
     "rules": "database.rules.json"
   },
-  "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
-  },
+  "hosting": [
+    {
+      "site": "studenthandbook-a215a",
+      "source": "firebase-basic"
+    }
+  ],
   "emulators": {
     "auth": {
       "port": 9099
