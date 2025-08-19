@@ -88,7 +88,7 @@ export function AppSidebar() {
                         href={item.url}
                         className={`relative flex items-center gap-3 px-3 py-5.5 rounded-lg transition-all duration-200 group ${
                           isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-white border border-blue-300 dark:border-blue-700"
                             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         }`}
                       >
@@ -98,16 +98,16 @@ export function AppSidebar() {
                         <item.icon
                           className={`h-4 w-4 transition-colors ${
                             isActive
-                              ? "text-primary"
+                              ? "text-blue-600 dark:text-blue-300"
                               : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
                           }`}
                         />
                         <div className="flex flex-col space y-4 group-data-[collapsible=icon]:hidden">
-                          <span className={`font-medium text-base ${isActive ? "text-primary" : ""}`}>{item.title}</span>
+                          <span className={`font-medium text-base ${isActive ? "text-blue-700 dark:text-blue-300" : ""}`}>{item.title}</span>
                           <span
                             className={`text-xs transition-colors ${
                               isActive
-                                ? "text-primary"
+                                ? "text-blue-500 dark:text-blue-400"
                                 : "text-muted-foreground group-hover:text-sidebar-accent-foreground/80"
                             }`}
                           >
