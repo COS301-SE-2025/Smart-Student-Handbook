@@ -11,8 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { UserIcon } from "lucide-react";
-import { useState } from "react";
+import { UserIcon, Check } from "lucide-react";
+import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
 import { toast } from "sonner";
@@ -38,23 +38,34 @@ export default function ShareNoteDialog({
     onShare,
     searchUsers,
 }: ShareNoteDialogProps) {
-
     const [searchName, setSearchName] = useState("");
     const [searchResults, setSearchResults] = useState<User[]>([]);
     const [collaboratorId, setCollaboratorId] = useState<string | null>(null);
-    const [permission, setPermission] = useState<"read" | "write" | "none">(
-    "none"); 
+    const [permission, setPermission] = useState<"read" | "write" | "none">("none"); 
 
-    const handleSearch = async () => {
-        const results = await searchUsers(searchName);
-        setSearchResults(results);
-        console.log(searchName)
-    };
+    // Debounced search effect
+    useEffect(() => {
+        if (!searchName.trim()) {
+            setSearchResults([]);
+            return;
+        }
+
+        const delay = setTimeout(async () => {
+            try {
+                const results = await searchUsers(searchName);
+                setSearchResults(results);
+            } catch (err) {
+                console.error("Search error:", err);
+            }
+        }, 50);
+
+        return () => clearTimeout(delay);
+    }, [searchName, searchUsers]);
 
     const handleShare = async (e: React.MouseEvent) => {
         e.stopPropagation();
 
-        if (!noteId || !collaboratorId || !permission) {
+        if (!noteId || !collaboratorId || permission === "none") {
             toast.error("Missing note, collaborator, or permission");
             return;
         }
@@ -63,20 +74,19 @@ export default function ShareNoteDialog({
             const functions = getFunctions(app);
             const shareNote = httpsCallable(functions, "shareNote");
 
-            console.log(permission) ; 
-
             const result = await shareNote({ collaboratorId, noteId, permission });
 
             toast.success("Note shared successfully!");
             setOpen(false);
-            setCollaboratorId("");
+            setCollaboratorId(null);
+            setSearchName("");
+            setSearchResults([]);
             console.log(`Shared note ${noteId} with ${collaboratorId}`, result);
         } catch (error: any) {
             console.error("Error sharing note:", error);
             toast.error("Failed to share note.");
         }
     };
-
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -92,27 +102,32 @@ export default function ShareNoteDialog({
                         value={searchName}
                         onChange={(e) => setSearchName(e.target.value)}
                     />
-                    <Button onClick={handleSearch}>Search</Button>
                 </div>
 
                 {searchResults.length > 0 && (
                     <div className="mt-2 space-y-1 max-h-40 overflow-y-auto border rounded p-2">
-                        {searchResults.map((user) => (
-                            <Button
-                                key={user.uid}
-                                variant="ghost"
-                                size="sm"
-                                className="w-full flex items-center justify-start gap-2"
-                                onClick={() => {
-                                    setCollaboratorId(user.uid);
-                                    setSearchName(`${user.name ?? ""} ${user.surname ?? ""}`);
-                                    setSearchResults([]);
-                                }}
-                            >
-                                <UserIcon className="h-4 w-4" />
-                                <span>{user.name ?? "Unnamed"} {user.surname ?? ""}</span>
-                            </Button>
-                        ))}
+                        {searchResults.map((user) => {
+                            const isSelected = collaboratorId === user.uid;
+                            return (
+                                <Button
+                                    key={user.uid}
+                                    variant={isSelected ? "secondary" : "ghost"}
+                                    size="sm"
+                                    className="w-full flex items-center justify-between gap-2"
+                                    onClick={() => {
+                                        setCollaboratorId(user.uid);
+                                        setSearchName(`${user.name ?? ""} ${user.surname ?? ""}`);
+                                        setSearchResults([]);
+                                    }}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <UserIcon className="h-4 w-4" />
+                                        <span>{user.name ?? "Unnamed"} {user.surname ?? ""}</span>
+                                    </div>
+                                    {isSelected && <Check className="h-4 w-4 text-green-500" />}
+                                </Button>
+                            );
+                        })}
                     </div>
                 )}
 

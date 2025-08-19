@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged, User } from "@firebase/auth";
-import { ref, update } from "@firebase/database";
+import { get, ref, update } from "@firebase/database";
 import { db } from "@/lib";
 import NoteTree from "@/components/notes/NoteTree";
 import Main from "@/components/YjsEditor/EditorMain";
@@ -21,30 +21,37 @@ import {
   deleteNodeInDB,
   renameNodeInDB,
 } from "@/lib/DBTree";
-import { Button } from "@/components/ui/button";
 import { extractNoteTextFromString } from "@/lib/note/BlockFormat"
 
-import SummaryPanel from "@/components/ai/SummaryPanel"
-import FlashCardSection from "@/components/flashcards/FlashCardSection"
 import SimpleSummaryPanel from "@/components/ai/SimpleSummary";
-import SimpleFlashCardSection from "@/components/ai/SimpleFlashcardPanel";
+import SimpleFlashCardSection from "@/components/flashcards/SimpleFlashcardPanel";
 import { toast } from "sonner";
 
 export default function NotesPage() {
   const [user, setUser] = useState<User | null>(null);
+  const [displayname , setDisplayName] = useState<string | null>(null) ; 
   const [tree, setTree] = useState<FileNode[]>([]);
   const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [currentOwnerId, setOwnerID] = useState<string | null>(null);
 
-  const [summary, setSummary] = useState<string | null>(null);
-  const [loadingSummary, setLoadingSummary] = useState(false);
-
   useEffect(() => {
     const auth = getAuth();
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+
+    setUser(firebaseUser);
+
+    const names = ref(db , `users/${user?.uid}/UserSettings`) ; 
+    const snapshot = await get(names) ; 
+
+    const data = snapshot.val() ; 
+    setDisplayName(data.name) ; 
+
+
+    console.log("User Names:" , displayname) ; 
+
+    
     });
     return () => unsub();
   }, []);
@@ -222,7 +229,7 @@ export default function NotesPage() {
                   searchParams={{
                     doc: selectedNoteId,
                     ownerId: currentOwnerId ?? undefined,
-                    username: user.displayName ?? undefined,
+                    username: displayname ?? undefined,
                   }}
                 />
               </div>
@@ -237,7 +244,7 @@ export default function NotesPage() {
         <div className="flex-[2] flex flex-col gap-6 items-center">
           <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-gray-900 shadow overflow-hidden">
             <SimpleSummaryPanel
-              sourceText={extractNoteTextFromString(selectedNote?.content)}
+              sourceText={extractNoteTextFromString(selectedNote?.content as any)}
               title="Summary"
               className="h-full"
             />
@@ -245,7 +252,7 @@ export default function NotesPage() {
 
           <div className="w-full max-w-md border rounded-2xl bg-white dark:bg-gray-900 shadow overflow-hidden">
             <SimpleFlashCardSection
-              initialText={extractNoteTextFromString(selectedNote?.content)}
+              initialText={extractNoteTextFromString(selectedNote?.content as any)}
             />
           </div>
         </div>
