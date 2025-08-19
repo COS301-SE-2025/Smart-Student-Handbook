@@ -88,7 +88,7 @@ export function AppSidebar() {
                         href={item.url}
                         className={`relative flex items-center gap-3 px-3 py-5.5 rounded-lg transition-all duration-200 group ${
                           isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-white border border-blue-300 dark:border-blue-700"
                             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         }`}
                       >
