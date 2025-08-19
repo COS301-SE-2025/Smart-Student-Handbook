@@ -137,7 +137,7 @@ export function LoginForm({
           <div className="hidden md:flex items-center justify-center bg-white p-0">
             <div className="relative w-120 h-120">
               <Image
-                src="/sshblogo.png"
+                src="/sshlogo.png"
                 alt="Smart Student Handbook Logo"
                 fill
                 className="object-contain"
