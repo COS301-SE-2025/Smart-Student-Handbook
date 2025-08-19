@@ -327,13 +327,13 @@ export function SmartHeader() {
         return {
           title: "Smart Student Handbook",
           icon: <GraduationCap className="h-4 w-4" />,
-          href: "/",
+          href: "../../dashboard",
         }
       default:
         return {
           title: "Smart Student Handbook",
           icon: <GraduationCap className="h-4 w-4" />,
-          href: "../page.tsx",
+          href: "../../dashboard",
         }
     }
   })()
