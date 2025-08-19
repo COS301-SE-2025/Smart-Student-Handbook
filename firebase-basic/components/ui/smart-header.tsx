@@ -22,6 +22,7 @@ import { fns } from "@/lib/firebase"
 import { getDatabase, ref as dbRef, onValue, remove as dbRemove } from "firebase/database"
 import { isSameDay, parseISO, format } from "date-fns"
 import Link from "next/link"
+import Image from "next/image"
 
 interface Notification {
   id: string
@@ -477,8 +478,15 @@ export function SmartHeader() {
               href={pageInfo.href}
               className="flex items-center gap-2 font-semibold hover:underline underline-offset-4"
             >
-              {pageInfo.icon}
-              <span>{pageInfo.title}</span>
+              <Image
+                src="/header-logo.png"        
+                alt="Smart Student Handbook"
+                width={60}                 
+                height={40}
+                priority
+                className="h-10 w-auto"
+              />
+              <span className="hidden sm:inline">Smart Student Handbook</span>
             </Link>
           </div>
         </div>
