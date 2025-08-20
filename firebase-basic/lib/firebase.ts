@@ -1,3 +1,4 @@
+// lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
 import { getDatabase } from "firebase/database";
@@ -14,16 +15,22 @@ const firebaseConfig = {
 };
 
 // Initialize (or reuse) the App
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Export the services
+// Export the services (singletons)
 export const auth = getAuth(app);
 export const db   = getDatabase(app);
-export const fns  = getFunctions(app);
+
+// ⭐ Explicit region to match your deploy (logs show us-central1)
+export const fns  = getFunctions(app, "us-central1");
 
 // Persist user session across reloads / tabs
 setPersistence(auth, browserLocalPersistence).catch(() => {
   // Some environments block IndexedDB/localStorage — silent fallback to in-memory
 });
 
-export {app} ; 
+// // (Optional) Use the emulator locally
+// if (process.env.NEXT_PUBLIC_USE_FUNCTIONS_EMULATOR === "1") {
+//   const { connectFunctionsEmulator } = await import("firebase/functions");
+//   connectFunctionsEmulator(fns, "localhost", 5001);
+// }

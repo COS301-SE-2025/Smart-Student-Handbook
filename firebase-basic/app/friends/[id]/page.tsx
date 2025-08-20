@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { httpsCallable } from "firebase/functions"
+import { fns } from "@/lib/firebase"
 import { getAuth } from "firebase/auth"
-import { getDatabase, ref, get, onValue, set, remove, off } from "firebase/database"
+import { getDatabase, ref, onValue, off, get } from "firebase/database"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import Link from "next/link"
 import {
   ArrowLeft,
   UserPlus,
@@ -17,10 +20,28 @@ import {
   FileText,
   Mail,
   Phone,
-  MapPin,
-  Calendar,
   Users,
+  GraduationCap,
+  Globe,
+  Lock,
 } from "lucide-react"
+import { toast } from "sonner"
+
+interface Friend {
+  uid: string
+  name: string
+  surname: string
+  profilePicture?: string
+  email?: string
+}
+
+interface Organization {
+  id: string
+  name: string
+  description: string
+  isPrivate: boolean
+  members: Record<string, string>
+}
 
 export default function FriendPage() {
   const params = useParams()
@@ -28,22 +49,136 @@ export default function FriendPage() {
   const id = params.id as string
   const [friend, setFriend] = useState<any>(null)
   const [status, setStatus] = useState<"friends" | "sent" | "incoming" | "none">("none")
-  const [mutualFriends, setMutualFriends] = useState<any[]>([])
-  const [commonOrgs, setCommonOrgs] = useState<string[]>([])
+  const [mutualFriends, setMutualFriends] = useState<Friend[]>([])
+  const [mutualOrganizations, setMutualOrganizations] = useState<Organization[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMutuals, setLoadingMutuals] = useState(false)
 
   const currentUser = getAuth().currentUser
   const db = getDatabase()
 
+  // Firebase Functions
+  const sendFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "sendFriendRequest")
+  const acceptFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "acceptFriendRequest")
+  const rejectFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "rejectFriendRequest")
+  const cancelFriendRequestFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "cancelFriendRequest")
+  const removeFriendFunc = httpsCallable<{ targetUserId: string }, { success: boolean, message: string }>(fns, "removeFriend")
+
+  // Load mutual friends and organizations
+  const loadMutualData = async () => {
+    if (!currentUser) return
+    setLoadingMutuals(true)
+    
+    try {
+      // Get current user's friends and organizations
+      const [currentUserSnapshot, friendUserSnapshot, organizationsSnapshot] = await Promise.all([
+        get(ref(db, `users/${currentUser.uid}`)),
+        get(ref(db, `users/${id}`)),
+        get(ref(db, `organizations`))
+      ])
+
+      const currentUserData = currentUserSnapshot.val()
+      const friendUserData = friendUserSnapshot.val()
+      const organizationsData = organizationsSnapshot.val()
+
+      const currentUserFriends = Object.keys(currentUserData?.friends || {})
+      const friendUserFriends = Object.keys(friendUserData?.friends || {})
+      
+      // Find mutual friends
+      const mutualFriendIds = currentUserFriends.filter(friendId => friendUserFriends.includes(friendId))
+      const mutualFriendsData: Friend[] = []
+
+      for (const friendId of mutualFriendIds) {
+        // Get full user data, not just UserSettings
+        const friendSnapshot = await get(ref(db, `users/${friendId}`))
+        if (friendSnapshot.exists()) {
+          const friendData = friendSnapshot.val()
+          const userSettings = friendData.UserSettings || {}
+          
+          // Try to get email from different possible locations
+          const email = friendData.email || userSettings.email || ""
+          
+          mutualFriendsData.push({
+            uid: friendId,
+            name: userSettings.name || "",
+            surname: userSettings.surname || "",
+            profilePicture: userSettings.profilePicture || "",
+            email: email
+          })
+        }
+      }
+
+      // Find mutual organizations - FIXED LOGIC
+      const mutualOrgsData: Organization[] = []
+      if (organizationsData) {
+        // Check all organizations where both users are members
+        Object.entries(organizationsData).forEach(([orgId, orgData]: [string, any]) => {
+          const members = orgData.members || {}
+          const currentUserIsMember = !!members[currentUser.uid]
+          const friendIsMember = !!members[id]
+          
+          if (currentUserIsMember && friendIsMember) {
+            mutualOrgsData.push({
+              id: orgId,
+              name: orgData.name || "",
+              description: orgData.description || "",
+              isPrivate: !!orgData.isPrivate,
+              members: members
+            })
+          }
+        })
+      }
+
+      console.log(`Found ${mutualOrgsData.length} mutual organizations for user ${id}:`, 
+        mutualOrgsData.map(org => ({
+          name: org.name,
+          isPrivate: org.isPrivate,
+          memberCount: Object.keys(org.members).length,
+          currentUserRole: org.members[currentUser.uid],
+          friendRole: org.members[id]
+        }))
+      )
+
+      setMutualFriends(mutualFriendsData)
+      setMutualOrganizations(mutualOrgsData)
+    } catch (error) {
+      console.error("Error loading mutual data:", error)
+    } finally {
+      setLoadingMutuals(false)
+    }
+  }
+
   useEffect(() => {
     if (!currentUser) return
 
-    const friendRef = ref(db, `users/${id}/UserSettings`)
+    // Try to get email from the user's root data first, then fallback to UserSettings
+    const friendRootRef = ref(db, `users/${id}`)
     const currentUserRef = ref(db, `users/${currentUser.uid}`)
-    const friendFriendsRef = ref(db, `users/${id}/friends`)
-    const currentFriendsRef = ref(db, `users/${currentUser.uid}/friends`)
 
-    const unsubProfile = onValue(friendRef, (snapshot) => {
-      if (snapshot.exists()) setFriend(snapshot.val())
+    const unsubProfile = onValue(friendRootRef, async (snapshot) => {
+      if (snapshot.exists()) {
+        const userData = snapshot.val()
+        console.log('Full user data loaded:', userData) // Debug log
+        
+        // Try to get email from root level first
+        let friendData = userData.UserSettings || {}
+        let friendEmail = userData.email || friendData.email || ""
+        
+        // If no email found, try different paths
+        if (!friendEmail && userData.UserSettings?.email) {
+          friendEmail = userData.UserSettings.email
+        }
+        
+        // Combine the data
+        const combinedFriendData = {
+          ...friendData,
+          email: friendEmail
+        }
+        
+        console.log('Combined friend data:', combinedFriendData) // Debug log
+        setFriend(combinedFriendData)
+      }
+      setLoading(false)
     })
 
     const unsubStatus = onValue(currentUserRef, (snapshot) => {
@@ -57,77 +192,76 @@ export default function FriendPage() {
       else if (incoming[id]) setStatus("incoming")
       else if (sent[id]) setStatus("sent")
       else setStatus("none")
-
-      const myOrgs = new Set<string>(userData.organizations || [])
-      const theirOrgs = new Set<string>(friend?.organizations || [])
-      const common = [...myOrgs].filter((org) => theirOrgs.has(org))
-      setCommonOrgs(common)
     })
 
-    const unsubMutuals = onValue(currentFriendsRef, (snap1) => {
-      const currentList = snap1.exists() ? Object.keys(snap1.val()) : []
-      onValue(friendFriendsRef, (snap2) => {
-        const friendList = snap2.exists() ? Object.keys(snap2.val()) : []
-        const mutuals = currentList.filter((uid) => friendList.includes(uid))
-        Promise.all(
-          mutuals.map(async (uid) => {
-            const s = await get(ref(db, `users/${uid}/UserSettings`))
-            return { uid, ...s.val() }
-          }),
-        ).then(setMutualFriends)
-      })
-    })
+    // Load mutual data when component mounts
+    loadMutualData()
 
     return () => {
-      off(friendRef)
+      off(friendRootRef)
       off(currentUserRef)
-      off(friendFriendsRef)
-      off(currentFriendsRef)
     }
-  }, [id, currentUser, friend])
+  }, [id, currentUser])
 
   const handleSendRequest = async () => {
-    if (!currentUser || !friend) return
-    const requestData = {
-      name: friend.name ?? "",
-      surname: friend.surname ?? "",
-      email: friend.email ?? "",
+    try {
+      const result = await sendFriendRequestFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("sent")
+    } catch (error: any) {
+      console.error("Error sending friend request:", error)
+      toast.error(error.message || "Failed to send friend request")
     }
-    await set(ref(db, `users/${currentUser.uid}/sentRequests/${id}`), requestData)
-    await set(ref(db, `users/${id}/incomingRequests/${currentUser.uid}`), {
-      name: currentUser.displayName ?? "",
-      email: currentUser.email ?? "",
-    })
   }
 
   const handleCancel = async () => {
-    if (!currentUser) return
-    await remove(ref(db, `users/${currentUser.uid}/sentRequests/${id}`))
-    await remove(ref(db, `users/${id}/incomingRequests/${currentUser.uid}`))
+    try {
+      const result = await cancelFriendRequestFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("none")
+    } catch (error: any) {
+      console.error("Error cancelling friend request:", error)
+      toast.error(error.message || "Failed to cancel friend request")
+    }
   }
 
   const handleAccept = async () => {
-    if (!currentUser) return
-    await set(ref(db, `users/${currentUser.uid}/friends/${id}`), true)
-    await set(ref(db, `users/${id}/friends/${currentUser.uid}`), true)
-    await remove(ref(db, `users/${currentUser.uid}/incomingRequests/${id}`))
-    await remove(ref(db, `users/${id}/sentRequests/${currentUser.uid}`))
+    try {
+      const result = await acceptFriendRequestFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("friends")
+      // Reload mutual data since they're now friends
+      loadMutualData()
+    } catch (error: any) {
+      console.error("Error accepting friend request:", error)
+      toast.error(error.message || "Failed to accept friend request")
+    }
   }
 
   const handleReject = async () => {
-    if (!currentUser) return
-    await remove(ref(db, `users/${currentUser.uid}/incomingRequests/${id}`))
-    await remove(ref(db, `users/${id}/sentRequests/${currentUser.uid}`))
+    try {
+      const result = await rejectFriendRequestFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("none")
+    } catch (error: any) {
+      console.error("Error rejecting friend request:", error)
+      toast.error(error.message || "Failed to reject friend request")
+    }
   }
 
   const handleUnfriend = async () => {
-    if (!currentUser) return
-    await remove(ref(db, `users/${currentUser.uid}/friends/${id}`))
-    await remove(ref(db, `users/${id}/friends/${currentUser.uid}`))
+    try {
+      const result = await removeFriendFunc({ targetUserId: id })
+      toast.success(result.data.message)
+      setStatus("none")
+    } catch (error: any) {
+      console.error("Error removing friend:", error)
+      toast.error(error.message || "Failed to remove friend")
+    }
   }
 
   const getInitials = (name: string, surname: string) => {
-    return `${name.charAt(0)}${surname.charAt(0)}`.toUpperCase()
+    return `${name?.charAt(0) || ''}${surname?.charAt(0) || ''}`.toUpperCase()
   }
 
   const getActionButton = () => {
@@ -135,12 +269,12 @@ export default function FriendPage() {
       case "friends":
         return (
           <Button variant="destructive" onClick={handleUnfriend}>
-            <UserX className="h-4 w-4 mr-2" /> Cancel Friendship
+            <UserX className="h-4 w-4 mr-2" /> Remove Friend
           </Button>
         )
       case "sent":
         return (
-          <Button variant="destructive" onClick={handleCancel}>
+          <Button variant="outline" onClick={handleCancel}>
             <UserX className="h-4 w-4 mr-2" /> Cancel Request
           </Button>
         )
@@ -150,7 +284,7 @@ export default function FriendPage() {
             <Button onClick={handleAccept}>
               <UserCheck className="h-4 w-4 mr-2" /> Accept
             </Button>
-            <Button variant="destructive" onClick={handleReject}>
+            <Button variant="outline" onClick={handleReject}>
               <UserX className="h-4 w-4 mr-2" /> Reject
             </Button>
           </div>
@@ -164,9 +298,20 @@ export default function FriendPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
@@ -174,10 +319,11 @@ export default function FriendPage() {
           {getActionButton()}
         </div>
 
+        {/* Main Profile Card */}
         <Card>
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-6">
-              <Avatar className="h-24 w-24">
+              <Avatar className="h-24 w-24 mx-auto md:mx-0">
                 <AvatarImage
                   src={friend?.profilePicture || "/placeholder.svg"}
                   alt={`${friend?.name} ${friend?.surname}`}
@@ -186,30 +332,43 @@ export default function FriendPage() {
                   {getInitials(friend?.name ?? "?", friend?.surname ?? "?")}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1">
-                <h1 className="text-3xl font-bold mb-2">
-                  {friend?.name} {friend?.surname}
-                </h1>
-                <p className="text-muted-foreground mb-2">{friend?.bio}</p>
+              
+              <div className="flex-1 text-center md:text-left">
+                <div className="mb-3">
+                  <h1 className="text-3xl font-bold mb-2">
+                    {friend?.name} {friend?.surname}
+                  </h1>
+                </div>
+                
+                {friend?.description && (
+                  <p className="text-muted-foreground mb-4">{friend.description}</p>
+                )}
+                
+                {/* Additional profile info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  {/* Email should be displayed here with the other info */}
                   {friend?.email && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Mail className="h-4 w-4" /> <span>{friend.email}</span>
+                    <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                      <Mail className="h-4 w-4" /> 
+                      <span>{friend.email}</span>
+                    </div>
+                  )}
+                  {friend?.degree && (
+                    <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                      <GraduationCap className="h-4 w-4" /> 
+                      <span>{friend.degree}</span>
+                    </div>
+                  )}
+                  {friend?.occupation && (
+                    <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                      <Building2 className="h-4 w-4" /> 
+                      <span>{friend.occupation}</span>
                     </div>
                   )}
                   {friend?.phone && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-4 w-4" /> <span>{friend.phone}</span>
-                    </div>
-                  )}
-                  {friend?.location && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" /> <span>{friend.location}</span>
-                    </div>
-                  )}
-                  {friend?.joinDate && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-4 w-4" /> <span>Joined {friend.joinDate}</span>
+                    <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                      <Phone className="h-4 w-4" /> 
+                      <span>{friend.phone}</span>
                     </div>
                   )}
                 </div>
@@ -218,81 +377,118 @@ export default function FriendPage() {
           </CardContent>
         </Card>
 
-        {/* Mutual Friends */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" /> Mutual Friends
-              <Badge variant="secondary" className="ml-auto">
-                {mutualFriends.length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {mutualFriends.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {mutualFriends.map((f) => (
-                  <div key={f.uid} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 border">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={f.profilePicture || ""} alt={f.name} />
-                      <AvatarFallback>
-                        {f.name.charAt(0)}
-                        {f.surname?.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium">
-                      {f.name} {f.surname}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No mutual friends found</p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Mutual Friends Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Mutual Friends
+                <Badge variant="secondary">{mutualFriends.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingMutuals ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </div>
+              ) : mutualFriends.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                  <p className="text-muted-foreground">No mutual friends</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {mutualFriends.slice(0, 5).map((mutualFriend) => (
+                    <Link key={mutualFriend.uid} href={`/friends/${mutualFriend.uid}`}>
+                      <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={mutualFriend.profilePicture || "/placeholder.svg"} />
+                          <AvatarFallback className="bg-muted text-foreground">
+                            {getInitials(mutualFriend.name, mutualFriend.surname)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">
+                            {mutualFriend.name} {mutualFriend.surname}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {mutualFriend.email || 'Mutual friend'}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                  {mutualFriends.length > 5 && (
+                    <p className="text-sm text-muted-foreground text-center pt-2">
+                      and {mutualFriends.length - 5} more mutual friends
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Common Organizations */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" /> Common Organizations
-              <Badge variant="secondary" className="ml-auto">
-                {commonOrgs.length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {commonOrgs.length > 0 ? (
-              <ul className="space-y-2">
-                {commonOrgs.map((org, i) => (
-                  <li key={i} className="bg-muted/50 px-3 py-2 rounded-md border">
-                    {org}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">No common organizations found.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Shared Notes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" /> Shared Notes
-              <Badge variant="secondary" className="ml-auto">
-                0
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Shared and public notes from this user will appear here once available.
-            </p>
-          </CardContent>
-        </Card>
+          {/* Mutual Organizations Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Mutual Organizations
+                <Badge variant="secondary">{mutualOrganizations.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingMutuals ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </div>
+              ) : mutualOrganizations.length === 0 ? (
+                <div className="text-center py-8">
+                  <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                  <p className="text-muted-foreground">No mutual organizations</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {mutualOrganizations.slice(0, 5).map((org) => (
+                    <Link key={org.id} href={`/organisations/${org.id}`}>
+                      <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-muted text-foreground">
+                            {org.name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm truncate">{org.name}</p>
+                            {org.isPrivate ? (
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            ) : (
+                              <Globe className="h-3 w-3 text-muted-foreground" />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {Object.keys(org.members).length} members
+                          </p>
+                          {org.description && (
+                            <p className="text-xs text-muted-foreground truncate mt-1">
+                              {org.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                  {mutualOrganizations.length > 5 && (
+                    <p className="text-sm text-muted-foreground text-center pt-2">
+                      and {mutualOrganizations.length - 5} more organizations
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

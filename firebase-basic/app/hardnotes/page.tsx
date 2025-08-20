@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -16,6 +16,7 @@ import {
   User,
   UserIcon,
 } from "lucide-react";
+import { ChevronLeft, ChevronRight as ChevronRightToggle } from "lucide-react";
 import Link from "next/link";
 import QuillEditor from "@/components/quilleditor";
 import "react-quill/dist/quill.snow.css";
@@ -41,6 +42,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+export const dynamic = "force-dynamic"; // ← prevents static pre-render (CSR bailout)
 
 type Note = {
   ownerId: string;
@@ -76,6 +79,7 @@ type FileNode = Note | Folder;
 const generateId = () => Math.random().toString(36).slice(2, 9);
 
 export default function NotePage() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [testTree, setTree] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
@@ -694,7 +698,7 @@ export default function NotePage() {
                     Cancel
                   </Button>
                   <Button
-                    onClick={(e) => handleShare(e, selectedNote?.id, permission)}
+                    onClick={(e) => handleShare(e, selectedNote!.id, permission)}
                     disabled={!collaboratorId.trim()}
                   >
                     Share
@@ -753,12 +757,12 @@ export default function NotePage() {
                               setSelectedNote((prev) =>
                                 prev
                                   ? {
-                                    ...prev,
-                                    collaborators: {
-                                      ...prev.collaborators,
-                                      [user.uid]: false,
-                                    },
-                                  }
+                                      ...prev,
+                                      collaborators: {
+                                        ...prev.collaborators,
+                                        [user.uid]: false,
+                                      },
+                                    }
                                   : null
                               );
                             } catch (err) {
@@ -777,188 +781,136 @@ export default function NotePage() {
                 )}
               </DialogContent>
             </Dialog>
-
-          </div>
-        );
-      }
-    });
-
-    const renderShareTree = (nodes: FileNode[], depth = 0) =>
-    nodes.map((node) => {
-      if (node.type === "folder") {
-        const isSelected = selectedFolderId === node.id;
-        return (
-          <div key={node.id} className="mb-1">
-            <div
-              className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group ${isSelected ? "bg-muted" : ""
-                }`}
-              style={{ marginLeft: depth * 20 }}
-            >
-              <FolderIcon className="h-4 w-4 text-blue-500 mr-2 flex-shrink-0" />
-
-              <div className="flex-1 min-w-0">
-                {isSelected ? (
-                  <input
-                    type="text"
-                    value={node.name}
-                    onChange={(e) =>
-                      handleFolderNameChange(node.id, e.target.value)
-                    }
-                    onClick={(e) => e.stopPropagation()}
-                    className="bg-transparent border-none focus:outline-none focus:ring-0 w-full font-medium text-sm"
-                    autoFocus
-                  />
-                ) : (
-                  <span
-                    className="font-medium text-sm truncate cursor-pointer"
-                    onClick={() => {
-                      setSelectedFolderId(node.id);
-                      setSelectedNote(null);
-                    }}
-                  >
-                    {node.name}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {node.expanded && (
-              <div className="mt-1">{renderTree(node.children, depth + 1)}</div>
-            )}
-          </div>
-        );
-      } else {
-        const isSelected = selectedNote?.id === node.id;
-        return (
-          <div
-            key={node.id}
-            className={`flex items-center py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer mb-1 ${isSelected ? "bg-blue-50 border border-blue-200" : ""
-              }`}
-            style={{ marginLeft: (depth + 1) * 20 }}
-            onClick={() => handleSelectNote(node)}
-          >
-            <FileText className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
-
-            <span
-              className={`flex-1 text-sm truncate ${isSelected ? "font-medium text-blue-700" : ""
-                }`}
-            >
-              {node.name}
-            </span>
           </div>
         );
       }
     });
 
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader
-        title="Notes Editor"
-        description="Browse, organize, and edit your personal and shared notes all in one place."
-      />
-      <div className="h-[calc(100vh-3.5rem)] flex bg-background overflow-hidden">
-        <div className="w-80 border-r border-border bg-card/30 flex flex-col">
-          <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
+    <Suspense fallback={null}>
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          title="Library"
+          description="Browse, organize, and edit your personal and shared notes all in one place."
+        />
 
-            <div className="flex gap-2">
-              <Button
-                onClick={addFolder}
-                size="sm"
-                variant="outline"
-                className="flex-1 gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Folder
-              </Button>
-              <Button onClick={addNote} size="sm" className="flex-1 gap-2">
-                <Plus className="h-4 w-4" />
-                Note
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-1">
-              {testTree.length > 0 ? (
-                renderTree(testTree)
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No notes yet</p>
-                  <p className="text-xs">Create your first note or folder</p>
-                </div>
-              )}
-
-              {sharedTree.length > 0 && (
-                <>
-                  <h4 className="text-sm text-muted-foreground pl-2 mb-1">
-                    Shared
-                  </h4>
-                  {renderShareTree(sharedTree)}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {selectedNote ? (
-            <>
-              <div className="p-6 border-b border-border bg-background/80 backdrop-blur-sm">
-                <input
-                  type="text"
-                  value={selectedNote.name}
-                  onChange={(e) =>
-                    handleNoteChange(selectedNote.id, "name", e.target.value)
-                  }
-                  placeholder="Untitled Note"
-                  className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 w-full placeholder:text-muted-foreground"
-                />
+        <div className="relative h-[calc(100vh-3.5rem)] flex bg-background">
+          {/* Sidebar */}
+          <div
+            className={`
+              ${isSidebarOpen ? "w-80 border-r" : "w-0"} 
+              border-border bg-card/30 flex flex-col 
+              transition-all duration-200 overflow-hidden
+            `}
+          >
+            <div className="p-4 border-b border-border bg-background/80 backdrop-blur-sm">
+              {/* Left: Folder & Note */}
+              <div className="flex gap-2">
+                <Button onClick={addFolder} size="sm" variant="outline" className="flex-1 gap-2">
+                  <Plus className="h-4 w-4" /> Folder
+                </Button>
+                <Button onClick={addNote} size="sm" className="flex-1 gap-2">
+                  <Plus className="h-4 w-4" /> Note
+                </Button>
               </div>
+            </div>
 
-              <div className="flex-1 overflow-hidden">
-                <div className="h-full p-6">
-                  <div className="h-full max-w mx-auto">
-                    <div className="h-full [&_.ql-container]:h-[calc(100%-42px)] [&_.ql-editor]:h-full">
-                      <QuillEditor
-                        key={selectedNote.id}
-                        value={selectedNote.content}
-                        readOnly={permission === "read"}
-                        onChange={(newContent) =>
-                          handleNoteChange(selectedNote.id, "content", newContent)
-                        }
-                      />
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-1">
+                {testTree.length > 0 ? (
+                  renderTree(testTree)
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No notes yet</p>
+                    <p className="text-xs">Create your first note or folder</p>
+                  </div>
+                )}
+
+                {sharedTree.length > 0 && (
+                  <>
+                    <h4 className="text-sm text-muted-foreground pl-2 mb-1">Shared</h4>
+                    {renderTree(sharedTree)}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* toggle button */}
+          <button
+            onClick={() => setIsSidebarOpen((v) => !v)}
+            title={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            className={`
+              absolute top-4 
+              ${isSidebarOpen ? "left-80" : "left-0"}   /* 80 = 20rem */
+              ml-1                                      /* tiny gap */
+              p-1 bg-transparent rounded hover:bg-muted/10 transition
+              z-20
+            `}
+          >
+            {isSidebarOpen ? (
+              <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            )}
+          </button>
+
+          {/* Main content area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {selectedNote ? (
+              <>
+                <div className="p-6 border-b border-border bg-background/80 backdrop-blur-sm">
+                  <input
+                    type="text"
+                    value={selectedNote.name}
+                    onChange={(e) => handleNoteChange(selectedNote.id, "name", e.target.value)}
+                    placeholder="Untitled Note"
+                    className="text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 w-full placeholder:text-muted-foreground"
+                  />
+                </div>
+
+                <div className="flex-1 overflow-hidden">
+                  <div className="h-full p-6">
+                    <div className="h-full max-w-4xl mx-auto">
+                      <div className="h-full [&_.ql-container]:h-[calc(100%-42px)] [&_.ql-editor]:h-full">
+                        <QuillEditor
+                          key={selectedNote.id}
+                          value={selectedNote.content}
+                          readOnly={permission === "read"}
+                          onChange={(newContent) => handleNoteChange(selectedNote.id, "content", newContent)}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-muted/20">
-              <div className="text-center max-w-md">
-                <FileText className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-muted-foreground mb-2">
-                  Select a note to start writing
-                </h3>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Choose a note from the sidebar or create a new one to begin
-                  taking notes
-                </p>
-                <div className="flex gap-2 justify-center">
-                  <Button onClick={addNote} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create Note
-                  </Button>
-                  <Button onClick={addFolder} variant="outline" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create Folder
-                  </Button>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center bg-muted/20">
+                <div className="text-center max-w-md">
+                  <FileText className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                    Select a note to start writing
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Choose a note from the sidebar or create a new one to begin taking notes
+                  </p>
+                  <div className="flex gap-2 justify-center">
+                    <Button onClick={addNote} className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create Note
+                    </Button>
+                    <Button onClick={addFolder} variant="outline" className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create Folder
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </Suspense>
   );
 }

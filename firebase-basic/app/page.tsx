@@ -79,7 +79,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       {/* Banner Image */}
       <section className="w-full">
-        <div className="relative w-full h-[600px] md:h-[600px]">
+        <div className="relative w-full h-[600px] md:h-[600px] overflow-hidden">
           <Image
             src="/sshbbanner.png"
             alt="Smart Student Handbook Banner"
@@ -108,7 +108,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button
                 size="lg"
-                className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg font-semibold transition-all duration-200 disabled:opacity-70"
+                className="bg-black text-white hover:bg-gray-800 px-8 py-3 text-lg font-semibold transition-all duration-200 disabled:opacity-70"
                 disabled={isLoginLoading}
                 onClick={() => {
                   setIsLoginLoading(true)
@@ -118,7 +118,7 @@ export default function Home() {
                 {isLoginLoading ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Redirecting...</span>
+                    <span></span>
                   </div>
                 ) : (
                   "Login"
@@ -127,7 +127,7 @@ export default function Home() {
 
               <Button
                 size="lg"
-                className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg font-semibold transition-all duration-200 disabled:opacity-70"
+                className="bg-black text-white hover:bg-gray-800 px-8 py-3 text-lg font-semibold transition-all duration-200 disabled:opacity-70"
                 disabled={isSignupLoading}
                 onClick={() => {
                   setIsSignupLoading(true)
@@ -137,7 +137,7 @@ export default function Home() {
                 {isSignupLoading ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Redirecting...</span>
+                    <span></span>
                   </div>
                 ) : (
                   "Sign Up"
@@ -239,11 +239,15 @@ export default function Home() {
           <p className="text-gray-700">
             Join thousands of students already using Smart Student Handbook to enhance their academic journey.
           </p>
-          <Link href="/signup">
-            <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg font-semibold">
-              Start Your Free Trial
+          
+            <Button 
+              size="lg" 
+              className="bg-black text-white hover:bg-gray-800 px-8 py-3 text-lg font-semibold"
+              onClick={() => window.open("/user-manual.pdf", "_blank")} 
+            >
+              User Manual
             </Button>
-          </Link>
+          
         </div>
       </section>
 
