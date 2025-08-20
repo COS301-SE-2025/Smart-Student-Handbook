@@ -55,7 +55,8 @@ Built to boost academic productivity and make studying simpler and smarter.
 - 📄 [Functional Requirements (SRS v3)](https://docs.google.com/document/d/1hx7fG0_NB3ZX6MbRYp7rPdcK3UcVKukj/edit?usp=sharing&ouid=110216960497066760698&rtpof=true&sd=true)
 - `</>` [Coding Standards & Style Guide](https://docs.google.com/document/d/1jon85aK5e1c0lPFog6cDFowFoMS-bff--frhNm1pH8U/edit?usp=sharing)
 - 📝 [Architectural Requirements Design](https://drive.google.com/file/d/1H1dOGesQxQaboIQTfN0642f6wKESVrzi/view?usp=sharing)
-- 📖 [User Manual](https://docs.google.com/document/d/1zn6EdZky7Wvaw14rAB7GTqvU5vIcr9i1lcMXVe_Ohdg/edit?usp=sharing)
+- 📝 [Technical Installation Manual](https://drive.google.com/file/d/1qz2uF8kpABSmg4iEk7dPEaQhs5RrJ3Yp/view?usp=sharing)
+- 📖 [User Manual](https://drive.google.com/file/d/1qDhr2VoTKRUb15Flq_DGgGrum7w6Je19/view?usp=sharing)
 - 📖 [Deployment Diagram](https://drive.google.com/file/d/1XvGKjqRUz9UwgsGNMfPuPc65xKprGZGK/view?usp=drive_link)
 - 🔗[Demo Video](https://drive.google.com/file/d/1Tkw3Wsu43KCyIVX9yeC8zNIBY9Rl5UNT/view?usp=sharing)
 
@@ -197,6 +198,7 @@ We follow a customized GitFlow:
 
 
 ---
+
 
 
 
