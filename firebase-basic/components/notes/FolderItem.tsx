@@ -53,7 +53,7 @@ export default function FolderItem({
       }}
       style={style}
       className={cn(
-        "flex items-center gap-2 px-3 py-1 rounded cursor-pointer group",
+        "flex gap-2 rounded cursor-pointer group",
         isOver && "bg-blue-100"
       )}
     >

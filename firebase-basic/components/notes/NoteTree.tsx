@@ -74,7 +74,7 @@ export default function NodeTree({ treeData, onSelect, onRename, onDelete, onDro
     const isSelected = selectedNodeId === node.id;
 
     return (
-      <div key={node.id} className="pl-4 max-w-full overflow-hidden">
+      <div key={node.id} className="max-w-full overflow-hidden">
         {isFolder ? (
           <>
             <FolderItem
@@ -140,7 +140,7 @@ export default function NodeTree({ treeData, onSelect, onRename, onDelete, onDro
     <DndContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
       <div
         ref={setRootDropRef}
-        className={`dnd-context-container p-4 border rounded
+        className={`dnd-context-container p-3 border
           ${isDragging
             ? theme === 'dark' ? "border-blue-500 bg-gray-800" : "border-blue-500 bg-blue-50"
             : theme === 'dark' ? "border-gray-700 bg-gray-900 text-white" : "border-gray-300 bg-white text-black"}
