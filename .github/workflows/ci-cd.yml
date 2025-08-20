@@ -50,7 +50,7 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "dummy"
           GOOGLE_APPLICATION_CREDENTIALS: "dummy"
           NEXT_PUBLIC_GEMINI_API_KEY: "dummy"
-          CONNECTION_STRING: "dummy"
+          CONNECTION_STRING: "http://localhost"
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
