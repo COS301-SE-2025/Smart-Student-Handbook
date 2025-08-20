@@ -422,7 +422,7 @@ export default function FlashCardSection({
                             <CardContent className="h-full flex flex-col justify-center items-center relative p-8">
                               <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
                                 <div className="inline-flex items-center justify-center px-3 py-1 rounded-lg bg-white border-2 border-black">
-                                  <span className="font-normal text-sm uppercase tracking-wide text-black">
+                                  <span className="font-semibold text-sm uppercase tracking-wide text-black">
                                     Question
                                   </span>
                                 </div>

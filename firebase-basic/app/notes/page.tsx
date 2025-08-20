@@ -1,3 +1,4 @@
+// app/notes/page.tsx (or wherever this lives)
 "use client";
 
 import { useEffect, useState } from "react";
@@ -22,6 +23,8 @@ import {
   renameNodeInDB,
 } from "@/lib/DBTree";
 import { extractNoteTextFromString } from "@/lib/note/BlockFormat";
+
+// NEW: use the shared Button component
 import { Button } from "@/components/ui/button";
 
 import SummaryPanel from "@/components/ai/SummaryPanel";
@@ -31,18 +34,12 @@ import { toast } from "sonner";
 export default function NotesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [displayname, setDisplayName] = useState<string | null>(null);
-
   const [tree, setTree] = useState<FileNode[]>([]);
   const [sharedTree, setSharedTree] = useState<FileNode[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [currentOwnerId, setOwnerID] = useState<string | null>(null);
 
-  /* -------------------- Organisation notes state (from v1 UI) -------------------- */
-  const [orgTree, setOrgTree] = useState<FileNode[]>([]);
-  const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
-
-  /* -------------------------------- Auth + name -------------------------------- */
   useEffect(() => {
     const auth = getAuth();
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -65,7 +62,6 @@ export default function NotesPage() {
     return () => unsub();
   }, []);
 
-  /* ------------------------------ Personal + shared ----------------------------- */
   useEffect(() => {
     if (!user) return;
 
@@ -79,7 +75,6 @@ export default function NotesPage() {
     fetchTree();
   }, [user]);
 
-  /* ----------------------------- Selected note load ----------------------------- */
   useEffect(() => {
     if (!selectedNoteId) {
       setSelectedNote(null);
@@ -92,52 +87,18 @@ export default function NotesPage() {
     })();
   }, [selectedNoteId]);
 
-  /* ------------------------- Organisation notes (from v1) ------------------------ */
-  useEffect(() => {
-    if (!user) return;
-
-    (async () => {
-      // Adjust if your schema for org membership differs
-      const orgIdSnap = await get(ref(db, `users/${user.uid}/primaryOrgId`));
-      const orgId = (orgIdSnap.val() as string | null) ?? null;
-      setActiveOrgId(orgId);
-
-      if (!orgId) {
-        setOrgTree([]);
-        return;
-      }
-
-      const notesSnap = await get(ref(db, `organizations/${orgId}/notes`));
-      const raw = (notesSnap.val() as Record<string, any> | null) ?? null;
-
-      const arr: FileNode[] = raw
-        ? Object.values(raw).map((n: any) => ({
-            id: n.id,
-            name: n.name ?? "Untitled",
-            type: "note",
-            ownerId: n.ownerId ?? orgId,
-            parentId: n.parentId ?? null,
-            children: undefined,
-          }))
-        : [];
-
-      setOrgTree(sortTree(arr));
-    })();
-  }, [user]);
-
   if (!user) {
     return <div>Loading...</div>;
   }
 
-  /* --------------------------------- Handlers ---------------------------------- */
   const handleAdd = async (type: "note" | "folder") => {
     let newNode;
     if (type === "folder") {
       newNode = await createFolderInDB(user.uid, "New Folder", null);
-      toast.success("Folder created!");
+      toast.success(`Folder created!`);
     } else {
       newNode = await createNoteInDB(user.uid, "Untitled Note", null);
-      toast.success("Note created!");
+      toast.success(`Note created!`);
     }
     setTree((prev) => addNode(prev, null, type, newNode.id, newNode.name));
   };
@@ -210,92 +171,49 @@ export default function NotesPage() {
     return null;
   }
 
-  /* ----------------------------------- UI ------------------------------------- */
   return (
     <div className="flex h-screen">
-      {/* LEFT: v1-style notes structure ONLY (buttons + 3 sections) */}
-      <div
-        className="
-          w-1/4 border-r p-2
-          grid gap-2
-          grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]
-          min-h-0
-        "
-      >
-        {/* Row 1: buttons */}
-        <div className="flex gap-3">
-          <Button onClick={() => handleAdd("note")} variant="default" size="sm">
-            + Note
-          </Button>
-          <Button onClick={() => handleAdd("folder")} variant="default" size="sm">
-            + Folder
-          </Button>
-        </div>
-
-        {/* Row 2: My Notes */}
-        <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
-          <div className="px-3 py-2 border-b text-sm font-semibold">My Notes</div>
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            className="min-h-0 h-full overflow-auto no-scrollbar"
-          >
-            <NoteTree
-              treeData={tree}
-              onSelect={(id: string) => {
-                setSelectedNoteId(id);
-                const node = findNodeById(tree, id);
-                setOwnerID(node?.ownerId ?? user.uid);
-              }}
-              onRename={handleRename}
-              onDelete={handleDelete}
-              onDropNode={handleMove}
-            />
+      <div className="w-1/4 border-r p-2 space-y-2">
+        <div className="flex gap-2">
+          <div className="flex gap-2">
+            {/* Use shared Button component for consistent styling */}
+            <Button onClick={() => handleAdd("note")} variant="default" size="sm" className="px-3">
+              + Note
+            </Button>
+            <Button onClick={() => handleAdd("folder")} variant="default" size="sm" className="px-3">
+              + Folder
+            </Button>
           </div>
         </div>
 
-        {/* Row 3: Shared Notes */}
-        <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
-          <div className="px-3 py-2 border-b text-sm font-semibold">Shared Notes</div>
-          <div className="min-h-0 h-full overflow-auto no-scrollbar">
-            <NoteTree
-              treeData={sharedTree}
-              onSelect={(id: string) => {
-                setSelectedNoteId(id);
-                const node = findNodeById(sharedTree, id);
-                setOwnerID(node?.ownerId ?? user.uid);
-              }}
-              onRename={handleRename}
-              onDelete={handleDelete}
-              onDropNode={handleMove}
-            />
-          </div>
-        </div>
+        <div onDragOver={(e) => e.preventDefault()} className="drop-root-zone">
+          <NoteTree
+            treeData={tree}
+            onSelect={(id: string) => {
+              setSelectedNoteId(id);
+              const node = findNodeById(tree, id);
+              setOwnerID(node?.ownerId ?? null);
+            }}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onDropNode={handleMove}
+          />
 
-        {/* Row 4: Organisation Notes */}
-        <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
-          <div className="px-3 py-2 border-b text-sm font-semibold">
-            Organisation Notes{activeOrgId ? ` – ${activeOrgId}` : ""}
-          </div>
-          <div className="min-h-0 h-full overflow-auto no-scrollbar">
-            <NoteTree
-              treeData={orgTree}
-              onSelect={(id: string) => {
-                setSelectedNoteId(id);
-                const node = findNodeById(orgTree, id);
-                // Prefer node.ownerId if present; otherwise fall back to activeOrgId
-                setOwnerID(node?.ownerId ?? activeOrgId ?? user.uid);
-              }}
-              onRename={handleRename}
-              onDelete={handleDelete}
-              onDropNode={handleMove}
-            />
-          </div>
+          <NoteTree
+            treeData={sharedTree}
+            onSelect={(id: string) => {
+              setSelectedNoteId(id);
+              const node = findNodeById(sharedTree, id);
+              setOwnerID(node?.ownerId ?? null);
+            }}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onDropNode={handleMove}
+          />
         </div>
       </div>
 
-      {/* CENTER + RIGHT: keep v2 exactly (editor + sticky Summary/Flashcards) */}
       <div className="flex flex-1 gap-6 p-6">
-        {/* Center: Editor */}
         <div className="flex-[3] flex flex-col gap-6 items-center">
           {selectedNoteId ? (
             <div className="flex flex-col w-full items-center">
@@ -321,7 +239,7 @@ export default function NotesPage() {
           )}
         </div>
 
-        {/* Right: Sticky pane with Summary (top) + Flashcards (bottom) */}
+        {/* RIGHT COLUMN: fixed (sticky) pane with two equal (50/50) sections */}
         <div
           className="
             w-[420px] shrink-0
@@ -340,8 +258,9 @@ export default function NotesPage() {
                   orgId={user.uid}
                   ownerId={currentOwnerId ?? user.uid}
                   noteId={selectedNoteId ?? ""}
+                  /** ensure user-scope save to users/{uid}/notes/{noteId}/summary */
                   userId={user.uid}
-                  isPersonal
+                  isPersonal={true}
                 />
               </div>
             </div>
@@ -352,10 +271,11 @@ export default function NotesPage() {
                 <FlashcardGenerator
                   initialText={extractNoteTextFromString(selectedNote?.content as any)}
                   className="h-full"
+                  /** ensure user-scope save to users/{uid}/notes/{noteId}/flashcards */
                   userId={user.uid}
                   ownerId={user.uid}
                   noteId={selectedNoteId ?? ""}
-                  isPersonal
+                  isPersonal={true}
                 />
               </div>
             </div>
