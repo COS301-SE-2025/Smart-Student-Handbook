@@ -56,6 +56,7 @@ Built to boost academic productivity and make studying simpler and smarter.
 - `</>` [Coding Standards & Style Guide](https://docs.google.com/document/d/1jon85aK5e1c0lPFog6cDFowFoMS-bff--frhNm1pH8U/edit?usp=sharing)
 - 📝 [Architectural Requirements Design](https://drive.google.com/file/d/1H1dOGesQxQaboIQTfN0642f6wKESVrzi/view?usp=sharing)
 - 📖 [User Manual](https://docs.google.com/document/d/1zn6EdZky7Wvaw14rAB7GTqvU5vIcr9i1lcMXVe_Ohdg/edit?usp=sharing)
+- 📖 [Deployment Diagram](https://drive.google.com/file/d/1XvGKjqRUz9UwgsGNMfPuPc65xKprGZGK/view?usp=drive_link)
 - 🔗[Demo Video](https://drive.google.com/file/d/1Tkw3Wsu43KCyIVX9yeC8zNIBY9Rl5UNT/view?usp=sharing)
 
 ## 🔗 Project Management & Links
@@ -196,6 +197,7 @@ We follow a customized GitFlow:
 
 
 ---
+
 
 
 
