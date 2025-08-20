@@ -1,11 +1,14 @@
-name: CI / CD
+name: CI
+
 on:
   push:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+
 env:
   NODE_VERSION: '20'
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -51,99 +54,3 @@ jobs:
           path: |
             firebase-basic/.next/
           retention-days: 1
-  deploy-staging:
-    needs: build-test
-    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    environment: staging
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: |
-            firebase-basic/package-lock.json
-            functions/package-lock.json
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-files
-          path: ./firebase-basic/
-      - name: Install firebase-basic dependencies
-        working-directory: ./firebase-basic
-        run: npm ci
-      - name: Install functions dependencies
-        working-directory: ./functions
-        run: npm ci
-      - name: Copy built files to public
-        run: |
-          rm -rf public/* || true
-          mkdir -p public
-          if [ -d "firebase-basic/.next" ]; then
-            cp -r firebase-basic/.next/static public/_next/static
-            echo "✅ Successfully copied build files to public/"
-            ls -la public/
-          else
-            echo "❌ No .next directory found at firebase-basic/.next"
-            ls -la firebase-basic/
-            exit 1
-          fi
-      - name: Authenticate to Firebase
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
-      - name: Deploy to Firebase Staging
-        run: |
-          npm install -g firebase-tools
-          firebase deploy --project staging --force
-  deploy-production:
-    needs: build-test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: |
-            firebase-basic/package-lock.json
-            functions/package-lock.json
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-files
-          path: ./firebase-basic/
-      - name: Install firebase-basic dependencies
-        working-directory: ./firebase-basic
-        run: npm ci
-      - name: Install functions dependencies
-        working-directory: ./functions
-        run: npm ci
-      - name: Copy built files to public
-        run: |
-          rm -rf public/* || true
-          mkdir -p public
-          if [ -d "firebase-basic/.next" ]; then
-            cp -r firebase-basic/.next/static public/_next/static
-            echo "✅ Successfully copied build files to public/"
-            ls -la public/
-          else
-            echo "❌ No .next directory found at firebase-basic/.next"
-            ls -la firebase-basic/
-            exit 1
-          fi
-      - name: Authenticate to Firebase
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
-      - name: Deploy to Firebase Production
-        run: |
-          npm install -g firebase-tools
-          firebase deploy --project production --force
