@@ -54,6 +54,7 @@ Built to boost academic productivity and make studying simpler and smarter.
 - 📄 [Functional Requirements (SRS v2)](https://docs.google.com/document/d/1GNNrZV6f3-w9E6491yCxKhAI8Hea4iuT/edit?usp=sharing)
 - 📄 [Functional Requirements (SRS v3)](https://docs.google.com/document/d/1hx7fG0_NB3ZX6MbRYp7rPdcK3UcVKukj/edit?usp=sharing&ouid=110216960497066760698&rtpof=true&sd=true)
 - `</>` [Coding Standards & Style Guide](https://docs.google.com/document/d/1jon85aK5e1c0lPFog6cDFowFoMS-bff--frhNm1pH8U/edit?usp=sharing)
+- 📝 [Architectural Requirements Design]([https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit](https://drive.google.com/file/d/1H1dOGesQxQaboIQTfN0642f6wKESVrzi/view?usp=drive_link))
 - 📖 [User Manual](https://docs.google.com/document/d/1zn6EdZky7Wvaw14rAB7GTqvU5vIcr9i1lcMXVe_Ohdg/edit?usp=sharing)
 - 🔗[Demo Video](https://drive.google.com/file/d/1Tkw3Wsu43KCyIVX9yeC8zNIBY9Rl5UNT/view?usp=sharing)
 
@@ -195,4 +196,5 @@ We follow a customized GitFlow:
 
 
 ---
+
 
