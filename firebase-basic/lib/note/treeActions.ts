@@ -190,3 +190,29 @@ export const fetchNoteById = async (noteID: string): Promise<Note | null> => {
     return null;
   }
 };
+
+export const fetchNoteWithOwner = async (noteID: string , ownerID : string): Promise<Note | null> => {
+  try {
+
+    const auth = getAuth();
+    const user = auth.currentUser;
+
+    if (!user) {
+      console.warn("No user is signed in.");
+      return null;
+    }
+
+    const noteRef = ref(db, `users/${ownerID}/notes/${noteID}`);
+    const snapshot = await get(noteRef);
+
+    if (snapshot.exists()) {
+      return snapshot.val() as Note;
+    } else {
+      console.warn(`Note with ID ${noteID} not found.`);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching note:", error);
+    return null;
+  }
+};
