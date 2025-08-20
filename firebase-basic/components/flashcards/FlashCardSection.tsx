@@ -57,10 +57,10 @@ function tryJson(text: string) {
       Array.isArray(obj)
         ? obj
         : Array.isArray((obj as any).cards)
-        ? (obj as any).cards
-        : Array.isArray((obj as any).flashcards)
-        ? (obj as any).flashcards
-        : null
+          ? (obj as any).cards
+          : Array.isArray((obj as any).flashcards)
+            ? (obj as any).flashcards
+            : null
     if (!arr) return null
     const out: Array<{ front: string; back: string }> = []
     for (const item of arr) {
@@ -72,7 +72,7 @@ function tryJson(text: string) {
         front = String(item[0]); back = String(item[1])
       } else if (typeof item === "object" && item) {
         front = (item as any).front ?? (item as any).question ?? (item as any).q ?? ""
-        back  = (item as any).back  ?? (item as any).answer   ?? (item as any).a ?? ""
+        back = (item as any).back ?? (item as any).answer ?? (item as any).a ?? ""
       }
       front = tidy(front); back = tidy(back)
       if (front && back) out.push({ front, back })
@@ -129,8 +129,8 @@ function parseFlashcards(raw: string) {
 }
 
 /* -------------------------- Callables (org & user) -------------------------- */
-const callLoadOrgPack  = httpsCallable(fns, "loadNoteFlashcardsPack")
-const callSaveOrgPack  = httpsCallable(fns, "saveNoteFlashcardsPack")
+const callLoadOrgPack = httpsCallable(fns, "loadNoteFlashcardsPack")
+const callSaveOrgPack = httpsCallable(fns, "saveNoteFlashcardsPack")
 const callLoadUserPack = httpsCallable(fns, "loadUserNoteFlashcardsPack")
 const callSaveUserPack = httpsCallable(fns, "saveUserNoteFlashcardsPack")
 
@@ -448,21 +448,22 @@ export default function FlashCardSection({
                               </div>
                             </CardContent>
                           </Card>
-
                           {/* Back */}
                           <Card
                             className="absolute inset-0 [backface-visibility:hidden] border bg-background overflow-hidden rounded-2xl"
                             style={{ transform: "rotateY(180deg)" }}
                           >
-                            <CardContent className="h-full flex flex-col justify-center items-center relative p-8">
-                              <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                            <CardContent className="h-full flex flex-col p-8">
+                              <div className="flex items-center justify-between mb-4">
                                 <div className="inline-flex items-center justify-center px-3 py-1 rounded-lg bg-white border-2 border-black">
-                                  <span className="font-semibold text-sm uppercase tracking-wide text-black">Answer</span>
+                                  <span className="font-semibold text-sm uppercase tracking-wide text-black">
+                                    Answer
+                                  </span>
                                 </div>
                                 <Button
                                   onClick={(e) => {
-                                    e.stopPropagation()
-                                    deleteCurrentCard()
+                                    e.stopPropagation();
+                                    deleteCurrentCard();
                                   }}
                                   variant="ghost"
                                   size="sm"
@@ -472,15 +473,15 @@ export default function FlashCardSection({
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               </div>
-                              <div className="text-center w-full px-4 overflow-y-auto max-h-full">
-                                <div className="px-2">
-                                  <p className="font-medium leading-relaxed text-foreground break-words text-lg md:text-xl">
-                                    {currentCard.back}
-                                  </p>
-                                </div>
+
+                              <div className="flex-1 overflow-y-auto w-full text-center px-2">
+                                <p className="font-medium leading-relaxed text-foreground break-words text-lg md:text-xl">
+                                  {currentCard.back}
+                                </p>
                               </div>
                             </CardContent>
                           </Card>
+
                         </div>
                       </div>
 
@@ -613,15 +614,17 @@ export default function FlashCardSection({
                       className="absolute inset-0 [backface-visibility:hidden] border bg-background overflow-hidden rounded-2xl"
                       style={{ transform: "rotateY(180deg)" }}
                     >
-                      <CardContent className="h-full flex flex-col justify-center items-center relative p-4">
+                      <CardContent className="h-full min-h-0 flex flex-col relative p-4 pt-14">
                         <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
                           <div className="inline-flex items-center justify-center px-3 py-1 rounded-lg bg-white border-2 border-black">
-                            <span className="font-semibold text-sm uppercase tracking-wide text-black">Answer</span>
+                            <span className="font-semibold text-sm uppercase tracking-wide text-black">
+                              answer
+                            </span>
                           </div>
                           <Button
                             onClick={(e) => {
-                              e.stopPropagation()
-                              deleteCurrentCard()
+                              e.stopPropagation();
+                              deleteCurrentCard();
                             }}
                             variant="ghost"
                             size="sm"
@@ -631,15 +634,16 @@ export default function FlashCardSection({
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                        <div className="text-center w-full px-4 overflow-y-auto max-h-full">
-                          <div className="px-2">
-                            <p className="font-medium leading-relaxed text-foreground break-words text-sm md:text-base">
-                              {currentCard.back}
-                            </p>
-                          </div>
+
+                        {/* Scrollable content */}
+                        <div className="flex-1 min-h-0 w-full overflow-y-auto px-4 text-center">
+                          <p className="font-medium leading-relaxed text-foreground break-words text-sm md:text-base">
+                            {currentCard.back}
+                          </p>
                         </div>
                       </CardContent>
                     </Card>
+
                   </div>
                 </div>
 

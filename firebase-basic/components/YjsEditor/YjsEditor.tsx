@@ -8,6 +8,10 @@ import "@blocknote/mantine/style.css";
 import { useYDoc, useYjsProvider } from "@y-sweet/react";
 import { PartialBlock, Block } from "@blocknote/core";
 import { loadFromStorage, saveToStorage } from "@/lib/storageFunctions";
+import { Note } from "@/types/note";
+import { fetchNoteById, fetchNoteWithOwner } from "@/lib/note/treeActions";
+import { ref, set } from "@firebase/database";
+import { db } from "@/lib";
 
 interface YjsBlockNoteEditorProps {
   noteID: string;
@@ -39,6 +43,19 @@ export function YjsBlockNoteEditor({
 
   const [initialContent, setInitialContent] = useState<PartialBlock[] | null>(null);
   const [providerReady, setProviderReady] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+
+  const [noteName, setNoteName] = useState(selectedNote?.name ?? "");
+
+  useEffect(() => {
+    setNoteName(selectedNote?.name ?? "");
+  }, [selectedNote]);
+
+  async function handleNameUpdate(newName: string) {
+    if (!selectedNote?.id) return;
+    const noteRef = ref(db, `users/${ownerID}/notes/${selectedNote.id}/name`);
+    await set(noteRef, newName);
+  }
 
   const editor = useCreateBlockNote(
     provider
@@ -52,7 +69,6 @@ export function YjsBlockNoteEditor({
       : {}
   );
 
-  // Load initial content from storage
   useEffect(() => {
     let mounted = true;
     setInitialContent(null);
@@ -60,6 +76,9 @@ export function YjsBlockNoteEditor({
     async function fetchNote() {
       try {
         const content = await loadFromStorage(noteID, ownerID);
+        const note = await fetchNoteWithOwner(noteID, ownerID);
+        setSelectedNote(note);
+
         if (mounted) setInitialContent(content as any);
       } catch (err) {
         console.error("Failed to load note", err);
@@ -113,5 +132,27 @@ export function YjsBlockNoteEditor({
     return <div>Loading editor…</div>;
   }
 
-  return <BlockNoteView editor={editor} theme={theme} />;
+  return (
+    <div>
+      <div>
+        <input
+          type="text"
+          value={noteName}
+          onChange={(e) => setNoteName(e.target.value)}
+          onBlur={() => handleNameUpdate(noteName)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            }
+          }}
+          className="border-b-4 border-black-100 border-solid text-2xl font-bold text-left 
+                   text-gray-900 dark:text-gray-100 pb-4 pl-12 bg-transparent outline-none w-full"
+        />
+      </div>
+
+      <div className="flex-1 overflow-auto h-[calc(100vh-16px)]">
+        <BlockNoteView editor={editor} theme={theme} />
+      </div>
+    </div>
+  );
 }

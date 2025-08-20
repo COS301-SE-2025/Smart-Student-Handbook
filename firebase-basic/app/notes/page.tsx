@@ -89,6 +89,7 @@ export default function NotesPage() {
     (async () => {
       const note = await fetchNoteById(selectedNoteId);
       setSelectedNote(note);
+
     })();
   }, [selectedNoteId]);
 
@@ -112,13 +113,13 @@ export default function NotesPage() {
 
       const arr: FileNode[] = raw
         ? Object.values(raw).map((n: any) => ({
-            id: n.id,
-            name: n.name ?? "Untitled",
-            type: "note",
-            ownerId: n.ownerId ?? orgId,
-            parentId: n.parentId ?? null,
-            children: undefined,
-          }))
+          id: n.id,
+          name: n.name ?? "Untitled",
+          type: "note",
+          ownerId: n.ownerId ?? orgId,
+          parentId: n.parentId ?? null,
+          children: undefined,
+        }))
         : [];
 
       setOrgTree(sortTree(arr));
@@ -214,14 +215,10 @@ export default function NotesPage() {
   return (
     <div className="flex h-screen">
       {/* LEFT: v1-style notes structure ONLY (buttons + 3 sections) */}
-      <div
-        className="
-          w-1/4 border-r p-2
-          grid gap-2
-          grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]
-          min-h-0
-        "
-      >
+      <div className="flex-[1] border-r p-2 grid gap-2
+                    grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]
+                    min-h-0">
+
         {/* Row 1: buttons */}
         <div className="flex gap-3">
           <Button onClick={() => handleAdd("note")} variant="default" size="sm">
@@ -293,71 +290,61 @@ export default function NotesPage() {
         </div>
       </div>
 
-      {/* CENTER + RIGHT: keep v2 exactly (editor + sticky Summary/Flashcards) */}
-      <div className="flex flex-1 gap-6 p-6">
-        {/* Center: Editor */}
-        <div className="flex-[3] flex flex-col gap-6 items-center">
-          {selectedNoteId ? (
-            <div className="flex flex-col w-full items-center">
-              <div className="w-full max-w-6xl p-4 mb-6 border rounded-2xl bg-white dark:bg-gray-800 shadow">
-                <h2 className="text-2xl font-bold text-left text-gray-900 dark:text-gray-100">
-                  {selectedNote?.name}
-                </h2>
-              </div>
-              <div className="flex-1 min-h-0 w-full max-w-6xl border rounded-2xl overflow-hidden bg-white dark:bg-gray-800 shadow p-2">
-                <Main
-                  searchParams={{
-                    doc: selectedNoteId,
-                    ownerId: currentOwnerId ?? undefined,
-                    username: displayname ?? undefined,
-                  }}
-                />
-              </div>
+      <div className="flex-[3] flex flex-col gap-6 p-6">
+        {selectedNoteId ? (
+          <div className="flex flex-col w-full items-center">
+            <div className="flex-1 min-h-0 w-full max-w-6xl bg-white max-h-screen dark:bg-gray-950 shadow p-2">
+              <Main
+                searchParams={{
+                  doc: selectedNoteId,
+                  ownerId: currentOwnerId ?? undefined,
+                  username: displayname ?? undefined,
+                }}
+              />
             </div>
-          ) : (
-            <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
-              Select a note or folder
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
+            Select a note or folder
+          </div>
+        )}
+      </div>
 
-        {/* Right: Sticky pane with Summary (top) + Flashcards (bottom) */}
-        <div
-          className="
+      <div
+        className="
             w-[420px] shrink-0
             sticky top-6 self-start
             h-[calc(100vh-1.5rem)]
           "
-        >
-          <div className="flex flex-col gap-6 h-full">
-            {/* Top half: Summary */}
-            <div className="h-[calc((100%-1.5rem)/2)] min-h-0 border rounded-2xl bg-white dark:bg-gray-900 shadow overflow-hidden">
-              <div className="h-full overflow-auto [&>*]:h-full">
-                <SummaryPanel
-                  sourceText={extractNoteTextFromString(selectedNote?.content as any)}
-                  title="Summary"
-                  className="h-full"
-                  orgId={user.uid}
-                  ownerId={currentOwnerId ?? user.uid}
-                  noteId={selectedNoteId ?? ""}
-                  userId={user.uid}
-                  isPersonal
-                />
-              </div>
+      >
+        <div className="flex-[1] flex flex-col gap-6 p-2">
+          {/* Top half: Summary */}
+          <div className="flex-1 min-h-0 bg-white dark:bg-gray-900 shadow overflow-hidden">
+            <div className="h-full overflow-auto [&>*]:h-full">
+              <SummaryPanel
+                sourceText={extractNoteTextFromString(selectedNote?.content as any)}
+                title="Summary"
+                className="h-full"
+                orgId={user.uid}
+                ownerId={currentOwnerId ?? user.uid}
+                noteId={selectedNoteId ?? ""}
+                userId={user.uid}
+                isPersonal
+              />
             </div>
+          </div>
 
-            {/* Bottom half: Flashcards */}
-            <div className="h-[calc((100%-1.5rem)/2)] min-h-0 border rounded-2xl bg-white dark:bg-gray-900 shadow overflow-hidden">
-              <div className="h-full overflow-auto [&>*]:h-full">
-                <FlashcardGenerator
-                  initialText={extractNoteTextFromString(selectedNote?.content as any)}
-                  className="h-full"
-                  userId={user.uid}
-                  ownerId={user.uid}
-                  noteId={selectedNoteId ?? ""}
-                  isPersonal
-                />
-              </div>
+          {/* Bottom half: Flashcards */}
+          <div className="flex-1 min-h-0 bg-white dark:bg-gray-900 shadow overflow-hidden">
+            <div className="h-full overflow-auto [&>*]:h-full">
+              <FlashcardGenerator
+                initialText={extractNoteTextFromString(selectedNote?.content as any)}
+                className="h-full"
+                userId={user.uid}
+                ownerId={user.uid}
+                noteId={selectedNoteId ?? ""}
+                isPersonal
+              />
             </div>
           </div>
         </div>
