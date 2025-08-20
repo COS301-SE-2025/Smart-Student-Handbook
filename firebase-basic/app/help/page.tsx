@@ -39,7 +39,7 @@ function HelpInner() {
             </CardHeader>
             <CardContent>
               <Button asChild size="lg" className="w-full">
-                <Link href="/user-manual.pdf" target="_blank" rel="noopener">
+                <Link href="/ssh-user-manual.pdf" target="_blank" rel="noopener">
                   Open PDF
                 </Link>
               </Button>

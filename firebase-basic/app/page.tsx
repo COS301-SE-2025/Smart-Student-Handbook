@@ -243,7 +243,7 @@ export default function Home() {
             <Button 
               size="lg" 
               className="bg-black text-white hover:bg-gray-800 px-8 py-3 text-lg font-semibold"
-              onClick={() => window.open("/user-manual.pdf", "_blank")} 
+              onClick={() => window.open("/ssh-user-manual.pdf", "_blank")} 
             >
               User Manual
             </Button>
