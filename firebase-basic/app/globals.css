@@ -1,3 +1,4 @@
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -229,7 +230,39 @@
   }
 }
 
-/* Hide scrollbars but keep scroll behaviour */
-.no-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* When an overlay is open, let the overlay's backdrop blur handle visuals uniformly.
+   We only disable interaction on chrome (header/sidebar). */
+.overlay-open header,
+.overlay-open aside,
+.overlay-open nav[aria-label="Sidebar"],
+.overlay-open .app-header,
+.overlay-open .app-sidebar,
+.overlay-open .sidebar,
+.overlay-open [data-sidebar],
+.overlay-open [data-radix-sidebar],
+.overlay-open .shadcn-sidebar {
+  pointer-events: none;
+  user-select: none;
+  /* no filter here — let the overlay's backdrop-blur do the visual work */
+}
+
+/* (Optional) slight dim for chrome while overlay is open */
+.overlay-open header,
+.overlay-open aside,
+.overlay-open nav[aria-label="Sidebar"],
+.overlay-open .app-header,
+.overlay-open .app-sidebar,
+.overlay-open .sidebar,
+.overlay-open [data-sidebar],
+.overlay-open [data-radix-sidebar],
+.overlay-open .shadcn-sidebar {
+  opacity: 0.95;
+}
+
+.app-header,
+.app-sidebar,
+header,
+aside {
+  will-change: filter, opacity;
+}
 

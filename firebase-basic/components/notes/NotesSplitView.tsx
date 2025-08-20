@@ -1,3 +1,4 @@
+// components/notes/NotesSplitView.tsx
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -10,24 +11,33 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth } from "firebase/auth"
 
-/* --------------------------------- Types --------------------------------- */
 export type Note = {
   ownerId: string
   id: string
   name: string
-  content: string // HTML from Quill
-  type: "note"
+  content: string
+  type: "note" | string
   createdAt?: number
   updatedAt?: number
 }
 
 type NotesSplitViewProps = {
   notes: Note[]
+  /** Keep orgID to stay compatible; used only when storageScope === "org" */
   orgID: string
   initialSelectedId?: string | null
+
+  /** NEW: where the note content autosaves. Default "user" preserves existing behavior. */
+  storageScope?: "user" | "org"
+
+  /**
+   * NEW: where Summary/Flashcards save+load.
+   * Defaults to storageScope to keep things predictable.
+   * Set to "org" on the org page, leave as default elsewhere.
+   */
+  aiScope?: "user" | "org"
 }
 
-/* --------------------- Typed dynamic import for Quill --------------------- */
 type QuillProps = {
   value: string
   onChange: (val: string) => void
@@ -37,7 +47,7 @@ type QuillProps = {
 
 const QuillEditor = dynamic<QuillProps>(
   () => import("@/components/quilleditor").then((m: any) => m.default ?? m.QuillEditor),
-  { ssr: false },
+  { ssr: false }
 )
 
 /* ------------------------------ Utilities -------------------------------- */
@@ -47,6 +57,48 @@ function htmlToPlain(html: string): string {
   return (doc.body?.textContent ?? "").replace(/\s+/g, " ").trim()
 }
 
+// Extract plain text from Block/JSON structures (e.g., BlockNote/Yjs) or fallback
+function jsonToPlain(input: unknown): string {
+  const out: string[] = []
+  const walk = (v: any) => {
+    if (v == null) return
+    if (typeof v === "string") { out.push(v); return }
+    if (Array.isArray(v)) { for (const x of v) walk(x); return }
+    if (typeof v === "object") {
+      for (const key of Object.keys(v)) {
+        const val = (v as any)[key]
+        if (key === "text" && typeof val === "string") out.push(val)
+        else if (key === "content" || key === "children" || key === "props") walk(val)
+        else if (typeof val === "string") {
+          if (!/^[A-Za-z0-9\-_]{8,}$/.test(val)) out.push(val)
+        } else if (Array.isArray(val) || typeof val === "object") {
+          walk(val)
+        }
+      }
+    }
+  }
+  walk(input)
+  return out.join(" ").replace(/\s+/g, " ").trim()
+}
+
+function toPlain(content: string): string {
+  if (!content) return ""
+  const s = content.trim()
+  // HTML-ish?
+  if (s.startsWith("<")) return htmlToPlain(s)
+  // JSON-ish?
+  if (s.startsWith("{") || s.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(s)
+      return jsonToPlain(parsed)
+    } catch {
+      // fall through
+    }
+  }
+  // Plain text fallback
+  return s.replace(/\s+/g, " ").trim()
+}
+
 /* --------------------------- Firebase callables --------------------------- */
 const callUpdateNoteFn = httpsCallable(fns, "updateNoteAtPath")
 async function callUpdateNote(path: string, note: Partial<Note>) {
@@ -54,14 +106,23 @@ async function callUpdateNote(path: string, note: Partial<Note>) {
 }
 
 /* ------------------------------ Main component --------------------------- */
-export default function NotesSplitView({ notes, orgID, initialSelectedId }: NotesSplitViewProps) {
+export default function NotesSplitView({
+  notes,
+  orgID,
+  initialSelectedId,
+  storageScope = "user",         // 🔒 default keeps existing user implementation intact
+  aiScope,                       // if undefined, will default to storageScope below
+}: NotesSplitViewProps) {
   const [stateNotes, setStateNotes] = useState<Note[]>(notes)
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
     initialSelectedId ?? notes[0]?.id ?? null
   )
   const [isRightPaneCollapsed, setIsRightPaneCollapsed] = useState(false)
 
-  const ownerId = getAuth().currentUser?.uid ?? ""
+  const auth = getAuth()
+  const userId = auth.currentUser?.uid ?? "" // used for user scope paths
+
+  const effectiveAIScope: "user" | "org" = aiScope ?? storageScope
 
   useEffect(() => {
     setStateNotes(notes)
@@ -76,22 +137,29 @@ export default function NotesSplitView({ notes, orgID, initialSelectedId }: Note
 
   const [plain, setPlain] = useState<string>("")
   useEffect(() => {
-    if (selectedNote?.content != null) setPlain(htmlToPlain(selectedNote.content))
+    if (selectedNote?.content != null) setPlain(toPlain(selectedNote.content))
   }, [selectedNote?.id, selectedNote?.content])
 
-  // Auto-save (debounced 1s)
+  // Auto-save (debounced 1s) for the note itself (user- or org-scoped storage)
   useEffect(() => {
     if (!selectedNote?.id) return
     const t = setTimeout(() => {
-      const path = `organizations/${orgID}/notes/${selectedNote.id}`
-      callUpdateNote(path, {
+      const path =
+        storageScope === "org"
+          ? `organizations/${orgID}/notes/${selectedNote.id}`
+          : userId
+          ? `users/${userId}/notes/${selectedNote.id}`
+          : null
+
+      if (!path) return // no-op if user not available in user scope
+      void callUpdateNote(path, {
         content: selectedNote.content,
         name: selectedNote.name,
         updatedAt: Date.now(),
       })
     }, 1000)
     return () => clearTimeout(t)
-  }, [selectedNote?.id, selectedNote?.content, selectedNote?.name, orgID])
+  }, [selectedNote?.id, selectedNote?.content, selectedNote?.name, orgID, storageScope, userId])
 
   if (!selectedNote) {
     return <div className="min-h-[60vh] grid place-items-center p-6 text-muted-foreground" />
@@ -122,6 +190,7 @@ export default function NotesSplitView({ notes, orgID, initialSelectedId }: Note
             size="sm"
             onClick={() => setIsRightPaneCollapsed(!isRightPaneCollapsed)}
             className="ml-2 h-8 w-8 p-0"
+            aria-label={isRightPaneCollapsed ? "Expand right pane" : "Collapse right pane"}
           >
             {isRightPaneCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
@@ -136,7 +205,7 @@ export default function NotesSplitView({ notes, orgID, initialSelectedId }: Note
             onChange={(newContent: string) => {
               const id = note.id
               setStateNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content: newContent } : n)))
-              setPlain(htmlToPlain(newContent))
+              setPlain(toPlain(newContent))
             }}
           />
         </div>
@@ -145,28 +214,58 @@ export default function NotesSplitView({ notes, orgID, initialSelectedId }: Note
       {/* Right pane: AI assistants */}
       {!isRightPaneCollapsed && (
         <div className="flex-[2] min-w-0 flex flex-col gap-4 overflow-hidden transition-all duration-300">
-          {/* Summary section */}
+          {/* Summary */}
           <div className="flex-1 min-h-0 border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
-            <SummaryPanel
-              sourceText={plain}
-              title="Summary"
-              className="h-full"
-              orgId={orgID}
-              ownerId={ownerId}
-              noteId={note.id}
-              allowDelete={true}
-            />
+            {effectiveAIScope === "org" ? (
+              <SummaryPanel
+                sourceText={plain}
+                title="Summary"
+                className="h-full"
+                /** ORG SCOPE */
+                orgId={orgID}
+                ownerId={note.ownerId || userId}
+                noteId={note.id}
+                isPersonal={false} // hard-force org scope (prevents fallback to user)
+              />
+            ) : (
+              <SummaryPanel
+                sourceText={plain}
+                title="Summary"
+                className="h-full"
+                /** USER SCOPE */
+                userId={userId}
+                ownerId={userId}
+                noteId={note.id}
+                isPersonal={true}
+                /** do NOT pass orgId so it won’t default to org scope */
+              />
+            )}
           </div>
 
-          {/* Flashcards section (single pack per note) */}
+          {/* Flashcards */}
           <div className="flex-1 min-h-0 border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
-            <FlashCardSection
-              sourceText={plain}
-              className="h-full"
-              orgId={orgID}
-              ownerId={ownerId}
-              noteId={note.id}
-            />
+            {effectiveAIScope === "org" ? (
+              <FlashCardSection
+                sourceText={plain}
+                className="h-full"
+                /** ORG SCOPE */
+                orgId={orgID}
+                ownerId={note.ownerId || userId}
+                noteId={note.id}
+                isPersonal={false}
+              />
+            ) : (
+              <FlashCardSection
+                sourceText={plain}
+                className="h-full"
+                /** USER SCOPE */
+                userId={userId}
+                ownerId={userId}
+                noteId={note.id}
+                isPersonal={true}
+                /** do NOT pass orgId */
+              />
+            )}
           </div>
         </div>
       )}
