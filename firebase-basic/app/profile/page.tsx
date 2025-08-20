@@ -10,7 +10,7 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { db } from "@/lib/firebase"
-import { onValue, ref, set } from "firebase/database"
+import { onValue, ref, set, get } from "firebase/database"
 import { saveUserSettings } from "@/utils/SaveUserSettings"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -189,10 +189,10 @@ export default function ProfilePage() {
 
   /* ----- save profile settings ----------------------------------------- */
   const handleSave = async () => {
-    if (!uid) return
+    if (!uid) return;
     if (!isDirty) {
-      toast.info("No changes to save.")
-      return
+      toast.info("No changes to save.");
+      return;
     }
 
     // canonicalize hobbies (trim + dedupe empty)
@@ -203,16 +203,26 @@ export default function ProfilePage() {
         .map((h) => h.trim())
         .filter(Boolean)
         .join(", "),
-    }
+    };
 
     const payload = {
       ...canonical,
       hobbies: canonical.hobbies.split(", ").filter(Boolean), // store array
-    }
+    };
 
-    await saveUserSettings(uid, payload)
-    setSavedForm(canonical)
-    toast.success("Your settings have been saved.")
+    // Preserve existing fields like email
+    const userSettingsRef = ref(db, `users/${uid}/UserSettings`);
+    const existingSettingsSnapshot = await get(userSettingsRef);
+    const existingSettings = existingSettingsSnapshot.val() || {};
+
+    const updatedSettings = {
+      ...existingSettings, // Preserve existing fields
+      ...payload, // Overwrite with updated fields
+    };
+
+    await set(userSettingsRef, updatedSettings);
+    setSavedForm(canonical);
+    toast.success("Your settings have been saved.");
   }
 
   /* ----- password change ------------------------------------------------ */
