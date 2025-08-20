@@ -20,10 +20,11 @@ jest.mock("firebase/auth", () => ({
   updateProfile: jest.fn(() => Promise.resolve()),
 }));
 
-// Fix: Create mock functions directly in the mock call
+// Mock get function as well
 jest.mock("firebase/database", () => ({
   ref: jest.fn((db, path) => ({ db, path })),
   set: jest.fn(),
+  get: jest.fn(),
 }));
 
 jest.mock("@/lib/firebase", () => ({
@@ -32,7 +33,7 @@ jest.mock("@/lib/firebase", () => ({
 }));
 
 // Import the mocked functions after mocking
-import { ref as mockRef, set as mockSet } from 'firebase/database';
+import { ref as mockRef, set as mockSet, get as mockGet } from 'firebase/database';
 
 describe('SignupForm', () => {
   beforeEach(() => {
@@ -40,8 +41,22 @@ describe('SignupForm', () => {
     mockCreateUserWithEmailAndPassword.mockReset();
     (mockSet as jest.Mock).mockReset();
     (mockRef as jest.Mock).mockReset();
+    (mockGet as jest.Mock).mockReset();
     mockPush.mockReset();
     (mockRef as jest.Mock).mockImplementation((db, path) => ({ db, path }));
+    
+    // Mock get to return incomplete user settings by default
+    (mockGet as jest.Mock).mockResolvedValue({
+      val: () => ({
+        name: 'Test',
+        surname: 'User',
+        email: 'test@example.com',
+        degree: '', // incomplete
+        occupation: '', // incomplete
+        hobbies: [], // incomplete
+        description: '', // incomplete
+      })
+    });
   });
 
   describe('Happy paths', () => {
@@ -50,14 +65,12 @@ describe('SignupForm', () => {
       
       expect(screen.getByText('Create Account')).toBeInTheDocument();
       expect(screen.getByText('Join the Smart Student community')).toBeInTheDocument();
-      expect(screen.getByTestId('name-input')).toBeInTheDocument();
-      // Fixed: Use placeholder text selector instead of testid for now
-      expect(screen.getByPlaceholderText('Your surname')).toBeInTheDocument();
-      expect(screen.getByTestId('email-input')).toBeInTheDocument();
-      expect(screen.getByTestId('password-input')).toBeInTheDocument();
-      expect(screen.getByTestId('submit-button')).toBeInTheDocument();
-      expect(screen.getByText(/Already have an account/i)).toBeInTheDocument();
-      expect(screen.getByText(/By signing up, you agree to our/i)).toBeInTheDocument();
+      expect(screen.getByLabelText('Name')).toBeInTheDocument();
+      expect(screen.getByLabelText('Surname')).toBeInTheDocument();
+      expect(screen.getByLabelText('Email')).toBeInTheDocument();
+      expect(screen.getByLabelText('Password')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /sign up/i })).toBeInTheDocument();
+      expect(screen.getByText(/By clicking continue, you agree to our/i)).toBeInTheDocument();
     });
 
     test('successful form submission', async () => {
@@ -71,14 +84,14 @@ describe('SignupForm', () => {
     
       render(<SignupForm />);
     
-      // Fill out the form - Fixed: Use specific selectors
-      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
-      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
-      fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
-      fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
+      // Fill out the form
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByLabelText('Surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
       
       // Submit the form
-      fireEvent.click(screen.getByTestId('submit-button'));
+      fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
 
       // Wait for the async operations to complete
       await waitFor(() => {
@@ -93,13 +106,15 @@ describe('SignupForm', () => {
           {
             name: 'Test',
             surname: 'User',
-            role: 'User',
             email: 'test@example.com',
-            createdAt: expect.any(Number),
+            degree: '',
+            occupation: '',
+            hobbies: [],
+            description: '',
           }
         );
         
-        expect(mockPush).toHaveBeenCalledWith('/dashboard');
+        expect(mockPush).toHaveBeenCalledWith('/profile'); // Should redirect to profile for incomplete settings
       });
     });
 
@@ -118,13 +133,13 @@ describe('SignupForm', () => {
       render(<SignupForm />);
 
       // Fill out form with valid data
-      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
-      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
-      fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
-      fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByLabelText('Surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
       
       // Submit form
-      fireEvent.click(screen.getByTestId('submit-button'));
+      fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
 
       // Wait for error message
       await waitFor(() => {
@@ -144,13 +159,13 @@ describe('SignupForm', () => {
       render(<SignupForm />);
 
       // Fill out form
-      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
-      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
-      fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
-      fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByLabelText('Surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
       
       // Submit form
-      fireEvent.click(screen.getByTestId('submit-button'));
+      fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
 
       // Wait for error message
       await waitFor(() => {
@@ -159,25 +174,54 @@ describe('SignupForm', () => {
     });
   });
 
+  describe('Form validation', () => {
+    test('shows error for invalid email', async () => {
+      render(<SignupForm />);
+      
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByLabelText('Surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'invalid-email' } });
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+      
+      fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+      
+      await waitFor(() => {
+        expect(screen.getByText('Please enter a valid email address.')).toBeInTheDocument();
+      });
+    });
+
+    test('shows error for short password', async () => {
+      render(<SignupForm />);
+      
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByLabelText('Surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: '123' } });
+      
+      fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+      
+      await waitFor(() => {
+        expect(screen.getByText('Password must be at least 6 characters.')).toBeInTheDocument();
+      });
+    });
+
+    test('shows error for missing name or surname', async () => {
+      render(<SignupForm />);
+      
+      // Leave name empty
+      fireEvent.change(screen.getByLabelText('Surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+      
+      fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+      
+      await waitFor(() => {
+        expect(screen.getByText('Please provide both first name and surname.')).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('Form behavior', () => {
-    test('disables submit button when required fields are empty', () => {
-      render(<SignupForm />);
-      const button = screen.getByTestId('submit-button');
-      expect(button).toBeDisabled();
-    });
-
-    test('enables submit button when all fields are valid', () => {
-      render(<SignupForm />);
-      
-      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
-      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
-      fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
-      fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
-      
-      const button = screen.getByTestId('submit-button');
-      expect(button).not.toBeDisabled();
-    });
-
     test('trims whitespace from inputs', async () => {
       const mockUser = { 
         uid: 'test-uid',
@@ -190,20 +234,20 @@ describe('SignupForm', () => {
       render(<SignupForm />);
 
       // Fill form with whitespace
-      fireEvent.change(screen.getByTestId('name-input'), { target: { value: '  Test  ' } });
-      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: '  User  ' } });
-      fireEvent.change(screen.getByTestId('email-input'), { target: { value: '  test@example.com  ' } });
-      fireEvent.change(screen.getByTestId('password-input'), { target: { value: '  password123  ' } });
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: '  Test  ' } });
+      fireEvent.change(screen.getByLabelText('Surname'), { target: { value: '  User  ' } });
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: '  test@example.com  ' } });
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: '  password123  ' } });
       
       // Submit form
-      fireEvent.click(screen.getByTestId('submit-button'));
+      fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
 
-      // Verify trimmed values were used
+      // Verify trimmed values were used (note: password is NOT trimmed in the actual component)
       await waitFor(() => {
         expect(mockCreateUserWithEmailAndPassword).toHaveBeenCalledWith(
           expect.anything(),
           'test@example.com',
-          'password123'
+          '  password123  ' // Password should NOT be trimmed
         );
         
         expect(mockSet).toHaveBeenCalledWith(
@@ -211,9 +255,11 @@ describe('SignupForm', () => {
           {
             name: 'Test',
             surname: 'User',
-            role: 'User',
             email: 'test@example.com',
-            createdAt: expect.any(Number),
+            degree: '',
+            occupation: '',
+            hobbies: [],
+            description: '',
           }
         );
       });

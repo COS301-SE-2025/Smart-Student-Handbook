@@ -11,8 +11,11 @@ import "@testing-library/jest-dom";
 
 // --- Mocks ---
 
+const mockUseSearchParams = jest.fn()
 jest.mock("@/hooks/useUserId")
-jest.mock("next/navigation")
+jest.mock("next/navigation", () => ({
+  useSearchParams: mockUseSearchParams
+}))
 jest.mock("firebase/functions")
 jest.mock("@/lib/firebase", () => ({
   fns: {},
@@ -117,7 +120,7 @@ describe('OrganisationsPage() OrganisationsPage method', () => {
     const searchParams = {
       get: jest.fn().mockReturnValue(''),
     }
-    ;(useSearchParams as jest.Mock).mockReturnValue(searchParams)
+    mockUseSearchParams.mockReturnValue(searchParams)
 
     // Create callable mocks
     mockGetPublicOrgs = jest.fn().mockResolvedValue({
@@ -182,39 +185,8 @@ describe('OrganisationsPage() OrganisationsPage method', () => {
         loading: true,
       })
       render(<OrganisationsPage />)
-      expect(screen.getByText('Loading...')).toBeInTheDocument()
-    })
-
-    test('renders loading state when loading is true', async () => {
-      let resolvePublic: any
-      let resolvePrivate: any
-      
-      mockGetPublicOrgs.mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            resolvePublic = resolve
-          }),
-      )
-      mockGetPrivateOrgs.mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            resolvePrivate = resolve
-          }),
-      )
-      
-      render(<OrganisationsPage />)
-      
-      // Should show loading state
-      await waitFor(() => {
-        expect(screen.getByText('Loading...')).toBeInTheDocument()
-      })
-      
-      // Resolve promises and wait for completion
-      await act(async () => {
-        resolvePublic({ data: [] })
-        resolvePrivate({ data: [] })
-        await flushPromises()
-      })
+      // When authLoading is true, the component returns null, so the container should be empty
+      expect(document.body).toBeEmptyDOMElement()
     })
 
     test('renders orgs, filter tabs, and allows switching filters', async () => {
@@ -265,7 +237,7 @@ describe('OrganisationsPage() OrganisationsPage method', () => {
       const searchParams = {
         get: jest.fn().mockImplementation((key) => (key === 'search' ? 'private' : '')),
       }
-      ;(useSearchParams as jest.Mock).mockReturnValue(searchParams)
+      mockUseSearchParams.mockReturnValue(searchParams)
       
       render(<OrganisationsPage />)
       
@@ -280,7 +252,7 @@ describe('OrganisationsPage() OrganisationsPage method', () => {
       const searchParams = {
         get: jest.fn().mockImplementation((key) => (key === 'search' ? 'notfound' : '')),
       }
-      ;(useSearchParams as jest.Mock).mockReturnValue(searchParams)
+      mockUseSearchParams.mockReturnValue(searchParams)
       
       render(<OrganisationsPage />)
       

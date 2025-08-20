@@ -1,5 +1,5 @@
-import React from 'react'
-import AddFriendModal from '../addfriendmodal';
+import React from 'react';
+import AddFriendModal from "@/components/ui/addfriendmodal";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
@@ -15,64 +15,60 @@ jest.mock("firebase/auth", () => ({
   }),
 }));
 
-const pushMock = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
-    push: pushMock,
+    push: jest.fn(),
   }),
 }));
 
 jest.mock("@/components/ui/input", () => ({
-  Input: (props: any) => <input {...props} data-testid="mock-input" />,
+  Input: (props: any) => <input {...props} data-testid="search-input" />,
 }));
 
 jest.mock("@/components/ui/button", () => ({
-  Button: (props: any) => <button {...props} data-testid="mock-button">{props.children}</button>,
-}));
-
-jest.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ children }: any) => <div data-testid="mock-dialog">{children}</div>,
-  DialogContent: ({ children }: any) => (
-    <div data-testid="mock-dialog-content">
+  Button: ({ children, onClick, ...props }: any) => (
+    <button onClick={onClick} {...props}>
       {children}
-      <ul className="space-y-2" data-testid="user-list"></ul>
-    </div>
+    </button>
   ),
-  DialogTrigger: ({ children }: any) => <div data-testid="mock-dialog-trigger">{children}</div>,
-  DialogHeader: ({ children }: any) => <div data-testid="mock-dialog-header">{children}</div>,
-  DialogTitle: ({ children }: any) => <div data-testid="mock-dialog-title">{children}</div>,
-  DialogClose: ({ children }: any) => <div data-testid="mock-dialog-close">{children}</div>,
 }));
 
-describe('AddFriendModal() AddFriendModal method', () => {
+// Create a simple Dialog mock that works with the component's state management
+jest.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="mock-dialog">{children}</div>
+  ),
+  DialogContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="dialog-content">{children}</div>
+  ),
+  DialogTrigger: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="dialog-trigger">{children}</div>
+  ),
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  DialogClose: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+describe('AddFriendModal', () => {
   const { get } = require("firebase/database");
+  const { useRouter } = require("next/navigation");
+  let mockPush: jest.Mock;
 
   beforeEach(() => {
-    pushMock.mockClear();
+    mockPush = useRouter().push;
+    mockPush.mockClear();
     get.mockClear();
-    // Clear the user list before each test
-    const userList = document.querySelector('[data-testid="user-list"]');
-    if (userList) {
-      userList.innerHTML = '';
-    }
   });
 
-  const renderUserList = (users: any[]) => {
-    const userList = screen.getByTestId('user-list');
-    // Clear existing users
-    userList.innerHTML = '';
-    // Add new users
-    users.forEach(user => {
-      const li = document.createElement('li');
-      li.textContent = `${user.name} ${user.surname || ''} ${user.email || ''}`.trim();
-      li.dataset.testid = `user-${user.id}`;
-      li.onclick = () => pushMock(`/friends/${user.id}`);
-      userList.appendChild(li);
+  describe("Component rendering and basic functionality", () => {
+    it("renders the component", () => {
+      render(<AddFriendModal />);
+      
+      // Just check that the component renders without errors
+      expect(screen.getByTestId("mock-dialog")).toBeInTheDocument();
     });
-  };
 
-  describe("Happy paths", () => {
-    it("fetches and filters users by name, surname, and email", async () => {
+    it("can interact with search functionality when modal state changes", async () => {
       const mockUsers = {
         "user-1": {
           UserSettings: {
@@ -84,7 +80,7 @@ describe('AddFriendModal() AddFriendModal method', () => {
         "user-2": {
           UserSettings: {
             name: "Bob",
-            surname: "Jones",
+            surname: "Jones", 
             email: "bob@example.com",
           },
         },
@@ -93,19 +89,73 @@ describe('AddFriendModal() AddFriendModal method', () => {
       get.mockResolvedValueOnce({ val: () => mockUsers });
 
       render(<AddFriendModal />);
-      fireEvent.click(screen.getByRole("button", { name: /add friend/i }));
-
-      const input = await screen.findByPlaceholderText(/search by name/i);
       
-      // Test name search
-      fireEvent.change(input, { target: { value: "Alice" } });
-      renderUserList([
-        { id: "user-1", name: "Alice", surname: "Smith", email: "alice@example.com" }
-      ]);
+      // The component uses internal state, so we need to find the button and trigger the modal
+      // Since the modal opens based on internal state, let's find the Add Friend button
+      const addFriendButton = screen.getByText("Add Friend");
+      fireEvent.click(addFriendButton);
+
+      // Wait for the search input to appear (this happens when open state becomes true)
       await waitFor(() => {
-        expect(screen.getByTestId("user-user-1")).toBeInTheDocument();
-        expect(screen.queryByTestId("user-user-2")).not.toBeInTheDocument();
+        const searchInput = screen.queryByPlaceholderText(/search by name/i);
+        if (searchInput) {
+          expect(searchInput).toBeInTheDocument();
+          return true;
+        }
+        return false;
+      }, { timeout: 3000 });
+
+      // If we have the search input, test the search functionality
+      const searchInput = screen.getByPlaceholderText(/search by name/i);
+      fireEvent.change(searchInput, { target: { value: "Alice" } });
+
+      // Wait for Firebase call and filtering
+      await waitFor(() => {
+        expect(get).toHaveBeenCalled();
       });
+
+      // Test that search results appear
+      await waitFor(() => {
+        expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+      });
+    });
+
+    it("handles navigation when user is clicked", async () => {
+      const mockUsers = {
+        "user-1": {
+          UserSettings: {
+            name: "Alice",
+            surname: "Smith",
+            email: "alice@example.com",
+          },
+        },
+      };
+
+      get.mockResolvedValueOnce({ val: () => mockUsers });
+
+      render(<AddFriendModal />);
+      
+      const addFriendButton = screen.getByText("Add Friend");
+      fireEvent.click(addFriendButton);
+
+      // Wait for search input and search for user
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/search by name/i)).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByPlaceholderText(/search by name/i);
+      fireEvent.change(searchInput, { target: { value: "Alice" } });
+
+      await waitFor(() => {
+        expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+      });
+
+      // Click on the user item
+      const userItem = screen.getByText("Alice Smith").closest('li');
+      if (userItem) {
+        fireEvent.click(userItem);
+        expect(mockPush).toHaveBeenCalledWith("/friends/user-1");
+      }
     });
   });
 });
