@@ -130,7 +130,7 @@ export default function NotesSplitView({ notes, orgID, initialSelectedId }: Note
         <div className="flex-1 min-h-0">
           <Main
             searchParams={{
-              doc: selectedNoteId,
+              doc: selectedNoteId as any,
               ownerId: orgID ?? undefined,
               username: "Organisation Member" ,
             }}
@@ -150,7 +150,7 @@ export default function NotesSplitView({ notes, orgID, initialSelectedId }: Note
               orgId={orgID}
               ownerId={ownerId}
               noteId={note.id}
-              allowDelete={true}
+              
             />
           </div>
 
