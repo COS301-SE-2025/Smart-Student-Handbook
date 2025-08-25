@@ -121,12 +121,14 @@ function countSlotsCovered(start: string, end: string, slots: { start: string; e
 
 function CustomCalendarGrid({
   selectedDate,
-  onDateClick,
+  onDaySelect,
+  onDayDoubleClick,
   getEventsForDate,
   getLecturesForDay,
 }: {
   selectedDate: Date
-  onDateClick: (date: Date) => void
+  onDaySelect: (date: Date) => void
+  onDayDoubleClick: (date: Date) => void
   getEventsForDate: (d: Date) => Event[]
   getLecturesForDay: (d: Date) => LectureSlot[]
 }) {
@@ -226,7 +228,8 @@ function CustomCalendarGrid({
           {days.map((day, index) => (
             <button
               key={index}
-              onClick={() => day.isCurrentMonth && onDateClick(day.date)}
+              onClick={() => day.isCurrentMonth && onDaySelect(day.date)}
+              onDoubleClick={() => day.isCurrentMonth && onDayDoubleClick(day.date)}
               className={getDateClasses(day.date, day.isCurrentMonth)}
               disabled={!day.isCurrentMonth}
             >
@@ -534,8 +537,13 @@ function StudentCalendar() {
     return currentTime >= begin && currentTime <= end
   }
 
-  const handleDateClick = (d?: Date) => {
-    if (!d) return
+  const handleSelectDate = (d: Date) => {
+    setSelectedDate(d)
+    setDate(d)
+    setTimetableDate(d)
+  }
+
+  const handleAddEventForDate = (d: Date) => {
     setSelectedDate(d)
     setDate(d)
     setTimetableDate(d)
@@ -652,7 +660,6 @@ function StudentCalendar() {
       return nd
     })
 
-  //if (!userId) return <div className="text-center py-10 text-foreground">Please sign in to use the calendar.</div>
 
   const isPersonalSelectedDate = selectedDate != null && !getSemesterForDate(selectedDate as Date)
 
@@ -702,7 +709,8 @@ function StudentCalendar() {
             <div className="xl:col-span-3 space-y-6">
               <CustomCalendarGrid
                 selectedDate={date}
-                onDateClick={handleDateClick}
+                onDaySelect={handleSelectDate}
+                onDayDoubleClick={handleAddEventForDate}
                 getEventsForDate={getEventsForDate}
                 getLecturesForDay={getLecturesForDay}
               />
