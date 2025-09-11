@@ -512,7 +512,7 @@ export function SmartHeader() {
               <Button variant="ghost" size="sm" className="relative h-8 w-8">
                 <Bell className="h-4 w-4" />
                 {!loadingNotifications && notifications.length > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 text-[10px] bg-destructive">
+                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 text-[10px] bg-blue-500 text-white">
                     {notifications.length}
                   </Badge>
                 )}
