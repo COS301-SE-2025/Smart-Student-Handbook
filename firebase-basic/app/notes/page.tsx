@@ -28,6 +28,14 @@ import SummaryPanel from "@/components/ai/SummaryPanel";
 import FlashcardGenerator from "@/components/flashcards/FlashCardSection";
 import { toast } from "sonner";
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown, ChevronRight, ChevronLeft } from "lucide-react";
+
+
 export default function NotesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [displayname, setDisplayName] = useState<string | null>(null);
@@ -213,111 +221,143 @@ export default function NotesPage() {
 
   /* ----------------------------------- UI ------------------------------------- */
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen w-screen overflow-hidden">
       {/* LEFT: v1-style notes structure ONLY (buttons + 3 sections) */}
-      <div className="flex-[1] border-r p-2 grid gap-2
-                    grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]
-                    min-h-0">
 
-        {/* Row 1: buttons */}
-        <div className="flex gap-3">
-          <Button onClick={() => handleAdd("note")} variant="default" size="sm">
-            + Note
-          </Button>
-          <Button onClick={() => handleAdd("folder")} variant="default" size="sm">
-            + Folder
-          </Button>
+      {/* LEFT SIDEBAR (Notes Tree Sections) */}
+      <Collapsible defaultOpen className="sticky top-0 left-0 h-screen shrink-0 border-r bg-background z-10">
+        {/* Collapse trigger */}
+        <div className="flex justify-start pl-1">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <ChevronLeft className="h-4 w-4 data-[state=open]:hidden" />
+              <ChevronRight className="h-4 w-4 data-[state=closed]:hidden" />
+            </Button>
+          </CollapsibleTrigger>
         </div>
 
-        {/* Row 2: My Notes */}
-        <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
-          <div className="px-3 py-2 border-b text-sm font-semibold">My Notes</div>
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            className="min-h-0 h-full overflow-auto no-scrollbar"
-          >
-            <NoteTree
-              treeData={tree}
-              onSelect={(id: string) => {
-                setSelectedNoteId(id);
-                const node = findNodeById(tree, id);
-                setOwnerID(node?.ownerId ?? user.uid);
-              }}
-              onRename={handleRename}
-              onDelete={handleDelete}
-              onDropNode={handleMove}
-            />
+        <CollapsibleContent
+          className="
+      flex-[1] border-r p-2 grid gap-2
+      grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]
+      min-h-0 w-[300px]
+    "
+        >
+          {/* Row 1: buttons */}
+          <div className="flex gap-3">
+            <Button onClick={() => handleAdd("note")} variant="default" size="sm">
+              + Note
+            </Button>
+            <Button onClick={() => handleAdd("folder")} variant="default" size="sm">
+              + Folder
+            </Button>
           </div>
-        </div>
 
-        {/* Row 3: Shared Notes */}
-        <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
-          <div className="px-3 py-2 border-b text-sm font-semibold">Shared Notes</div>
-          <div className="min-h-0 h-full overflow-auto no-scrollbar">
-            <NoteTree
-              treeData={sharedTree}
-              onSelect={(id: string) => {
-                setSelectedNoteId(id);
-                const node = findNodeById(sharedTree, id);
-                setOwnerID(node?.ownerId ?? user.uid);
-              }}
-              onRename={handleRename}
-              onDelete={handleDelete}
-              onDropNode={handleMove}
-            />
-          </div>
-        </div>
-
-        {/* Row 4: Organisation Notes */}
-        <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
-          <div className="px-3 py-2 border-b text-sm font-semibold">
-            Organisation Notes{activeOrgId ? ` – ${activeOrgId}` : ""}
-          </div>
-          <div className="min-h-0 h-full overflow-auto no-scrollbar">
-            <NoteTree
-              treeData={orgTree}
-              onSelect={(id: string) => {
-                setSelectedNoteId(id);
-                const node = findNodeById(orgTree, id);
-                // Prefer node.ownerId if present; otherwise fall back to activeOrgId
-                setOwnerID(node?.ownerId ?? activeOrgId ?? user.uid);
-              }}
-              onRename={handleRename}
-              onDelete={handleDelete}
-              onDropNode={handleMove}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-[3] flex flex-col gap-6 p-6">
-        {selectedNoteId ? (
-          <div className="flex flex-col w-full items-center">
-            <div className="flex-1 min-h-0 w-full max-w-6xl bg-white max-h-screen dark:bg-gray-950 shadow p-2">
-              <Main
-                searchParams={{
-                  doc: selectedNoteId,
-                  ownerId: currentOwnerId ?? undefined,
-                  username: displayname ?? undefined,
+          {/* Row 2: My Notes */}
+          <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
+            <div className="px-3 py-2 border-b text-sm font-semibold">My Notes</div>
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              className="min-h-0 h-full overflow-auto no-scrollbar"
+            >
+              <NoteTree
+                treeData={tree}
+                onSelect={(id: string) => {
+                  setSelectedNoteId(id);
+                  const node = findNodeById(tree, id);
+                  setOwnerID(node?.ownerId ?? user.uid);
                 }}
+                onRename={handleRename}
+                onDelete={handleDelete}
+                onDropNode={handleMove}
               />
             </div>
           </div>
-        ) : (
-          <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
-            Select a note or folder
+
+          {/* Row 3: Shared Notes */}
+          <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
+            <div className="px-3 py-2 border-b text-sm font-semibold">Shared Notes</div>
+            <div className="min-h-0 h-full overflow-auto no-scrollbar">
+              <NoteTree
+                treeData={sharedTree}
+                onSelect={(id: string) => {
+                  setSelectedNoteId(id);
+                  const node = findNodeById(sharedTree, id);
+                  setOwnerID(node?.ownerId ?? user.uid);
+                }}
+                onRename={handleRename}
+                onDelete={handleDelete}
+                onDropNode={handleMove}
+              />
+            </div>
           </div>
-        )}
+
+          {/* Row 4: Organisation Notes */}
+          <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
+            <div className="px-3 py-2 border-b text-sm font-semibold">
+              Organisation Notes{activeOrgId ? ` – ${activeOrgId}` : ""}
+            </div>
+            <div className="min-h-0 h-full overflow-auto no-scrollbar">
+              <NoteTree
+                treeData={orgTree}
+                onSelect={(id: string) => {
+                  setSelectedNoteId(id);
+                  const node = findNodeById(orgTree, id);
+                  setOwnerID(node?.ownerId ?? activeOrgId ?? user.uid);
+                }}
+                onRename={handleRename}
+                onDelete={handleDelete}
+                onDropNode={handleMove}
+              />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+
+      <div className="flex-1 overflow-auto bg-muted">
+        <div className="flex-[3] flex flex-col">
+          {selectedNoteId ? (
+            <div className="flex flex-col w-full items-center">
+              <div className="flex-1 min-h-0 w-full max-w-6xl bg-white max-h-screen dark:bg-gray-950 shadow p-2">
+                <Main
+                  searchParams={{
+                    doc: selectedNoteId,
+                    ownerId: currentOwnerId ?? undefined,
+                    username: displayname ?? undefined,
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
+              Select a note or folder
+            </div>
+          )}
+        </div>
       </div>
 
-      <div
-        className="
-            w-[420px] shrink-0
-            sticky top-6 self-start
-            h-[calc(100vh-1.5rem)]
-          "
-      >
-        <div className="flex-[1] flex flex-col gap-6 p-2">
+
+      {/* RIGHT SIDEBAR (Summary + Flashcards) */}
+      <Collapsible defaultOpen className="sticky top-0 right-0 h-screen shrink-0 border-l bg-background z-10">
+        {/* Collapse trigger */}
+        <div className="flex justify-end pr-1">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <ChevronRight className="h-4 w-4 data-[state=open]:hidden" />
+              <ChevronLeft className="h-4 w-4 data-[state=closed]:hidden" />
+            </Button>
+          </CollapsibleTrigger>
+        </div>
+
+        <CollapsibleContent
+          className="
+      w-[420px] 
+      h-[calc(100vh-1.5rem)]
+      sticky top-6 self-start
+      flex flex-col gap-6 p-2
+    "
+        >
           {/* Top half: Summary */}
           <div className="flex-1 min-h-0 bg-white dark:bg-gray-900 shadow overflow-hidden">
             <div className="h-full overflow-auto [&>*]:h-full">
@@ -347,8 +387,9 @@ export default function NotesPage() {
               />
             </div>
           </div>
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
+
     </div>
   );
 }
