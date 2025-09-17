@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { httpsCallableFromURL } from "firebase/functions"
+import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
 import { getDatabase, ref, get, set, remove } from "firebase/database"
 import { useSearchParams } from "next/navigation"
@@ -61,27 +61,33 @@ export default function OrganisationsPage() {
 
   const searchQuery = searchParams.get("search") || ""
 
-  /* ---- callables -------------------------------------------------------- */
-  const getPublicOrgs = useMemo(
-    () => httpsCallableFromURL<{}, Org[]>(fns, "https://getpublicorganizations-omrwo3ykaa-uc.a.run.app"),
-    [],
-  )
-  const getPrivateOrgs = useMemo(
-    () => httpsCallableFromURL<{}, Org[]>(fns, "https://getuserorganizations-omrwo3ykaa-uc.a.run.app"),
-    [],
-  )
-  const joinOrg = useMemo(
-    () => httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(fns, "https://joinorganization-omrwo3ykaa-uc.a.run.app"),
-    [],
-  )
-  const leaveOrg = useMemo(
-    () => httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(fns, "https://leaveorganization-omrwo3ykaa-uc.a.run.app"),
-    [],
-  )
-  const createOrg = useMemo(
-    () => httpsCallableFromURL<{ organization: CreateOrgInput }, Org>(fns, "https://createorganization-omrwo3ykaa-uc.a.run.app"),
-    [],
-  )
+
+/* ---- callables -------------------------------------------------------- */
+const getPublicOrgs = useMemo(
+  () => httpsCallable<{}, Org[]>(fns, "getPublicOrganizations"),
+  [fns],
+)
+
+const getPrivateOrgs = useMemo(
+  () => httpsCallable<{}, Org[]>(fns, "getUserOrganizations"),
+  [fns],
+)
+
+const joinOrg = useMemo(
+  () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "joinOrganization"),
+  [fns],
+)
+
+const leaveOrg = useMemo(
+  () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "leaveOrganization"),
+  [fns],
+)
+
+const createOrg = useMemo(
+  () => httpsCallable<{ organization: CreateOrgInput }, Org>(fns, "createOrganization"),
+  [fns],
+)
+
 
   const db = getDatabase()
 

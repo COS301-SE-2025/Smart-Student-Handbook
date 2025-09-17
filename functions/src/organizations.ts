@@ -1,5 +1,4 @@
 // functions/src/organizations.ts
-
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https'
 import { db } from './firebaseAdmin'
 
@@ -51,17 +50,46 @@ export const createOrganization = onCall(
       throw new HttpsError('invalid-argument', 'Organization name is required')
     }
 
-    // Prevent duplicate names
-    const dupSnap = await db
-      .ref('organizations')
-      .orderByChild('name')
-      .equalTo(org.name.trim())
-      .get()
-    if (dupSnap.exists()) {
-      throw new HttpsError(
-        'already-exists',
-        'An organization with that name already exists.'
-      )
+    const orgName = org.name.trim()
+
+    // Prevent duplicate names - check both public organizations and user's private organizations
+    try {
+      // Check public organizations
+      const publicOrgsSnap = await db.ref('organizations').orderByChild('name').get()
+      if (publicOrgsSnap.exists()) {
+        const publicOrgs = publicOrgsSnap.val() as Record<string, Org>
+        const publicDuplicate = Object.values(publicOrgs).find(
+          existingOrg => existingOrg.name.toLowerCase() === orgName.toLowerCase()
+        )
+        if (publicDuplicate) {
+          throw new HttpsError(
+            'already-exists',
+            'An organization with that name already exists.'
+          )
+        }
+      }
+
+      // Check user's private organizations (by index)
+      const userPrivateOrgsSnap = await db.ref(`users/${uid}/privateOrganizations`).get()
+      if (userPrivateOrgsSnap.exists()) {
+        const userPrivateOrgs = userPrivateOrgsSnap.val() as Record<string, { role: string }>
+        const privateOrgIds = Object.keys(userPrivateOrgs)
+
+        // Load each private org to check name
+        for (const candidateId of privateOrgIds) {
+          const privateOrg = await loadOrg(candidateId)
+          if (privateOrg.name.toLowerCase() === orgName.toLowerCase()) {
+            throw new HttpsError(
+              'already-exists',
+              'An organization with that name already exists.'
+            )
+          }
+        }
+      }
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      console.error('Error checking for duplicate organization names:', error)
+      // If duplicate check fails, we still proceed with creation.
     }
 
     // Build members map
@@ -75,71 +103,78 @@ export const createOrganization = onCall(
       })
     }
 
-    // Push new org under /organizations
-    const refOrg = db.ref('organizations').push()
-    const id = refOrg.key!
+    const isPrivate = !!org.isPrivate
+    const id = db.ref('organizations').push().key!
+
     const newOrg: Org = {
       id,
       ownerId: uid,
-      name: org.name.trim(),
+      name: orgName,
       description: org.description || '',
-      isPrivate: !!org.isPrivate,
+      isPrivate,
       image: org.image || '',
       members,
       createdAt: Date.now(),
     }
-    await refOrg.set(newOrg)
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // Notify invited users of private org
-    // ──────────────────────────────────────────────────────────────────────────
-    if (newOrg.isPrivate) {
-      await Promise.all(
-        invited
-          .filter(i => i && i !== uid)
-          .map(async memberId => {
-            // index under their privateOrganizations
-            await db
-              .ref(`users/${memberId}/privateOrganizations/${id}`)
-              .set({ role: 'Member' })
+    if (isPrivate) {
+      // =============== FIX: atomic multi-path update ==================
+      const root = db.ref()
+      const updates: Record<string, any> = {}
 
-            // push an "added_to_group" notification
-            const notifRef = db.ref(`users/${memberId}/notifications`).push()
-            await notifRef.set({
-              id: notifRef.key,
-              type: 'added_to_group',
-              orgId: newOrg.id,
-              fromUserId: uid,
-              timestamp: Date.now(),
-              message: `You were added to "${newOrg.name}"`,
-            })
-          })
-      )
-    }
+      // 1) write org document
+      updates[`organizations/${id}`] = newOrg
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // Notify everyone (except creator) of new public org
-    // ──────────────────────────────────────────────────────────────────────────
-    if (!newOrg.isPrivate) {
+      // 2) creator index
+      updates[`users/${uid}/privateOrganizations/${id}`] = { role: 'Admin' }
+
+      // 3) invited member indexes (exclude creator)
+      for (const [memberId, role] of Object.entries(members)) {
+        if (memberId !== uid) {
+          updates[`users/${memberId}/privateOrganizations/${id}`] = { role }
+        }
+      }
+
+      // 4) notifications to invited members
+      for (const memberId of Object.keys(members)) {
+        if (memberId === uid) continue
+        const notifKey = root.child(`users/${memberId}/notifications`).push().key!
+        updates[`users/${memberId}/notifications/${notifKey}`] = {
+          id: notifKey,
+          type: 'added_to_group',
+          orgId: id,
+          fromUserId: uid,
+          timestamp: Date.now(),
+          message: `You were added to "${newOrg.name}"`,
+        }
+      }
+
+      // One all-or-nothing commit
+      await root.update(updates)
+      // ================================================================
+
+    } else {
+      // PUBLIC ORGANIZATION:
+      await db.ref(`organizations/${id}`).set(newOrg)
+
       const usersSnap = await db.ref('users').get()
       if (usersSnap.exists()) {
-        const allUserIds = Object.keys(usersSnap.val() as any).filter(
-          u => u !== uid
-        )
-        await Promise.all(
-          allUserIds.map(userId => {
-            const notifRef = db.ref(
-              `users/${userId}/notifications`
-            ).push()
-            return notifRef.set({
-              id: notifRef.key,
-              type: 'new_public_org',
-              orgId: newOrg.id,
-              timestamp: Date.now(),
-              message: `A new organisation "${newOrg.name}" has been created.`,
-            })
-          })
-        )
+        const allUserIds = Object.keys(usersSnap.val() as any).filter(u => u !== uid)
+        const root = db.ref()
+        const updates: Record<string, any> = {}
+        for (const userId of allUserIds) {
+          const notifKey = root.child(`users/${userId}/notifications`).push().key!
+          updates[`users/${userId}/notifications/${notifKey}`] = {
+            id: notifKey,
+            type: 'new_public_org',
+            orgId: id,
+            timestamp: Date.now(),
+            message: `A new organisation "${newOrg.name}" has been created.`,
+          }
+        }
+        if (Object.keys(updates).length) {
+          await root.update(updates)
+        }
       }
     }
 
@@ -160,7 +195,8 @@ export const getPublicOrganizations = onCall(async () => {
 })
 
 /* -------------------------------------------------------------------------- */
-/*                    get private orgs for a user (3)                        */
+/*                    get private orgs for a user (3)                         */
+/*  IMPORTANT: We read the user index then hydrate each org.                  */
 /* -------------------------------------------------------------------------- */
 export const getUserOrganizations = onCall(async (req: CallableRequest<{}>) => {
   const uid = req.auth?.uid
@@ -184,7 +220,7 @@ export const getUserOrganizations = onCall(async (req: CallableRequest<{}>) => {
 })
 
 /* -------------------------------------------------------------------------- */
-/*                            join org (4) / leave org (5)                   */
+/*                            join org (4) / leave org (5)                    */
 /* -------------------------------------------------------------------------- */
 export const joinOrganization = onCall(
   async (req: CallableRequest<Pick<OrgPayload, 'orgId'>>) => {
@@ -200,10 +236,7 @@ export const joinOrganization = onCall(
 
     const org = await loadOrg(orgId)
     if (org.isPrivate) {
-      throw new HttpsError(
-        'permission-denied',
-        'Cannot join a private organization'
-      )
+      throw new HttpsError('permission-denied', 'Cannot join a private organization')
     }
 
     await db.ref(`organizations/${orgId}/members/${uid}`).set('Member')
@@ -235,7 +268,7 @@ export const leaveOrganization = onCall(
       throw new HttpsError('permission-denied', 'Not a member')
     }
 
-    // sole member → delete
+    // sole member → delete org
     if (memberIds.length === 1 && memberIds[0] === uid) {
       if (org.isPrivate) {
         await db.ref(`users/${uid}/privateOrganizations/${orgId}`).remove()
@@ -244,21 +277,20 @@ export const leaveOrganization = onCall(
       return { success: true, deleted: true }
     }
 
-    // owner leaves → transfer
+    // owner leaves → transfer ownership to lexicographically-first remaining member
     if (org.ownerId === uid) {
       const others = memberIds.filter(id => id !== uid).sort()
       const newOwner = others[0]
       await db.ref(`organizations/${orgId}/ownerId`).set(newOwner)
-      await db
-        .ref(`organizations/${orgId}/members/${newOwner}`)
-        .set('Admin')
+      await db.ref(`organizations/${orgId}/members/${newOwner}`).set('Admin')
     }
 
+    // remove membership
     await db.ref(`organizations/${orgId}/members/${uid}`).remove()
+
+    // for private orgs, also remove user index
     if (org.isPrivate) {
-      await db
-        .ref(`users/${uid}/privateOrganizations/${orgId}`)
-        .remove()
+      await db.ref(`users/${uid}/privateOrganizations/${orgId}`).remove()
     }
 
     return { success: true, transferred: org.ownerId === uid }
@@ -266,7 +298,7 @@ export const leaveOrganization = onCall(
 )
 
 /* -------------------------------------------------------------------------- */
-/*                      add member (6) – send "added_to_group" notice         */
+/*                      add member (6) / remove member (7)                    */
 /* -------------------------------------------------------------------------- */
 export const addMember = onCall(
   async (req: CallableRequest<Pick<OrgPayload, 'orgId' | 'userId'>>) => {
@@ -286,14 +318,11 @@ export const addMember = onCall(
     }
 
     // add to org.members
-    await db
-      .ref(`organizations/${orgId}/members/${userId}`)
-      .set('Member')
-    // index under user
+    await db.ref(`organizations/${orgId}/members/${userId}`).set('Member')
+
+    // For private orgs, index under user's private organizations
     if (org.isPrivate) {
-      await db
-        .ref(`users/${userId}/privateOrganizations/${orgId}`)
-        .set({ role: 'Member' })
+      await db.ref(`users/${userId}/privateOrganizations/${orgId}`).set({ role: 'Member' })
     }
 
     // push notification
@@ -331,13 +360,9 @@ export const removeMember = onCall(
       throw new HttpsError('permission-denied', 'Cannot remove the owner')
     }
 
-    await db
-      .ref(`organizations/${orgId}/members/${userId}`)
-      .remove()
+    await db.ref(`organizations/${orgId}/members/${userId}`).remove()
     if (org.isPrivate) {
-      await db
-        .ref(`users/${userId}/privateOrganizations/${orgId}`)
-        .remove()
+      await db.ref(`users/${userId}/privateOrganizations/${orgId}`).remove()
     }
 
     return { success: true }
@@ -345,7 +370,7 @@ export const removeMember = onCall(
 )
 
 /* -------------------------------------------------------------------------- */
-/*                            deleteOrganization                             */
+/*                            deleteOrganization                               */
 /* -------------------------------------------------------------------------- */
 export const deleteOrganization = onCall(
   async (req: CallableRequest<Pick<OrgPayload, 'orgId'>>) => {
@@ -364,14 +389,55 @@ export const deleteOrganization = onCall(
       throw new HttpsError('permission-denied', 'Only owner can delete')
     }
 
-    for (const m of Object.keys(org.members || {})) {
-      if (org.isPrivate) {
-        await db
-          .ref(`users/${m}/privateOrganizations/${orgId}`)
-          .remove()
+    // Remove from all members' private organizations (if private)
+    if (org.isPrivate) {
+      for (const memberId of Object.keys(org.members || {})) {
+        await db.ref(`users/${memberId}/privateOrganizations/${orgId}`).remove()
       }
     }
+
+    // Remove the organization data
     await db.ref(`organizations/${orgId}`).remove()
+
     return { success: true }
   }
 )
+
+/* -------------------------------------------------------------------------- */
+/*                Backfill indexes for existing private orgs                  */
+/* -------------------------------------------------------------------------- */
+export const reindexPrivateOrganizationMemberships = onCall(async (req) => {
+  const uid = req.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+
+  // Gate this callable to allowed admin UIDs
+  const allowedAdmins = new Set<string>([
+    // 'U9mbOMterhVEpKjRGV2YDYHCBl03',
+  ])
+  if (!allowedAdmins.has(uid)) {
+    throw new HttpsError('permission-denied', 'Admin only')
+  }
+
+  const snap = await db.ref('organizations').orderByChild('isPrivate').equalTo(true).get()
+  if (!snap.exists()) return { updatedUsers: 0, updatedLinks: 0 }
+
+  const orgs: Record<string, Org> = snap.val()
+  const updates: Record<string, any> = {}
+  let updatedLinks = 0
+  const touchedUsers = new Set<string>()
+
+  for (const org of Object.values(orgs)) {
+    for (const [memberId, role] of Object.entries(org.members || {})) {
+      const path = `users/${memberId}/privateOrganizations/${org.id}`
+      updates[path] = { role }
+      updatedLinks++
+      touchedUsers.add(memberId)
+    }
+  }
+
+  if (updatedLinks > 0) {
+    await db.ref().update(updates)
+  }
+
+  return { updatedUsers: touchedUsers.size, updatedLinks }
+})
