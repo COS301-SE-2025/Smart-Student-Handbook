@@ -35,7 +35,7 @@ export function YjsBlockNoteEditor({
     });
     observer.observe(root, { attributes: true, attributeFilter: ['class'] });
 
-    setTheme(root.classList.contains('dark') ? 'dark' : 'light');
+    // setTheme(root.classList.contains('dark') ? 'dark' : 'light');
     return () => observer.disconnect();
   }, []);
 
@@ -202,7 +202,7 @@ export function YjsBlockNoteEditor({
       </div>
 
       <div className="flex-1 overflow-auto h-[calc(100vh-16px)]">
-        <BlockNoteView editor={editor} data-theming-css-variables-demo />
+        <BlockNoteView editor={editor} data-theming-css-variables-demo/>
       </div>
     </div>
   );

@@ -1,26 +1,21 @@
 /* Adds border and shadow to editor */
-.bn-container[data-theming-css-variables-demo][data-color-scheme="light"] {
-  --bn-colors-editor-text: green;
-  --bn-colors-editor-background: #ffeeee;
+.bn-container[data-theming-css-variables-demo][data-color-scheme] {
+  --bn-colors-editor-text: black;
+  --bn-colors-editor-background: #ffffff;
   --bn-colors-menu-text: #ffffff;
-  --bn-colors-menu-background: #9b0000;
-  --bn-colors-tooltip-text: #ffffff;
-  --bn-colors-tooltip-background: #b00000;
+  --bn-colors-menu-background: #02081a;
+  --bn-colors-tooltip-text: #02081a;
+  --bn-colors-tooltip-background: #ffffff;
   --bn-colors-hovered-text: #ffffff;
-  --bn-colors-hovered-background: #b00000;
-  --bn-colors-selected-text: #ffffff;
-  --bn-colors-selected-background: #c50000;
-  --bn-colors-disabled-text: #9b0000;
-  --bn-colors-disabled-background: #7d0000;
-  --bn-colors-shadow: #640000;
-  --bn-colors-border: #870000;
+  --bn-colors-hovered-background: #02081a;
+  --bn-colors-selected-text: #02081a;
   --bn-colors-side-menu: #bababa;
   --bn-color-highlight-colors: #ffffff;
   --bn-border-radius: 4px;
   --bn-font-family: Helvetica Neue, sans-serif;
 }
 
-.bn-container[data-theming-css-variables-demo][data-color-scheme="dark"] {
+.bn-container[data-theming-css-variables-demo][data-color-scheme="wdwd"] {
   --bn-colors-editor-text: #ffffff;
   --bn-colors-editor-background: #00040f;
   --bn-colors-menu-text: #ffffff;
