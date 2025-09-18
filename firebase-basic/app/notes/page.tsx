@@ -315,11 +315,11 @@ export default function NotesPage() {
       </Collapsible>
 
 
-      <div className="flex-1 overflow-auto bg-muted">
+      <div className="flex-1 bg-muted">
         <div className="flex-[3] flex flex-col">
           {selectedNoteId ? (
             <div className="flex flex-col w-full items-center">
-              <div className="flex-1 min-h-0 w-full max-w-6xl bg-white max-h-screen dark:bg-gray-950 shadow p-2">
+              <div className="flex-1 min-h-0 w-full max-w-6xl bg-white dark:bg-gray-950 shadow p-2">
                 <Main
                   searchParams={{
                     doc: selectedNoteId,
