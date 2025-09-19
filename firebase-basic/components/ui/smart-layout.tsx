@@ -22,7 +22,7 @@ const PROTECTED_PAGES = [
   "/hardnotes",
   "/profile",
   "/settings",
-  "/organisations", // ✅ fixed spelling
+  "/organisations", 
   "/friends",
 ]
 
