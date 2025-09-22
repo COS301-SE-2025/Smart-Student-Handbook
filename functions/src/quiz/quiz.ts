@@ -6,8 +6,18 @@
 
 export type QuizState = "lobby" | "countdown" | "active" | "ended" | "cancelled";
 
+/**
+ * Where and how the quiz runs:
+ * - "org-live"     : organization, synchronous (lobby → countdown → active), has leaderboard
+ * - "org-async"    : organization, asynchronous (per-user), results aggregated to an org leaderboard
+ * - "personal-async": personal/self quiz on a user's own note (no leaderboard)
+ */
+export type QuizType = "org-live" | "org-async" | "personal-async";
+
 export interface CreateQuizInput {
-  orgId: string;
+  /** For org quizzes */
+  orgId?: string;
+  /** Note ID (org or personal) */
   noteId: string;
   /** Per-question time in seconds */
   questionDurationSec: number;
@@ -34,7 +44,7 @@ export interface Participant {
   displayName: string;                              // name to show in lobby/leaderboard
   connected: boolean;                               // live presence flag
 
-  // per-user progress (asynchronous)
+  // per-user progress (asynchronous or live)
   currentIndex?: number;                            // user's current question index (0-based)
   questionStartAt?: number;                         // when the user's current question timer started (ms)
   finished?: boolean;                               // user has completed all questions
@@ -54,8 +64,14 @@ export interface LeaderboardEntry {
 
 export interface Quiz {
   id: string;
+  /** Present for org quizzes; omitted for personal quizzes. */
+  orgId?: string;
   noteId: string;
   creatorId: string;
+
+  /** live / async / personal */
+  type: QuizType;
+
   state: QuizState;                                  // "lobby" | "countdown" | "active" | "ended" | "cancelled"
   createdAt: number;
 
@@ -70,15 +86,11 @@ export interface Quiz {
   participants: Record<string, Participant>;
 
   // runtime fields
-  startedAt?: number;                                // when countdown was started
-  countdownEndAt?: number;                           // when countdown ends (ms)
-
-  // (legacy global fields are no longer used but left here for forward/back compat)
-  currentIndex?: number;                             // UNUSED after async move
-  questionStartAt?: number;                          // UNUSED after async move
+  startedAt?: number;                                // when countdown was started (live)
+  countdownEndAt?: number;                           // when countdown ends (ms) (live)
   finishedAt?: number;                               // when quiz ended (ms)
 
-  // final summary shown in review
+  // summary for review
   endSummary?: {
     leaderboard: LeaderboardEntry[];
     finishedAt: number;

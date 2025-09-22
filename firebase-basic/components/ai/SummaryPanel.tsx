@@ -1,4 +1,3 @@
-
 // components/ai/SummaryPanel.tsx
 "use client"
 
@@ -39,9 +38,14 @@ type OrgLoadRes = {
   success: boolean
   exists: boolean
   summary?: {
-    id: string; orgId: string; noteId: string;
-    ownerId: string | null; text: string; title: string;
-    createdAt: number | null; updatedAt: number | null;
+    id: string
+    orgId: string
+    noteId: string
+    ownerId: string | null
+    text: string
+    title: string
+    createdAt: number | null
+    updatedAt: number | null
   }
 }
 type OrgSaveReq = { orgId: string; noteId: string; ownerId: string; text: string; title?: string }
@@ -54,9 +58,14 @@ type UserLoadRes = {
   success: boolean
   exists: boolean
   summary?: {
-    id: string; userId: string; noteId: string;
-    ownerId: string | null; text: string; title: string;
-    createdAt: number | null; updatedAt: number | null;
+    id: string
+    userId: string
+    noteId: string
+    ownerId: string | null
+    text: string
+    title: string
+    createdAt: number | null
+    updatedAt: number | null
   }
 }
 type UserSaveReq = { userId: string; noteId: string; ownerId: string; text: string; title?: string }
@@ -65,12 +74,12 @@ type UserDeleteReq = { userId: string; noteId: string }
 type UserDeleteRes = { success: boolean }
 
 /* ---------------- Callables ---------------- */
-const callLoadOrg   = httpsCallable<OrgLoadReq, OrgLoadRes>(fns, "loadSummary")
-const callSaveOrg   = httpsCallable<OrgSaveReq, OrgSaveRes>(fns, "saveSummary")
+const callLoadOrg = httpsCallable<OrgLoadReq, OrgLoadRes>(fns, "loadSummary")
+const callSaveOrg = httpsCallable<OrgSaveReq, OrgSaveRes>(fns, "saveSummary")
 const callDeleteOrg = httpsCallable<OrgDeleteReq, OrgDeleteRes>(fns, "deleteSummary")
 
-const callLoadUser   = httpsCallable<UserLoadReq, UserLoadRes>(fns, "loadUserSummary")
-const callSaveUser   = httpsCallable<UserSaveReq, UserSaveRes>(fns, "saveUserSummary")
+const callLoadUser = httpsCallable<UserLoadReq, UserLoadRes>(fns, "loadUserSummary")
+const callSaveUser = httpsCallable<UserSaveReq, UserSaveRes>(fns, "saveUserSummary")
 const callDeleteUser = httpsCallable<UserDeleteReq, UserDeleteRes>(fns, "deleteUserSummary")
 
 /* ---------------- Local helpers ------------------- */
@@ -85,7 +94,9 @@ function clampPlain(input: string): string {
 async function sha256Hex(s: string): Promise<string> {
   const buf = new TextEncoder().encode(s)
   const hash = await crypto.subtle.digest("SHA-256", buf)
-  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("")
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
 }
 const cacheKey = (h: string) => `summary:${CACHE_VERSION}:${h}`
 function readCache(hash: string): string | null {
@@ -95,10 +106,14 @@ function readCache(hash: string): string | null {
     const { at, value } = JSON.parse(raw) as { at: number; value: string }
     if (Date.now() - at > CACHE_TTL_MS) return null
     return typeof value === "string" ? value : null
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 function writeCache(hash: string, value: string) {
-  try { localStorage.setItem(cacheKey(hash), JSON.stringify({ at: Date.now(), value })) } catch {}
+  try {
+    localStorage.setItem(cacheKey(hash), JSON.stringify({ at: Date.now(), value }))
+  } catch {}
 }
 
 export default function SummaryPanel({
@@ -140,7 +155,9 @@ export default function SummaryPanel({
   useEffect(() => setIsClient(true), [])
 
   useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setIsExpanded(false) }
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsExpanded(false)
+    }
     if (isExpanded) window.addEventListener("keydown", onEsc)
     return () => window.removeEventListener("keydown", onEsc)
   }, [isExpanded])
@@ -190,7 +207,9 @@ export default function SummaryPanel({
     }
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [useUserScope, orgId, userId, noteId])
 
   const handleSummarize = useCallback(async () => {
@@ -236,7 +255,8 @@ export default function SummaryPanel({
 
     try {
       const result = await (summarizeNote as unknown as (t: string, o?: { signal?: AbortSignal }) => Promise<string>)(
-        plain, { signal: ctrl.signal }
+        plain,
+        { signal: ctrl.signal },
       )
 
       if (runIdRef.current !== myRun) return
@@ -284,9 +304,9 @@ export default function SummaryPanel({
 
         <CardContent>
           {loadingExisting ? (
-           <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading summary…
-                    </div>
+            <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading summary…
+            </div>
           ) : summary ? (
             <div className="p-3 rounded-lg bg-card text-foreground whitespace-pre-wrap break-words text-xs md:text-sm leading-snug">
               {summary}
@@ -299,7 +319,8 @@ export default function SummaryPanel({
         </CardContent>
       </Card>
 
-      {isExpanded && isClient &&
+      {isExpanded &&
+        isClient &&
         createPortal(
           <div
             className="fixed inset-0 z-[10000] bg-black/35 backdrop-blur-[6px] flex items-center justify-center p-4"
@@ -360,7 +381,7 @@ export default function SummaryPanel({
               </Card>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </>
   )

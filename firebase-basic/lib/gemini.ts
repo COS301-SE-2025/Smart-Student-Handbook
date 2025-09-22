@@ -1,23 +1,15 @@
-/**
- * AI utilities for summarizing notes, generating flashcards, and producing MCQs.
- * - Tight cleaners strip URLs/citations/editor junk and meta option prefixes.
- * - MCQ generator uses a BYU-inspired prompt, bans meta phrasing, and requests JSON.
- * - Includes robust JSON parsing and final sanitization for client safety.
- *
- * NOTE: Using NEXT_PUBLIC_GEMINI_API_KEY exposes your key to the client.
- * For production, move calls to a server route or Firebase Callable Function.
- */
-
+// app/lib/gemini.ts
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 if (!API_KEY) {
-  // Fail fast in dev so you don't ship a broken build
   throw new Error("Missing env var NEXT_PUBLIC_GEMINI_API_KEY");
 }
 
-const MODEL_NAME = "gemini-1.5-pro"; // You can also use "models/gemini-1.5-pro" if your SDK expects that.
+const MODEL_NAME = "gemini-1.5-pro";
 const genAI = new GoogleGenerativeAI(API_KEY);
+
+/* ----------------------------- keep these as-is ---------------------------- */
 
 export async function summarizeNote(content: string): Promise<string> {
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -52,6 +44,8 @@ ${note}
   return text.trim();
 }
 
+/* ---------------------------------- types --------------------------------- */
+
 export type ClientQuizItem = {
   question: string;
   options: string[];     // length 4
@@ -59,46 +53,26 @@ export type ClientQuizItem = {
   explanation?: string;
 };
 
-/** Remove leaked JSON/HTML/URLs/wiki artifacts and clamp length. */
-function cleanLine(s: string): string {
-  let t = (s ?? "").toString().trim();
-
-  // Strip JSON/editor fragments & HTML
-  t = t.replace(/\[\s*{\s*"id"\s*:[\s\S]*$/g, "");
-  t = t.replace(/"id"\s*:\s*".*?"/g, "");
-  t = t.replace(/"type"\s*:\s*".*?"/g, "");
-  t = t.replace(/"props"\s*:\s*{[^}]*}/g, "");
-  t = t.replace(/<[^>]+>/g, " ");
-
-  // Strip URLs/citations and wiki/link artifacts
-  t = t.replace(/\bhttps?:\/\/\S+/gi, " ");
-  t = t.replace(/\bcite_note[-\w]*/gi, " ");
-  t = t.replace(/\blink\b/gi, " ");
-  t = t.replace(/\[\d+\]/g, " "); // [13], [15], etc.
-
-  // Strip common meta prefixes models like to emit
-  t = t.replace(
-    /^(Key principle implied by|Most defensible statement from|Opposite claim to|Partially true but misleading view of|Tangential trivia about|Ambiguous\/unverifiable note on|Incorrect causal link from|Speculative claim beyond)\s*:\s*/i,
-    ""
-  );
-
-  // Collapse whitespace and clamp
-  t = t.replace(/\s+/g, " ").trim();
-  if (t.length > 180) t = t.slice(0, 177) + "...";
-  return t;
-}
-
-/** Extract plain text from JSON/HTML/strings to avoid leaking editor markup into prompts. */
-function extractPlainText(input: string | undefined | null): string {
-  const s = (input ?? "").toString();
+/* -------------------------- minimal sanitization --------------------------- */
+/**
+ * Convert your stored rich-note JSON (array of nodes with {content:[{text:"..."}]})
+ * into plain text suitable for prompting the LLM.
+ * If the input is already a string, it’s lightly cleaned.
+ */
+function sanitizeRichNoteToPlain(input: unknown): string {
+  const s = String(input ?? "");
   if (!s) return "";
+
+  // If it's JSON, walk it; otherwise treat as plain text and strip tags/urls/whitespace.
   try {
     const parsed = JSON.parse(s);
-    const out: string[] = [];
+    const lines: string[] = [];
+
     const walk = (node: any) => {
       if (node == null) return;
+
       if (typeof node === "string") {
-        out.push(node);
+        if (node.trim()) lines.push(node);
         return;
       }
       if (Array.isArray(node)) {
@@ -106,86 +80,82 @@ function extractPlainText(input: string | undefined | null): string {
         return;
       }
       if (typeof node === "object") {
-        if (typeof (node as any).text === "string") out.push((node as any).text);
-        if (typeof (node as any).content === "string") out.push((node as any).content);
+        // Your DB shape: array of blocks; each block has content: [{ type:"text", text:"..." }]
+        if (Array.isArray((node as any).content)) {
+          for (const part of (node as any).content) {
+            if (part && typeof part.text === "string" && part.text.trim()) {
+              lines.push(part.text);
+            }
+          }
+        }
+        // Fallbacks: some editors place text in .text or .content as string
+        if (typeof (node as any).text === "string" && (node as any).text.trim()) {
+          lines.push((node as any).text);
+        }
+        if (typeof (node as any).content === "string" && (node as any).content.trim()) {
+          lines.push((node as any).content);
+        }
+        // Recurse over other fields
         for (const v of Object.values(node)) walk(v);
       }
     };
+
     walk(parsed);
-    return out
+    return lines
       .join(" ")
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\bhttps?:\/\/\S+/gi, " ")
-      .replace(/\bcite_note[-\w]*/gi, " ")
-      .replace(/\blink\b/gi, " ")
-      .replace(/\[\d+\]/g, " ")
+      .replace(/<[^>]*>/g, " ")          // strip html
+      .replace(/\bhttps?:\/\/\S+/gi, " ") // strip urls
       .replace(/\s+/g, " ")
       .trim();
   } catch {
+    // Not JSON — treat as plain text
     return s
       .replace(/<[^>]*>/g, " ")
       .replace(/\bhttps?:\/\/\S+/gi, " ")
-      .replace(/\bcite_note[-\w]*/gi, " ")
-      .replace(/\blink\b/gi, " ")
-      .replace(/\[\d+\]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
   }
 }
 
-function sanitizeClientQuestion(raw: any): ClientQuizItem {
-  const q = cleanLine(raw?.question ?? "");
-  const optsRaw = Array.isArray(raw?.options) ? raw.options : [];
-  const options = optsRaw
-    .slice(0, 4)
-    .map((o: any) => cleanLine(String(o)))
-    .filter((o: string) => o.length > 0);
+/* ------------------------- tiny output normalizer -------------------------- */
+function clamp(n: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, n));
+}
 
+function sanitizeItem(raw: any): ClientQuizItem {
+  const q = String(raw?.question ?? "").trim();
+
+  const options = Array.isArray(raw?.options)
+    ? raw.options.map((o: any) => String(o ?? "").trim()).slice(0, 4)
+    : [];
   while (options.length < 4) options.push("N/A");
 
   let idx = Number(raw?.answerIndex);
-  if (!(idx >= 0 && idx < 4)) idx = 0;
+  if (!Number.isInteger(idx)) idx = 0;
+  idx = clamp(idx, 0, 3);
 
   const explanation =
-    typeof raw?.explanation === "string" ? cleanLine(raw.explanation) : undefined;
+    typeof raw?.explanation === "string" ? String(raw.explanation).trim() : undefined;
 
-  return { question: q, options: options.slice(0, 4), answerIndex: idx, explanation };
+  return { question: q, options, answerIndex: idx, explanation };
 }
 
+/* ------------------------ MCQ generator (minimal) ------------------------- */
 /**
- * Client-side generator for MCQs.
- * For production, prefer your server callable (avoids exposing API key).
+ * Strictly: provide sanitized text + ask for the JSON shape. No extra guidance.
  */
 export async function generateQuizQuestions(
   note: string,
   numQuestions = 5
 ): Promise<ClientQuizItem[]> {
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-  const plain = extractPlainText(note);
-  const count = Math.max(1, Math.min(20, Math.floor(numQuestions || 5)));
+
+  const plain = sanitizeRichNoteToPlain(note);
+  const count = clamp(Math.floor(numQuestions || 5), 1, 20);
 
   const prompt = `
-You are writing ${count} Multiple-Choice Questions (MCQs) from NOTE_TEXT.
+Return ONLY a JSON array of exactly ${count} items. Each item must be:
 
-Write higher-quality MCQs that assess understanding and application (not mere recall).
-Use a direct question format (end stems with a '?').
-
-STRICT BANS:
-- Do NOT include URLs, markdown, HTML, citations, the word "link", "cite_note", or bracketed numbers like [13].
-- Do NOT use meta option prefixes such as "Key principle implied by:", "Most defensible statement from:", etc.
-- Do NOT use "All of the above" or "None of the above".
-- Do NOT write negatively phrased questions (avoid "NOT", "EXCEPT").
-
-REQUIREMENTS per item:
-- One clear question stem related to NOTE_TEXT.
-- Exactly 4 concise, plausible options; only one is clearly correct.
-- Options must be homogeneous in content and similar in length.
-- Provide a short explanation that cites facts from NOTE_TEXT (no URLs/citations).
-- Length limits: stem ≤ 160 chars; each option ≤ 110 chars; explanation ≤ 220 chars.
-- Vary the position of the correct answer across questions.
-
-OUTPUT FORMAT:
-Return ONLY a JSON array with items shaped as:
 {
   "question": "string",
   "options": ["string","string","string","string"],
@@ -193,32 +163,31 @@ Return ONLY a JSON array with items shaped as:
   "explanation": "string"
 }
 
-NOTE_TEXT:
+Use ONLY the following NOTE_TEXT as source:
 """${plain}"""
 `.trim();
 
-  // Ask Gemini to return JSON. Some SDK versions support responseMimeType + responseSchema.
+  // IMPORTANT: Gemini wants UPPERCASE types and does not support "additionalProperties".
   const generationConfig: any = {
     responseMimeType: "application/json",
     responseSchema: {
-      type: "array",
+      type: "ARRAY",
       minItems: count,
       maxItems: count,
       items: {
-        type: "object",
-        required: ["question", "options", "answerIndex"],
-        additionalProperties: false,
+        type: "OBJECT",
         properties: {
-          question: { type: "string", maxLength: 160 },
+          question: { type: "STRING" },
           options: {
-            type: "array",
+            type: "ARRAY",
             minItems: 4,
             maxItems: 4,
-            items: { type: "string", maxLength: 110 }
+            items: { type: "STRING" }
           },
-          answerIndex: { type: "integer", minimum: 0, maximum: 3 },
-          explanation: { type: "string", maxLength: 220 }
-        }
+          answerIndex: { type: "INTEGER" },
+          explanation: { type: "STRING" }
+        },
+        required: ["question", "options", "answerIndex"]
       }
     }
   };
@@ -230,58 +199,23 @@ NOTE_TEXT:
 
   const raw = (await result.response).text().trim();
 
-  // Robust parse with fences fallback
+  // Parse robustly
   let parsed: any;
   try {
     parsed = JSON.parse(raw);
   } catch {
     const m = raw.match(/\[[\s\S]*\]/);
     if (!m) {
-      // Last-chance cleanup (strip ```json / ``` fences)
       const stripped = raw.replace(/```json/gi, "```").replace(/```/g, "").trim();
-      try {
-        parsed = JSON.parse(stripped);
-      } catch {
-        console.error("❌ Failed to parse quiz questions:", raw);
-        throw new Error("Quiz generation failed. Model did not return valid JSON.");
-      }
+      parsed = JSON.parse(stripped);
     } else {
       parsed = JSON.parse(m[0]);
     }
   }
 
-  if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("Quiz generation failed. Empty or invalid array.");
+  if (!Array.isArray(parsed) || parsed.length !== count) {
+    throw new Error("Quiz generation failed: invalid JSON shape.");
   }
 
-  // Sanitize and enforce final constraints
-  const bannedOpt = /(all\s*(of\s*)?the\s*above|none\s*(of\s*)?the\s*above|https?:\/\/|\blink\b|cite_note|\[\d+\])/i;
-
-  const items = parsed.map(sanitizeClientQuestion).slice(0, count).map((it) => {
-    it.question = cleanLine(it.question);
-    it.options = it.options.map((o) => {
-      let v = cleanLine(o);
-      if (bannedOpt.test(v)) v = "N/A";
-      return v;
-    });
-
-    // Ensure exactly 4 options
-    if (it.options.length !== 4) {
-      while (it.options.length < 4) it.options.push("N/A");
-      it.options = it.options.slice(0, 4);
-    }
-
-    // Ensure valid answerIndex
-    if (!(it.answerIndex >= 0 && it.answerIndex < 4)) it.answerIndex = 0;
-
-    // Optional explanation cleanup
-    if (typeof it.explanation === "string") {
-      it.explanation = cleanLine(it.explanation);
-      if (!it.explanation) delete it.explanation;
-    }
-
-    return it;
-  });
-
-  return items;
+  return parsed.map(sanitizeItem);
 }

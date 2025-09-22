@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import dynamic from "next/dynamic"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
 import SummaryPanel from "@/components/ai/SummaryPanel"
@@ -57,9 +56,7 @@ async function callUpdateNote(path: string, note: Partial<Note>) {
 /* ------------------------------ Main component --------------------------- */
 export default function NotesSplitView({ notes, orgID, initialSelectedId }: NotesSplitViewProps) {
   const [stateNotes, setStateNotes] = useState<Note[]>(notes)
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
-    initialSelectedId ?? notes[0]?.id ?? null
-  )
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(initialSelectedId ?? notes[0]?.id ?? null)
   const [isRightPaneCollapsed, setIsRightPaneCollapsed] = useState(false)
 
   const ownerId = getAuth().currentUser?.uid ?? ""
@@ -104,8 +101,9 @@ export default function NotesSplitView({ notes, orgID, initialSelectedId }: Note
     <div className="flex h-[calc(100vh-2rem)] p-2 gap-4 min-h-0">
       {/* Editor pane */}
       <div
-        className={`${isRightPaneCollapsed ? "flex-1" : "flex-[3]"
-          } border rounded-xl p-3 bg-white dark:bg-neutral-900 shadow overflow-hidden flex flex-col min-h-0 transition-all duration-300`}
+        className={`${
+          isRightPaneCollapsed ? "flex-1" : "flex-[3]"
+        } border rounded-xl p-3 bg-white dark:bg-neutral-900 shadow overflow-hidden flex flex-col min-h-0 transition-all duration-300`}
       >
         <div className="flex items-center justify-between mb-2">
           <input
@@ -132,7 +130,7 @@ export default function NotesSplitView({ notes, orgID, initialSelectedId }: Note
             searchParams={{
               doc: selectedNoteId as any,
               ownerId: orgID ?? undefined,
-              username: "Organisation Member" ,
+              username: "Organisation Member",
             }}
           />
         </div>
@@ -150,19 +148,12 @@ export default function NotesSplitView({ notes, orgID, initialSelectedId }: Note
               orgId={orgID}
               ownerId={ownerId}
               noteId={note.id}
-              
             />
           </div>
 
           {/* Flashcards section (single pack per note) */}
           <div className="flex-1 min-h-0 border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
-            <FlashCardSection
-              sourceText={plain}
-              className="h-full"
-              orgId={orgID}
-              ownerId={ownerId}
-              noteId={note.id}
-            />
+            <FlashCardSection sourceText={plain} className="h-full" orgId={orgID} ownerId={ownerId} noteId={note.id} />
           </div>
         </div>
       )}
