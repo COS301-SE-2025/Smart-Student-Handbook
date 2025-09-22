@@ -2,13 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { httpsCallable } from "firebase/functions"
 import { db, fns } from "@/lib/firebase"
 import { get, onValue, ref } from "firebase/database"
-import { Trophy, X, ListChecks, UserRound } from "lucide-react"
-
-type QuizType = "org-async" | "personal-async"
+import { Trophy, X, ListChecks } from "lucide-react"
 
 interface QuizPanelProps {
   orgId?: string
@@ -29,61 +26,43 @@ export default function QuizPanel({
   defaultNumQuestions = 5,
   onClose,
 }: QuizPanelProps) {
-  // Tabs: Organization (anyone in org) vs My Quizzes (self)
-  const [tab, setTab] = useState<"org" | "self">("org")
-
-  // Callables — ORG
+  // Callables — ORG only
   const listOrgAsyncQuizzes = useMemo(() => httpsCallable(fns, "listOrgAsyncQuizzes"), [])
   const startOrResumeOrgAsyncAttempt = useMemo(() => httpsCallable(fns, "startOrResumeOrgAsyncAttempt"), [])
   const submitOrgAsyncAnswer = useMemo(() => httpsCallable(fns, "submitOrgAsyncAnswer"), [])
   const getOrgAsyncLeaderboard = useMemo(() => httpsCallable(fns, "getOrgAsyncLeaderboard"), [])
 
-  // Callables — SELF
-  const listPersonalAsyncQuizzes = useMemo(() => httpsCallable(fns, "listPersonalAsyncQuizzes"), [])
-  const startOrResumePersonalAsyncAttempt = useMemo(() => httpsCallable(fns, "startOrResumePersonalAsyncAttempt"), [])
-  const submitPersonalAsyncAnswer = useMemo(() => httpsCallable(fns, "submitPersonalAsyncAnswer"), [])
-
-  // Lists
+  // Lists - only org quizzes
   const [orgQuizzes, setOrgQuizzes] = useState<any[]>([])
-  const [selfQuizzes, setSelfQuizzes] = useState<any[]>([])
 
-  // Active attempt (org or self)
+  // Active attempt - only org
   const [active, setActive] = useState<{
-    scope: "org" | "self" | null
     quizId: string | null
     quizDoc: any | null
     currentIndex: number
     finished: boolean
-  }>({ scope: null, quizId: null, quizDoc: null, currentIndex: 0, finished: false })
+  }>({ quizId: null, quizDoc: null, currentIndex: 0, finished: false })
 
-  // Leaderboard for org quiz (computed on backend per finished user)
+  // Leaderboard for org quiz
   const [leaderboard, setLeaderboard] = useState<any[]>([])
 
-  // ---------- Load lists ----------
+  // ---------- Load org quizzes ----------
   useEffect(() => {
-    if (!noteId) return
+    if (!noteId || !orgId) return
 
     const load = async () => {
       try {
-        if (orgId) {
-          const res: any = await listOrgAsyncQuizzes({ orgId, noteId })
-          setOrgQuizzes(Array.isArray(res?.data?.items) ? res.data.items : [])
-        } else {
-          setOrgQuizzes([])
-        }
-
-        const resSelf: any = await listPersonalAsyncQuizzes({ noteId })
-        setSelfQuizzes(Array.isArray(resSelf?.data?.items) ? resSelf.data.items : [])
+        const res: any = await listOrgAsyncQuizzes({ orgId, noteId })
+        setOrgQuizzes(Array.isArray(res?.data?.items) ? res.data.items : [])
       } catch {
         setOrgQuizzes([])
-        setSelfQuizzes([])
       }
     }
 
     load()
-  }, [orgId, noteId, listOrgAsyncQuizzes, listPersonalAsyncQuizzes])
+  }, [orgId, noteId, listOrgAsyncQuizzes])
 
-  // ---------- Start / resume attempts ----------
+  // ---------- Start / resume org attempts ----------
   const startOrg = async (quizId: string) => {
     if (!orgId) return
     const res: any = await startOrResumeOrgAsyncAttempt({ orgId, quizId, displayName })
@@ -91,313 +70,253 @@ export default function QuizPanel({
     const q = snap.val()
     const me = q?.participants?.[userId]
     setActive({
-      scope: "org",
       quizId,
       quizDoc: q,
       currentIndex: res?.data?.currentIndex ?? (typeof me?.currentIndex === "number" ? me.currentIndex : 0),
       finished: !!me?.finished,
     })
 
-    // preload leaderboard (may be empty until someone finishes)
+    // preload leaderboard
     const lb: any = await getOrgAsyncLeaderboard({ orgId, quizId })
     setLeaderboard(Array.isArray(lb?.data?.items) ? lb.data.items : [])
   }
 
-  const startSelf = async (quizId: string) => {
-    const res: any = await startOrResumePersonalAsyncAttempt({ quizId })
-    const snap = await get(ref(db, `users/${userId}/quizzes/${quizId}`))
-    const q = snap.val()
-    const me = q?.participants?.[userId]
-    setActive({
-      scope: "self",
-      quizId,
-      quizDoc: q,
-      currentIndex: res?.data?.currentIndex ?? (typeof me?.currentIndex === "number" ? me.currentIndex : 0),
-      finished: !!me?.finished,
-    })
-  }
-
   // Watch active quiz doc for live progress updates
   useEffect(() => {
-    if (!active.quizId || !active.scope) return
-    const path =
-      active.scope === "org"
-        ? `organizations/${orgId}/quizzes/${active.quizId}`
-        : `users/${userId}/quizzes/${active.quizId}`
+    if (!active.quizId || !orgId) return
+    const path = `organizations/${orgId}/quizzes/${active.quizId}`
     const unsub = onValue(ref(db, path), (snap) => {
       const q = snap.val()
-      const me = active.scope === "org" ? q?.participants?.[userId] : q?.participants?.[userId]
+      const me = q?.participants?.[userId]
       const idx = typeof me?.currentIndex === "number" ? me.currentIndex : 0
       const finished = !!me?.finished
       setActive((prev) => ({ ...prev, quizDoc: q, currentIndex: idx, finished }))
     })
     return () => unsub()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active.quizId, active.scope, orgId, userId])
+  }, [active.quizId, orgId, userId])
 
   // ---------- Submit answers ----------
   const handleAnswer = async (optionIdx: number) => {
-    if (!active.quizId || !active.scope) return
+    if (!active.quizId || !orgId) return
 
-    if (active.scope === "org" && orgId) {
-      await submitOrgAsyncAnswer({ orgId, quizId: active.quizId, optionIdx })
-      // after submit, refresh leaderboard if finished
-      const me = active.quizDoc?.participants?.[userId]
-      if (me?.finished) {
-        const lb: any = await getOrgAsyncLeaderboard({ orgId, quizId: active.quizId })
-        setLeaderboard(Array.isArray(lb?.data?.items) ? lb.data.items : [])
-      }
-    } else {
-      await submitPersonalAsyncAnswer({ quizId: active.quizId, optionIdx })
+    await submitOrgAsyncAnswer({ orgId, quizId: active.quizId, optionIdx })
+    // after submit, refresh leaderboard if finished
+    const me = active.quizDoc?.participants?.[userId]
+    if (me?.finished) {
+      const lb: any = await getOrgAsyncLeaderboard({ orgId, quizId: active.quizId })
+      setLeaderboard(Array.isArray(lb?.data?.items) ? lb.data.items : [])
     }
   }
 
   // ---------- Render ----------
   return (
-    <Card className="border rounded-lg">
-      <CardHeader className="flex items-center justify-between flex-row border-b">
+    <div className="h-full flex flex-col bg-background/30 backdrop-blur-md border border-border/30 rounded-lg shadow-lg">
+      <div className="flex items-center justify-between p-4 border-b border-border/30 bg-background/20">
         <div className="flex items-center gap-3">
-          <CardTitle className="text-lg">Quiz Panel</CardTitle>
-          <div className="inline-flex rounded-md border overflow-hidden">
-            <button
-              className={`px-3 py-1 text-sm flex items-center gap-1 ${tab === "org" ? "bg-primary text-white" : "bg-background"}`}
-              onClick={() => setTab("org")}
-              disabled={!orgId}
-              title={orgId ? "Organization quizzes" : "Open inside an organization to use"}
-            >
-              <ListChecks className="h-3.5 w-3.5" /> Org
-            </button>
-            <button
-              className={`px-3 py-1 text-sm flex items-center gap-1 ${tab === "self" ? "bg-primary text-white" : "bg-background"}`}
-              onClick={() => setTab("self")}
-            >
-              <UserRound className="h-3.5 w-3.5" /> My Quizzes
-            </button>
-          </div>
+          <ListChecks className="h-5 w-5 text-blue-400" />
+          <h2 className="text-lg font-semibold text-foreground">Organization Quiz</h2>
+          {!orgId && (
+            <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
+              Requires organization
+            </span>
+          )}
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
+        <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-background/40">
           <X className="h-4 w-4" />
         </Button>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-6">
-        {/* ---------------- ORG TAB ---------------- */}
-        {tab === "org" && (
-          <div className="grid md:grid-cols-12 gap-6">
-            <div className="md:col-span-5 space-y-3">
-              {!orgId && (
-                <div className="text-sm text-muted-foreground">
-                  Open this note inside an organization to view org quizzes.
-                </div>
-              )}
-
-              {orgId && (
-                <>
-                  <div className="text-sm text-muted-foreground">
-                    Choose an organization quiz and start or resume. The leaderboard updates after each member finishes.
-                  </div>
-
-                  <div className="space-y-2">
-                    {orgQuizzes.length === 0 && (
-                      <div className="text-sm text-muted-foreground">No org quizzes yet.</div>
-                    )}
-                    {orgQuizzes.map((q: any) => (
-                      <div key={q.id} className="border rounded-lg p-3 flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{q.title || "Anytime Quiz"}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {q.numQuestions} Q • {q.questionDurationSec}s / Q
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" onClick={() => startOrg(q.id)}>
-                            Start / Resume
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Quiz Section - Top Half */}
+        <div className="flex-1 p-4 border-b border-border/30 bg-background/10">
+          {!orgId ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="text-center">
+                <ListChecks className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Open this note inside an organization to access quizzes</p>
+              </div>
             </div>
-
-            <div className="md:col-span-7">
-              {!active.quizId || active.scope !== "org" ? (
-                <div className="text-center py-10 text-muted-foreground">Select an org quiz to begin.</div>
-              ) : (
-                <AttemptView
-                  quizDoc={active.quizDoc}
-                  userId={userId}
-                  onAnswer={handleAnswer}
-                  finished={active.finished}
-                  leaderboard={leaderboard}
-                />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ---------------- SELF TAB ---------------- */}
-        {tab === "self" && (
-          <div className="grid md:grid-cols-12 gap-6">
-            <div className="md:col-span-5 space-y-3">
+          ) : !active.quizId ? (
+            // Quiz Selection
+            <div className="space-y-4">
               <div className="text-sm text-muted-foreground">
-                Your personal quizzes for this note. These are private and have no leaderboards.
+                Select an organization quiz to begin. Results will appear on the leaderboard below.
               </div>
               <div className="space-y-2">
-                {selfQuizzes.length === 0 && (
-                  <div className="text-sm text-muted-foreground">No personal quizzes yet.</div>
-                )}
-                {selfQuizzes.map((q: any) => (
-                  <div key={q.id} className="border rounded-lg p-3 flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{q.title || "Self Quiz"}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {q.numQuestions} Q • {q.questionDurationSec}s / Q
+                {orgQuizzes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ListChecks className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No organization quizzes available yet</p>
+                    <p className="text-xs mt-2">Create a quiz using the controls above</p>
+                  </div>
+                ) : (
+                  orgQuizzes.map((q: any) => (
+                    <div
+                      key={q.id}
+                      className="bg-background/40 backdrop-blur-sm border border-border/40 rounded-lg p-4 flex items-center justify-between hover:bg-background/60 transition-all duration-200"
+                    >
+                      <div>
+                        <div className="font-medium text-foreground">{q.title || "Organization Quiz"}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {q.numQuestions} questions • {q.questionDurationSec}s per question
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => startSelf(q.id)}>
-                        Start / Resume
+                      <Button onClick={() => startOrg(q.id)} className="shrink-0 bg-blue-600 hover:bg-blue-700">
+                        Start Quiz
                       </Button>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
+          ) : (
+            // Active Quiz
+            <QuizView quizDoc={active.quizDoc} userId={userId} onAnswer={handleAnswer} finished={active.finished} />
+          )}
+        </div>
 
-            <div className="md:col-span-7">
-              {!active.quizId || active.scope !== "self" ? (
-                <div className="text-center py-10 text-muted-foreground">Select a personal quiz to begin.</div>
-              ) : (
-                <AttemptView
-                  quizDoc={active.quizDoc}
-                  userId={userId}
-                  onAnswer={handleAnswer}
-                  finished={active.finished}
-                  // no leaderboard for self
-                />
-              )}
-            </div>
+        {/* Leaderboard Section - Bottom Half */}
+        <div className="flex-1 p-4 bg-background/5">
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy className="h-5 w-5 text-yellow-500" />
+            <h3 className="font-semibold text-foreground">Leaderboard</h3>
+            {active.quizId && (
+              <span className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-full">Live Results</span>
+            )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {!active.quizId ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="text-center">
+                <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Select a quiz to view leaderboard</p>
+              </div>
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="text-center">
+                <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No completed attempts yet</p>
+                <p className="text-xs mt-2">Be the first to complete the quiz!</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-full overflow-y-auto">
+              {leaderboard.map((row: any, idx: number) => (
+                <div
+                  key={row.uid}
+                  className={`flex items-center justify-between p-3 rounded-lg border backdrop-blur-sm transition-all duration-200 ${
+                    row.uid === userId
+                      ? "bg-blue-500/20 border-blue-400/40 shadow-md"
+                      : "bg-background/40 border-border/40 hover:bg-background/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${
+                        idx === 0
+                          ? "bg-gradient-to-br from-yellow-400 to-yellow-600 text-white"
+                          : idx === 1
+                            ? "bg-gradient-to-br from-gray-300 to-gray-500 text-white"
+                            : idx === 2
+                              ? "bg-gradient-to-br from-amber-500 to-amber-700 text-white"
+                              : "bg-muted/60 text-muted-foreground"
+                      }`}
+                    >
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <div className="font-medium text-foreground">{row.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Avg: {Math.round((row.avgTimeMs ?? 0) / 1000)}s per question
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-foreground">{row.score} pts</div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.correctCount}/{active.quizDoc?.questions ? Object.keys(active.quizDoc.questions).length : 0}{" "}
+                      correct
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
-/* ---------------- Attempt renderer (shared) ---------------- */
-function AttemptView({
+/* Simplified quiz view component for active quiz display */
+function QuizView({
   quizDoc,
   userId,
   onAnswer,
   finished,
-  leaderboard,
 }: {
   quizDoc: any
   userId: string
   onAnswer: (idx: number) => Promise<void>
   finished: boolean
-  leaderboard?: any[]
 }) {
   if (!quizDoc) return null
+
   const qArr: any[] = Object.values(quizDoc.questions ?? {}).sort((a: any, b: any) => Number(a.id) - Number(b.id))
   const me = quizDoc.participants?.[userId]
   const idx: number = typeof me?.currentIndex === "number" ? me.currentIndex : 0
   const current = qArr[idx]
 
-  if (!finished && current) {
+  if (finished) {
     return (
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="text-sm text-muted-foreground">
-            Question {idx + 1} of {qArr.length}
-          </div>
-        </div>
-        <div className="w-full bg-muted rounded-full h-2 mb-8">
-          <div
-            className="bg-primary h-2 rounded-full transition-all duration-300"
-            style={{ width: `${((idx + 1) / qArr.length) * 100}%` }}
-          />
-        </div>
-        <div className="bg-card border rounded-lg p-6 mb-6">
-          <h3 className="text-xl font-medium mb-6 leading-relaxed">{current.question}</h3>
-          <div className="grid gap-3">
-            {current.options.map((opt: string, i: number) => (
-              <Button
-                key={i}
-                variant="outline"
-                className="p-4 h-auto text-left justify-start hover:bg-primary/5 hover:border-primary/50 bg-transparent"
-                onClick={() => onAnswer(i)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center text-sm font-medium">
-                    {String.fromCharCode(65 + i)}
-                  </div>
-                  <span className="text-base">{opt}</span>
-                </div>
-              </Button>
-            ))}
-          </div>
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Trophy className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold mb-2 text-foreground">Quiz Complete!</h3>
+          <p className="text-muted-foreground">Check the leaderboard below to see your results</p>
         </div>
       </div>
     )
   }
 
-  // finished → show leaderboard if provided
+  if (!current) return null
+
   return (
     <div className="space-y-6">
-      {Array.isArray(leaderboard) ? (
-        <>
-          <div className="flex items-center gap-2 text-xl font-semibold mb-2">
-            <Trophy className="h-6 w-6 text-yellow-500" />
-            Leaderboard
-          </div>
-          <div className="bg-muted rounded-lg p-4">
-            {leaderboard.length === 0 && (
-              <div className="text-sm text-muted-foreground">No completed attempts yet.</div>
-            )}
-            {leaderboard.map((row: any, idx2: number) => (
-              <div
-                key={row.uid}
-                className={`flex items-center justify-between p-3 rounded-lg mb-2 last:mb-0 ${
-                  row.uid === userId ? "bg-primary/10 border border-primary/20" : "bg-background"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                      idx2 === 0
-                        ? "bg-yellow-500 text-white"
-                        : idx2 === 1
-                          ? "bg-gray-400 text-white"
-                          : idx2 === 2
-                            ? "bg-amber-600 text-white"
-                            : "bg-muted-foreground/20"
-                    }`}
-                  >
-                    {idx2 + 1}
-                  </div>
-                  <div>
-                    <div className="font-medium">{row.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Avg: {Math.round((row.avgTimeMs ?? 0) / 1000)}s / Q
-                    </div>
-                  </div>
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Question {idx + 1} of {qArr.length}
+        </div>
+      </div>
+
+      <div className="w-full bg-muted/30 rounded-full h-2">
+        <div
+          className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300"
+          style={{ width: `${((idx + 1) / qArr.length) * 100}%` }}
+        />
+      </div>
+
+      <div className="bg-background/40 backdrop-blur-sm border border-border/40 rounded-lg p-6">
+        <h3 className="text-xl font-medium mb-6 leading-relaxed text-foreground">{current.question}</h3>
+        <div className="grid gap-3">
+          {current.options.map((opt: string, i: number) => (
+            <Button
+              key={i}
+              variant="outline"
+              className="p-4 h-auto text-left justify-start hover:bg-blue-500/10 hover:border-blue-400/50 bg-background/20 backdrop-blur-sm border-border/40 transition-all duration-200"
+              onClick={() => onAnswer(i)}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center text-sm font-medium">
+                  {String.fromCharCode(65 + i)}
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold">{row.score} pts</div>
-                  <div className="text-sm text-muted-foreground">
-                    {row.correctCount}/{qArr.length} correct
-                  </div>
-                </div>
+                <span className="text-base text-foreground">{opt}</span>
               </div>
-            ))}
-          </div>
-        </>
-      ) : (
-        <div className="text-center py-10 text-muted-foreground">You finished this quiz.</div>
-      )}
+            </Button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

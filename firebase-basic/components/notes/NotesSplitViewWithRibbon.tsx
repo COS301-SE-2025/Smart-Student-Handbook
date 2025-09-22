@@ -206,7 +206,7 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
         </div>
         {/* Right content area - uniform width for all sections */}
         {!isRightContentHidden && (
-          <div className="w-130 min-w-0 overflow-hidden transition-all duration-300">
+          <div className="w-140 min-w-0 overflow-hidden transition-all duration-300">
             {/* Uniform layout: 2 equal rows; single-panel sections sit in the TOP half. */}
             <div className="h-full grid grid-rows-2 gap-4">
               {/* Row 1 (top half) */}
