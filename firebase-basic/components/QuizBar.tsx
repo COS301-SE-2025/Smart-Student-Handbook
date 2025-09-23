@@ -1,26 +1,94 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Maximize2, Minimize2, ListChecks, UserRound, Trophy } from "lucide-react"
+import {
+  Loader2,
+  ListChecks,
+  Trophy,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  FolderOpen,
+  Folder,
+  Plus,
+  Maximize2,
+  Minimize2,
+} from "lucide-react"
+import { createPortal } from "react-dom"
+
 import { httpsCallable } from "firebase/functions"
+import { get, ref } from "firebase/database"
 import { db, fns } from "@/lib/firebase"
-import { ref, get, onValue } from "firebase/database"
+import { generateQuizQuestions, type ClientQuizItem } from "@/lib/gemini"
 
-// 👇 import the client-side Gemini generator (it already sanitizes the note)
-import { generateQuizQuestions } from "@/lib/gemini"
+// ------------------------------ Types ------------------------------
 
-type Role = "Admin" | "Member" | undefined
+type QuizListItem = {
+  id: string
+  title: string
+  numQuestions: number
+  questionDurationSec: number
+  createdAt?: number
+}
 
-interface QuizBarProps {
-  orgId?: string // orgId optional now: self quizzes can be created anywhere
+type LeaderboardRow = {
+  uid: string
+  name: string
+  score: number
+  correctCount: number
+  avgTimeMs: number
+  finishedAt?: number | null
+  totalQuestions?: number
+}
+
+type AttemptAnswer = {
+  optionIdx: number
+  timeMs: number
+  correct: boolean
+}
+
+type AttemptLight = {
+  quizId: string
+  finished: boolean
+  finishedAt: number | null
+  score: number
+}
+
+type OrgQuizDetail = {
+  id: string
+  title?: string
+  numQuestions: number
+  questionDurationSec: number
+  questions: {
+    [id: string]: {
+      id: string
+      question: string
+      options: string[]
+      correctIndex: number
+      explanation?: string
+    }
+  }
+}
+
+type QuizBarProps = {
+  orgId?: string
   noteId: string
   userId: string
   displayName: string
   defaultDurationSec?: number
   defaultNumQuestions?: number
 }
+
+// ------------------------------ UI Helpers ------------------------------
+
+function fmtMs(ms: number | undefined) {
+  if (!ms) return "0s"
+  return `${Math.round(ms / 1000)}s`
+}
+
+// ------------------------------ Component ------------------------------
 
 export default function QuizBar({
   orgId,
@@ -30,241 +98,428 @@ export default function QuizBar({
   defaultDurationSec = 45,
   defaultNumQuestions = 5,
 }: QuizBarProps) {
-  const [expanded, setExpanded] = useState(true)
-  const [role, setRole] = useState<Role>(undefined)
+  // folders
+  const [expandedFolders, setExpandedFolders] = useState({ active: true, completed: true })
 
-  const [activeView, setActiveView] = useState<"create" | "quiz" | null>("create")
+  const [loadingActiveQuizzes, setLoadingActiveQuizzes] = useState(false)
+  const [loadingCompletedQuizzes, setLoadingCompletedQuizzes] = useState(false)
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false)
 
-  // Quiz functionality states
-  const [orgQuizzes, setOrgQuizzes] = useState<any[]>([])
-  const [active, setActive] = useState<{
-    quizId: string | null
-    quizDoc: any | null
-    currentIndex: number
+  // data state
+  const [orgQuizzes, setOrgQuizzes] = useState<QuizListItem[]>([]) // all for note
+  const [myAttempts, setMyAttempts] = useState<AttemptLight[]>([])
+  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null)
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([])
+
+  // creation modal state
+  const [createOpen, setCreateOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createNumQuestions, setCreateNumQuestions] = useState<number>(defaultNumQuestions)
+  const [createDurationSec, setCreateDurationSec] = useState<number>(defaultDurationSec)
+  const [createPreview, setCreatePreview] = useState<ClientQuizItem[] | null>(null)
+  const createdRef = useRef<{ createdQuizId?: string }>({}) // keep track if we just created a quiz
+
+  // attempt modal state
+  const [attemptOpen, setAttemptOpen] = useState(false)
+  const [attemptLoading, setAttemptLoading] = useState(false)
+  const [attemptQuizDetail, setAttemptQuizDetail] = useState<OrgQuizDetail | null>(null)
+  const [attemptIndex, setAttemptIndex] = useState<number>(0)
+  const [submittingAnswer, setSubmittingAnswer] = useState(false)
+  const [selectedAnswerIndex, setSelectedAnswerIndex] = useState<number | null>(null)
+
+  // review modal state (for completed quizzes)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewAttempt, setReviewAttempt] = useState<{
+    score: number
     finished: boolean
-  }>({ quizId: null, quizDoc: null, currentIndex: 0, finished: false })
-  const [leaderboard, setLeaderboard] = useState<any[]>([])
+    finishedAt: number | null
+    answers: AttemptAnswer[]
+    stats: { avgTimeMs: number; correctCount: number }
+  } | null>(null)
+  const [reviewQuizDetail, setReviewQuizDetail] = useState<OrgQuizDetail | null>(null)
+  const [reviewIndex, setReviewIndex] = useState(0)
 
-  // Resolve role only when inside an org
-  useEffect(() => {
-    if (!orgId || !userId) return
-    const unsub = onValue(ref(db, `organizations/${orgId}/members/${userId}`), (snap) => setRole(snap.val() as Role))
-    return () => unsub()
-  }, [orgId, userId])
+  const [isClient, setIsClient] = useState(false)
 
-  // Callables
-  const createOrgAsyncQuiz = useMemo(() => httpsCallable(fns, "createOrgAsyncQuiz"), [])
-  const createSelfAsyncQuiz = useMemo(() => httpsCallable(fns, "createSelfAsyncQuiz"), [])
+  useEffect(() => setIsClient(true), [])
 
-  const listOrgAsyncQuizzes = useMemo(() => httpsCallable(fns, "listOrgAsyncQuizzes"), [])
-  const startOrResumeOrgAsyncAttempt = useMemo(() => httpsCallable(fns, "startOrResumeOrgAsyncAttempt"), [])
-  const submitOrgAsyncAnswer = useMemo(() => httpsCallable(fns, "submitOrgAsyncAnswer"), [])
-  const getOrgAsyncLeaderboard = useMemo(() => httpsCallable(fns, "getOrgAsyncLeaderboard"), [])
+  // ------------------------------ Load lists ------------------------------
 
-  const [creatingOrg, setCreatingOrg] = useState(false)
-  const [creatingSelf, setCreatingSelf] = useState(false)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const activeQuizzes = useMemo(() => {
+    if (!myAttempts.length) return orgQuizzes
+    const finishedMap = new Map(myAttempts.map((a) => [a.quizId, a.finished]))
+    return orgQuizzes.filter((q) => !finishedMap.get(q.id))
+  }, [orgQuizzes, myAttempts])
 
-  useEffect(() => {
-    if (!noteId || !orgId || activeView !== "quiz") return
+  const completedQuizzes = useMemo(() => {
+    if (!myAttempts.length) return []
+    const finishedIds = new Set(myAttempts.filter((a) => a.finished).map((a) => a.quizId))
+    return orgQuizzes.filter((q) => finishedIds.has(q.id))
+  }, [orgQuizzes, myAttempts])
 
-    const load = async () => {
-      try {
-        const res: any = await listOrgAsyncQuizzes({ orgId, noteId })
-        setOrgQuizzes(Array.isArray(res?.data?.items) ? res.data.items : [])
-      } catch {
-        setOrgQuizzes([])
-      }
+  async function refreshLists() {
+    if (!orgId) return
+    setLoadingActiveQuizzes(true)
+    setLoadingCompletedQuizzes(true)
+    try {
+      const listFn = httpsCallable(fns, "listOrgAsyncQuizzes")
+      const mineFn = httpsCallable(fns, "listMyOrgAsyncAttempts")
+      const [{ data: ld }, { data: md }]: any = await Promise.all([
+        listFn({ orgId, noteId }),
+        mineFn({ orgId, noteId }),
+      ])
+      setOrgQuizzes((ld?.items || []) as QuizListItem[])
+      setMyAttempts((md?.attempts || []) as AttemptLight[])
+    } finally {
+      setLoadingActiveQuizzes(false)
+      setLoadingCompletedQuizzes(false)
     }
-
-    load()
-  }, [orgId, noteId, activeView, listOrgAsyncQuizzes])
-
-  useEffect(() => {
-    if (!active.quizId || !orgId) return
-    const path = `organizations/${orgId}/quizzes/${active.quizId}`
-    const unsub = onValue(ref(db, path), (snap) => {
-      const q = snap.val()
-      const me = q?.participants?.[userId]
-      const idx = typeof me?.currentIndex === "number" ? me.currentIndex : 0
-      const finished = !!me?.finished
-      setActive((prev) => ({ ...prev, quizDoc: q, currentIndex: idx, finished }))
-    })
-    return () => unsub()
-  }, [active.quizId, orgId, userId])
-
-  // Helper: fetch the raw note content from RTDB
-  const fetchNoteContent = async (sourceOrgId: string | undefined, nId: string) => {
-    const path = sourceOrgId
-      ? `organizations/${sourceOrgId}/notes/${nId}/content`
-      : `users/${userId}/notes/${nId}/content`
-    const snap = await get(ref(db, path))
-    return snap.exists() ? (snap.val() as string) : ""
   }
 
-  // ORG quiz: generate questions first, then create
-  const handleCreateOrgAnytime = async () => {
-    if (!orgId) return
-    setCreatingOrg(true)
-    setErrorMsg(null)
+  // auto-load
+  useEffect(() => {
+    if (orgId) {
+      refreshLists()
+    }
+  }, [orgId, noteId])
+
+  // ------------------------------ Leaderboard ------------------------------
+
+  async function refreshLeaderboard(quizId: string | null) {
+    if (!orgId || !quizId) return
+    setLoadingLeaderboard(true)
     try {
-      // 1) get latest note JSON/string from DB
-      const noteRaw = await fetchNoteContent(orgId, noteId)
+      const lbFn = httpsCallable(fns, "getOrgAsyncLeaderboard")
+      const { data }: any = await lbFn({ orgId, quizId })
+      setLeaderboard((data?.items || []) as LeaderboardRow[])
+    } catch (error) {
+      console.error("Failed to load leaderboard:", error)
+    } finally {
+      setLoadingLeaderboard(false)
+    }
+  }
 
-      // 2) generate MCQs client-side (includes sanitization)
-      const questions = await generateQuizQuestions(noteRaw, defaultNumQuestions)
+  // periodic LB refresh for selected quiz
+  useEffect(() => {
+    if (!selectedQuizId) return
+    refreshLeaderboard(selectedQuizId)
+    const t = setInterval(() => refreshLeaderboard(selectedQuizId), 5000)
+    return () => clearInterval(t)
+  }, [selectedQuizId])
 
-      // 3) call function WITH questions
-      await createOrgAsyncQuiz({
+  // ------------------------------ Folder toggle ------------------------------
+
+  function toggleFolderExpansion(folder: "active" | "completed") {
+    setExpandedFolders((p) => ({ ...p, [folder]: !p[folder] }))
+  }
+
+  // ------------------------------ Create quiz flow ------------------------------
+
+  async function handleOpenCreate() {
+    setCreateOpen(true)
+    setCreatePreview(null)
+    setCreateNumQuestions(defaultNumQuestions)
+    setCreateDurationSec(defaultDurationSec)
+  }
+
+  async function handleGenerateFromNote() {
+    if (!orgId) return
+    setCreating(true)
+    setCreatePreview(null)
+    try {
+      // 1) read note content (assumes content stored under .../content)
+      const noteSnap = await get(ref(db, `organizations/${orgId}/notes/${noteId}/content`))
+      const noteContent = noteSnap.exists() ? String(noteSnap.val() ?? "") : ""
+
+      // 2) ask Gemini for questions
+      const items = await generateQuizQuestions(noteContent, createNumQuestions)
+      setCreatePreview(items)
+    } catch (e) {
+      console.error("Quiz generation failed:", e)
+      alert("Quiz generation failed. Check console/logs.")
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  async function handleCreateOrgAnytime() {
+    if (!orgId || !createPreview || createPreview.length === 0) return
+    setCreating(true)
+    try {
+      const createFn = httpsCallable(fns, "createOrgAsyncQuiz")
+      const questions = createPreview.map((q, i) => ({
+        id: String(i),
+        question: q.question,
+        options: q.options,
+        correctIndex: q.answerIndex,
+        explanation: q.explanation ?? "",
+      }))
+
+      const { data }: any = await createFn({
         orgId,
         noteId,
-        questionDurationSec: defaultDurationSec,
-        questions, // <-- required by backend now
+        questionDurationSec: createDurationSec,
+        questions,
       })
 
-      setActiveView("quiz")
-    } catch (err: any) {
-      console.error("Create Org Quiz failed:", err)
-      setErrorMsg(err?.message ?? "Failed to create org quiz")
+      // refresh lists and prompt to start
+      await refreshLists()
+      createdRef.current.createdQuizId = data?.quizId as string
+      await handleStartQuiz(createdRef.current.createdQuizId!, true) // open attempt modal right away
+      setCreateOpen(false)
+      setCreatePreview(null)
+    } catch (e) {
+      console.error("Create quiz failed:", e)
+      alert("Create quiz failed. See console.")
     } finally {
-      setCreatingOrg(false)
+      setCreating(false)
     }
   }
 
-  // SELF quiz: same flow; source is org note if orgId present, else personal note
-  const handleCreateSelfQuiz = async () => {
-    setCreatingSelf(true)
-    setErrorMsg(null)
-    try {
-      // 1) fetch note content (org or personal)
-      const noteRaw = await fetchNoteContent(orgId, noteId)
+  // ------------------------------ Attempt flow ------------------------------
 
-      // 2) generate MCQs client-side
-      const questions = await generateQuizQuestions(noteRaw, defaultNumQuestions)
-
-      // 3) call function WITH questions
-      await createSelfAsyncQuiz({
-        orgId: orgId ?? undefined,
-        noteId,
-        questionDurationSec: defaultDurationSec,
-        questions, // <-- required
-      })
-
-      setActiveView("quiz")
-    } catch (err: any) {
-      console.error("Create Self Quiz failed:", err)
-      setErrorMsg(err?.message ?? "Failed to create self quiz")
-    } finally {
-      setCreatingSelf(false)
-    }
+  async function loadQuizDetail(quizId: string) {
+    const getFn = httpsCallable(fns, "getOrgQuizDetail")
+    const { data }: any = await getFn({ orgId, quizId })
+    return data?.quiz as OrgQuizDetail
   }
 
-  const startOrg = async (quizId: string) => {
+  async function handleStartQuiz(quizId: string, openDirect = false) {
     if (!orgId) return
-    const res: any = await startOrResumeOrgAsyncAttempt({ orgId, quizId, displayName })
-    const snap = await get(ref(db, `organizations/${orgId}/quizzes/${quizId}`))
-    const q = snap.val()
-    const me = q?.participants?.[userId]
-    setActive({
-      quizId,
-      quizDoc: q,
-      currentIndex: res?.data?.currentIndex ?? (typeof me?.currentIndex === "number" ? me.currentIndex : 0),
-      finished: !!me?.finished,
-    })
+    setAttemptLoading(true)
+    try {
+      // start or resume
+      const startFn = httpsCallable(fns, "startOrResumeOrgAsyncAttempt")
+      const { data }: any = await startFn({ orgId, quizId, displayName })
 
-    // preload leaderboard
-    const lb: any = await getOrgAsyncLeaderboard({ orgId, quizId })
-    setLeaderboard(Array.isArray(lb?.data?.items) ? lb.data.items : [])
-  }
-
-  const handleAnswer = async (optionIdx: number) => {
-    if (!active.quizId || !orgId) return
-
-    await submitOrgAsyncAnswer({ orgId, quizId: active.quizId, optionIdx })
-    // after submit, refresh leaderboard if finished
-    const me = active.quizDoc?.participants?.[userId]
-    if (me?.finished) {
-      const lb: any = await getOrgAsyncLeaderboard({ orgId, quizId: active.quizId })
-      setLeaderboard(Array.isArray(lb?.data?.items) ? lb.data.items : [])
+      // load details
+      const quiz = await loadQuizDetail(quizId)
+      setAttemptQuizDetail(quiz || null)
+      setAttemptIndex(Number(data?.currentIndex || 0))
+      setSelectedQuizId(quizId)
+      setAttemptOpen(true)
+      setSelectedAnswerIndex(null)
+      // ensure we have LB visible
+      refreshLeaderboard(quizId)
+    } catch (e) {
+      console.error("Start attempt failed:", e)
+      alert("Could not start the quiz. See console.")
+    } finally {
+      setAttemptLoading(false)
     }
   }
+
+  async function submitAnswer(optionIdx: number) {
+    if (!attemptQuizDetail || selectedQuizId == null || !orgId) return
+    setSubmittingAnswer(true)
+    try {
+      const submitFn = httpsCallable(fns, "submitOrgAsyncAnswer")
+      const { data }: any = await submitFn({
+        orgId,
+        quizId: selectedQuizId,
+        optionIdx,
+      })
+      // LB updates even for partial (backend changed)
+      refreshLeaderboard(selectedQuizId)
+
+      const total = attemptQuizDetail.numQuestions
+      if (data?.finishedNow) {
+        // finished — close attempt modal, refresh lists so quiz moves to "Completed"
+        setAttemptOpen(false)
+        setAttemptQuizDetail(null)
+        setAttemptIndex(0)
+        setSelectedAnswerIndex(null)
+        await refreshLists()
+      } else {
+        setAttemptIndex((i) => Math.min(i + 1, total - 1))
+        setSelectedAnswerIndex(null)
+      }
+    } catch (e) {
+      console.error("Submit answer failed:", e)
+      alert("Could not submit answer. See console.")
+    } finally {
+      setSubmittingAnswer(false)
+    }
+  }
+
+  // ------------------------------ Review flow ------------------------------
+
+  async function openReview(quizId: string) {
+    if (!orgId) return
+    try {
+      setReviewOpen(true)
+      setReviewAttempt(null)
+      setReviewQuizDetail(null)
+      setReviewIndex(0)
+
+      const detail = await loadQuizDetail(quizId)
+      setReviewQuizDetail(detail || null)
+
+      const mineFn = httpsCallable(fns, "getMyOrgAsyncAttempt")
+      const { data }: any = await mineFn({ orgId, quizId })
+      if (!data?.attempt) {
+        setReviewAttempt({
+          score: 0,
+          finished: false,
+          finishedAt: null,
+          answers: [],
+          stats: { avgTimeMs: 0, correctCount: 0 },
+        })
+      } else {
+        setReviewAttempt(data.attempt)
+      }
+      setSelectedQuizId(quizId)
+      refreshLeaderboard(quizId)
+    } catch (e) {
+      console.error("Open review failed:", e)
+      alert("Could not load your attempt. See console.")
+    }
+  }
+
+  // ------------------------------ Render helpers ------------------------------
 
   const wrapperClass = "w-full transition-all"
 
-  return (
-    <div className={wrapperClass}>
-      <Card className="mt-4 bg-background/30 backdrop-blur-md border border-border/30 shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between bg-background/20 border-b border-border/30">
-          <div className="flex items-center gap-3">
-            <CardTitle className="text-base text-foreground">Quizzes</CardTitle>
-            <span className="text-xs text-muted-foreground">
-              {defaultNumQuestions} Q • {defaultDurationSec}s / Q
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {orgId ? (role === "Admin" ? "Admin" : role ? "Member" : "Guest") : "Personal"}
-            </span>
+  function renderQuestionCard() {
+    if (!attemptQuizDetail) return null
+    const qArr = Object.values(attemptQuizDetail.questions).sort((a, b) => Number(a.id) - Number(b.id))
+    const q = qArr[attemptIndex]
+    const idxHuman = attemptIndex + 1
+
+    return (
+      <div className="space-y-4">
+        <div className="text-sm text-muted-foreground">
+          Question {idxHuman} / {qArr.length}
+        </div>
+        <div className="text-base font-medium text-foreground">{q.question}</div>
+        <div className="grid gap-2">
+          {q.options.map((opt, i) => (
             <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setExpanded((v) => !v)}
-              className="hover:bg-background/40"
+              key={i}
+              variant={selectedAnswerIndex === i ? "default" : "outline"}
+              className={`justify-start text-left transition-all ${
+                selectedAnswerIndex === i
+                  ? "bg-blue-500 text-white border-blue-500 shadow-md"
+                  : "hover:bg-blue-50 hover:border-blue-300"
+              }`}
+              disabled={submittingAnswer}
+              onClick={() => {
+                setSelectedAnswerIndex(i)
+                setTimeout(() => submitAnswer(i), 100)
+              }}
             >
-              {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              <span className="font-medium mr-2">{String.fromCharCode(65 + i)}.</span>
+              {opt}
             </Button>
-          </div>
-        </CardHeader>
+          ))}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          // Simplified instruction text for faster flow Each question: {attemptQuizDetail.questionDurationSec}s •
+          Progress auto-saved
+        </div>
+      </div>
+    )
+  }
 
-        {expanded && (
-          <CardContent className="p-0">
-            <div className="flex border-b border-border/30 bg-background/10">
-              <Button
-                variant={activeView === "create" ? "default" : "ghost"}
-                onClick={() => setActiveView("create")}
-                className="flex-1 rounded-none border-r border-border/30 bg-transparent hover:bg-background/40"
-              >
-                Create Quiz
-              </Button>
-              <Button
-                variant={activeView === "quiz" ? "default" : "ghost"}
-                onClick={() => setActiveView("quiz")}
-                className="flex-1 rounded-none bg-transparent hover:bg-background/40"
-              >
-                Take Quiz
-              </Button>
-            </div>
+  function renderReviewCard() {
+    if (!reviewAttempt || !reviewQuizDetail) return null
+    const qArr = Object.values(reviewQuizDetail.questions).sort((a, b) => Number(a.id) - Number(b.id))
+    const aArr = reviewAttempt.answers || []
+    const q = qArr[reviewIndex]
+    const a = aArr[reviewIndex]
+    const idxHuman = reviewIndex + 1
 
-            {activeView === "create" && (
-              <div className="p-4 space-y-3 bg-background/5">
-                {errorMsg && (
-                  <div className="text-sm text-red-600 border border-red-200 bg-red-50 rounded px-3 py-2">
-                    {errorMsg}
-                  </div>
-                )}
-                <div className="flex flex-wrap items-center gap-2">
-                  {orgId && (
-                    <Button
-                      onClick={handleCreateOrgAnytime}
-                      disabled={creatingOrg}
-                      className="gap-2 bg-blue-600 hover:bg-blue-700"
-                    >
-                      {creatingOrg ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />}
-                      {creatingOrg ? "Creating…" : "Create Org Quiz"}
-                    </Button>
-                  )}
-                  <Button onClick={handleCreateSelfQuiz} disabled={creatingSelf} className="gap-2" variant="secondary">
-                    {creatingSelf ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserRound className="h-4 w-4" />}
-                    {creatingSelf ? "Creating…" : "Create My Quiz"}
-                  </Button>
+    const chosen = typeof a?.optionIdx === "number" ? a.optionIdx : null
+    const correct = q.correctIndex
+
+    return (
+      <div className="space-y-4">
+        <div className="text-sm text-muted-foreground">
+          Review {idxHuman} / {qArr.length}
+        </div>
+        <div className="text-base font-medium text-foreground">{q.question}</div>
+
+        <div className="grid gap-2">
+          {q.options.map((opt, i) => {
+            const isCorrect = i === correct
+            const isChosen = i === chosen
+            const style =
+              isCorrect && isChosen
+                ? "bg-green-500/20 border-green-400/40"
+                : isCorrect
+                  ? "bg-green-500/10 border-green-400/30"
+                  : isChosen
+                    ? "bg-red-500/10 border-red-400/30"
+                    : "bg-background/20 border-border/40"
+            return (
+              <div key={i} className={`rounded-lg border p-3 ${style}`}>
+                <div className="text-sm">
+                  {String.fromCharCode(65 + i)}. {opt}
                 </div>
               </div>
-            )}
+            )
+          })}
+        </div>
 
-            {activeView === "quiz" && (
-              <div className="h-96 flex flex-col">
-                {/* Quiz Section - Top Half */}
-                <div className="flex-1 p-4 border-b border-border/30 bg-background/10 overflow-y-auto">
+        <div className="text-sm">
+          {chosen === correct ? (
+            <span className="text-green-500 font-medium">Correct.</span>
+          ) : (
+            <span className="text-red-500 font-medium">Incorrect.</span>
+          )}{" "}
+          <span className="text-muted-foreground">Time: {fmtMs(a?.timeMs)}</span>
+        </div>
+
+        {q.explanation && (
+          <div className="rounded-lg border border-border/40 bg-background/20 p-3 text-sm">
+            <div className="font-medium mb-1">Explanation</div>
+            <div className="text-muted-foreground">{q.explanation}</div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-2">
+          <Button
+            variant="outline"
+            disabled={reviewIndex <= 0}
+            onClick={() => setReviewIndex((i) => Math.max(0, i - 1))}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setReviewIndex((i) => Math.min(qArr.length - 1, i + 1))}
+            disabled={reviewIndex >= qArr.length - 1}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // ------------------------------ UI ------------------------------
+
+  return (
+    <>
+      <Card className={`${wrapperClass} h-full`}>
+        <CardHeader className="flex flex-row items-center justify-between p-4 shrink-0">
+          <CardTitle className="text-lg">Quizzes</CardTitle>
+          <Button
+            onClick={() => setAttemptOpen(true)}
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
+            aria-label="Expand"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+
+        <CardContent className="p-0 flex-1 min-h-0">
+          <div className="h-full flex flex-col">
+            <div className="h-1/2 border-b border-border/30 bg-background/10 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="p-4">
                   {!orgId ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                       <div className="text-center">
@@ -272,198 +527,423 @@ export default function QuizBar({
                         <p>Open this note inside an organization to access quizzes</p>
                       </div>
                     </div>
-                  ) : !active.quizId ? (
-                    // Quiz Selection
-                    <div className="space-y-4">
-                      <div className="text-sm text-muted-foreground">
-                        Select an organization quiz to begin. Results will appear on the leaderboard below.
+                  ) : (
+                    <div className="space-y-1">
+                      <div>
+                        <button
+                          onClick={() => toggleFolderExpansion("active")}
+                          className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
+                        >
+                          {expandedFolders.active ? (
+                            <ChevronDown className="h-4 w-4 text-black" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-black" />
+                          )}
+                          {expandedFolders.active ? (
+                            <FolderOpen className="h-4 w-4 text-black" />
+                          ) : (
+                            <Folder className="h-4 w-4 text-black" />
+                          )}
+                          <span className="text-base font-medium text-foreground">
+                            Active Quizzes ({activeQuizzes.length})
+                            {loadingActiveQuizzes && <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />}
+                          </span>
+                        </button>
+
+                        {expandedFolders.active && (
+                          <div className="ml-6 space-y-1">
+                            {loadingActiveQuizzes ? (
+                              <div className="text-xs text-muted-foreground p-2 flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Loading active quizzes...
+                              </div>
+                            ) : activeQuizzes.length === 0 ? (
+                              <div className="text-xs text-muted-foreground p-2">No active quizzes</div>
+                            ) : (
+                              activeQuizzes.map((q) => (
+                                <div
+                                  key={q.id}
+                                  className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors w-full cursor-pointer"
+                                  onClick={() => handleStartQuiz(q.id)}
+                                >
+                                  <FileText className="h-4 w-4 text-black" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-base font-medium text-foreground truncate">
+                                      {q.title || "Anytime Quiz"}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {q.numQuestions} questions • {q.questionDurationSec}s each
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="space-y-2">
-                        {orgQuizzes.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <ListChecks className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>No organization quizzes available yet</p>
-                            <p className="text-xs mt-2">Create a quiz using the controls above</p>
+
+                      <div>
+                        <button
+                          onClick={() => toggleFolderExpansion("completed")}
+                          className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
+                        >
+                          {expandedFolders.completed ? (
+                            <ChevronDown className="h-4 w-4 text-black" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-black" />
+                          )}
+                          {expandedFolders.completed ? (
+                            <FolderOpen className="h-4 w-4 text-black" />
+                          ) : (
+                            <Folder className="h-4 w-4 text-black" />
+                          )}
+                          <span className="text-base font-medium text-foreground">
+                            Completed Quizzes ({completedQuizzes.length})
+                            {loadingCompletedQuizzes && <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />}
+                          </span>
+                        </button>
+
+                        {expandedFolders.completed && (
+                          <div className="ml-6 space-y-1">
+                            {loadingCompletedQuizzes ? (
+                              <div className="text-xs text-muted-foreground p-2 flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Loading completed quizzes...
+                              </div>
+                            ) : completedQuizzes.length === 0 ? (
+                              <div className="text-xs text-muted-foreground p-2">No completed quizzes</div>
+                            ) : (
+                              completedQuizzes.map((q) => (
+                                <div
+                                  key={q.id}
+                                  className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors w-full cursor-pointer"
+                                  onClick={() => openReview(q.id)}
+                                >
+                                  <FileText className="h-4 w-4 text-black" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-base font-medium text-foreground truncate">
+                                      {q.title || "Anytime Quiz"}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {q.numQuestions} questions • {q.questionDurationSec}s each
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {orgId && (
+                <div className="shrink-0 p-4 border-t border-border/20 bg-background/5">
+                  <Button
+                    onClick={handleOpenCreate}
+                    disabled={creating}
+                    size="sm"
+                    className="gap-2 bg-black text-white hover:bg-gray-800 border border-white/20"
+                  >
+                    {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    {creating ? "Working..." : "Create"}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="h-1/2 bg-background/5 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="p-4 h-full flex flex-col">
+                  <div className="flex items-center gap-2 mb-4 shrink-0">
+                    <Trophy className="h-5 w-5 text-black" />
+                    <h3 className="text-sm font-medium text-foreground">Leaderboard</h3>
+                    {loadingLeaderboard && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                  </div>
+
+                  <div className="flex-1 min-h-0">
+                    {!selectedQuizId ? (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        <div className="text-center">
+                          <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Click a quiz to view leaderboard</p>
+                        </div>
+                      </div>
+                    ) : loadingLeaderboard ? (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        <div className="text-center">
+                          <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin" />
+                          <p>Loading leaderboard...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 h-full overflow-y-auto">
+                        {leaderboard.length === 0 ? (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            <div className="text-center">
+                              <Trophy className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                              <p className="text-xs">No entries yet.</p>
+                            </div>
                           </div>
                         ) : (
-                          orgQuizzes.map((q: any) => (
+                          leaderboard.map((entry, index) => (
                             <div
-                              key={q.id}
-                              className="bg-background/40 backdrop-blur-sm border border-border/40 rounded-lg p-4 flex items-center justify-between hover:bg-background/60 transition-all duration-200"
+                              key={entry.uid}
+                              className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 ${
+                                entry.uid === userId
+                                  ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/60 shadow-lg"
+                                  : "bg-gradient-to-r from-background/40 to-background/20 border-border/40 hover:border-border/60"
+                              }`}
                             >
-                              <div>
-                                <div className="font-medium text-foreground">{q.title || "Organization Quiz"}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {q.numQuestions} questions • {q.questionDurationSec}s per question
+                              <div className="flex items-center gap-4">
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-md ${
+                                    index === 0
+                                      ? "bg-gradient-to-br from-yellow-400 to-yellow-600 text-black"
+                                      : index === 1
+                                        ? "bg-gradient-to-br from-gray-300 to-gray-500 text-black"
+                                        : index === 2
+                                          ? "bg-gradient-to-br from-orange-400 to-orange-600 text-white"
+                                          : "bg-gradient-to-br from-background/60 to-background/40 text-foreground border-2 border-border/40"
+                                  }`}
+                                >
+                                  {index + 1}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-semibold text-foreground">
+                                    {entry.name}
+                                    {entry.uid === userId && (
+                                      <span className="text-xs text-blue-500 ml-2 font-medium">(You)</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                    <span>⏱️ {fmtMs(entry.avgTimeMs)} avg</span>
+                                    <span>•</span>
+                                    <span>✅ {entry.correctCount} correct</span>
+                                  </div>
                                 </div>
                               </div>
-                              <Button onClick={() => startOrg(q.id)} className="shrink-0 bg-blue-600 hover:bg-blue-700">
-                                Start Quiz
-                              </Button>
+                              <div className="text-right">
+                                <div className="text-lg font-bold text-foreground">{entry.score}</div>
+                                <div className="text-xs text-muted-foreground">/{entry.totalQuestions ?? "?"}</div>
+                              </div>
                             </div>
                           ))
                         )}
                       </div>
-                    </div>
-                  ) : (
-                    // Active Quiz
-                    <QuizView
-                      quizDoc={active.quizDoc}
-                      userId={userId}
-                      onAnswer={handleAnswer}
-                      finished={active.finished}
-                    />
-                  )}
-                </div>
-
-                {/* Leaderboard Section - Bottom Half */}
-                <div className="flex-1 p-4 bg-background/5 overflow-y-auto">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Trophy className="h-5 w-5 text-yellow-500" />
-                    <h3 className="font-semibold text-foreground">Leaderboard</h3>
-                    {active.quizId && (
-                      <span className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-full">
-                        Live Results
-                      </span>
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-                  {!active.quizId ? (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      <div className="text-center">
-                        <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>Select a quiz to view leaderboard</p>
+      {/* Create Modal */}
+      {createOpen &&
+        isClient &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[10000] bg-black/35 backdrop-blur-[6px] flex items-center justify-center p-4"
+            onClick={() => setCreateOpen(false)}
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <Card className="w-full max-w-4xl min-w-[900px] h-[90vh] min-h-[700px] max-h-[800px] bg-background shadow-2xl flex flex-col">
+                <CardHeader className="flex flex-row items-center justify-between px-6 py-4 border-b shrink-0">
+                  <CardTitle className="text-xl">Create Anytime Quiz</CardTitle>
+                  <Button
+                    onClick={() => setCreateOpen(false)}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
+                    aria-label="Close modal"
+                  >
+                    <Minimize2 className="h-4 w-4" />
+                  </Button>
+                </CardHeader>
+
+                <CardContent className="flex flex-col flex-1 min-h-0 px-6 pb-6">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Number of questions</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={createNumQuestions}
+                          onChange={(e) =>
+                            setCreateNumQuestions(Math.max(1, Math.min(20, Number(e.target.value) || 1)))
+                          }
+                          className="w-full rounded-md border border-border/40 bg-background/40 px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Seconds per question</label>
+                        <input
+                          type="number"
+                          min={10}
+                          max={300}
+                          value={createDurationSec}
+                          onChange={(e) =>
+                            setCreateDurationSec(Math.max(10, Math.min(300, Number(e.target.value) || 10)))
+                          }
+                          className="w-full rounded-md border border-border/40 bg-background/40 px-3 py-2 text-sm"
+                        />
                       </div>
                     </div>
-                  ) : leaderboard.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      <div className="text-center">
-                        <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No completed attempts yet</p>
-                        <p className="text-xs mt-2">Be the first to complete the quiz!</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {leaderboard.map((row: any, idx: number) => (
-                        <div
-                          key={row.uid}
-                          className={`flex items-center justify-between p-3 rounded-lg border backdrop-blur-sm transition-all duration-200 ${
-                            row.uid === userId
-                              ? "bg-blue-500/20 border-blue-400/40 shadow-md"
-                              : "bg-background/40 border-border/40 hover:bg-background/60"
-                          }`}
+
+                    {!createPreview ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={handleGenerateFromNote}
+                          disabled={creating}
+                          className="bg-black text-white hover:bg-gray-800 border border-white/20"
                         >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${
-                                idx === 0
-                                  ? "bg-gradient-to-br from-yellow-400 to-yellow-600 text-white"
-                                  : idx === 1
-                                    ? "bg-gradient-to-br from-gray-300 to-gray-500 text-white"
-                                    : idx === 2
-                                      ? "bg-gradient-to-br from-amber-500 to-amber-700 text-white"
-                                      : "bg-muted/60 text-muted-foreground"
-                              }`}
-                            >
-                              {idx + 1}
-                            </div>
-                            <div>
-                              <div className="font-medium text-foreground">{row.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                Avg: {Math.round((row.avgTimeMs ?? 0) / 1000)}s per question
+                          {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Generate from note
+                        </Button>
+                        <div className="text-xs text-muted-foreground">
+                          We'll sanitize the note and ask Gemini to produce MCQs.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="text-sm font-medium">Preview ({createPreview.length})</div>
+                        <div className="max-h-64 overflow-auto rounded-md border border-border/40">
+                          <div className="p-3 space-y-3">
+                            {createPreview.map((q, i) => (
+                              <div key={i} className="rounded-md border border-border/30 bg-background/30 p-3">
+                                <div className="text-sm font-medium">
+                                  {i + 1}. {q.question}
+                                </div>
+                                <ul className="mt-2 text-sm list-disc pl-5">
+                                  {q.options.map((o, j) => (
+                                    <li key={j}>
+                                      {String.fromCharCode(65 + j)}. {o}
+                                    </li>
+                                  ))}
+                                </ul>
                               </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-foreground">{row.score} pts</div>
-                            <div className="text-xs text-muted-foreground">
-                              {row.correctCount}/
-                              {active.quizDoc?.questions ? Object.keys(active.quizDoc.questions).length : 0} correct
-                            </div>
+                            ))}
                           </div>
                         </div>
-                      ))}
+                        <div className="flex items-center justify-between">
+                          <Button variant="outline" onClick={() => setCreatePreview(null)} disabled={creating}>
+                            Regenerate
+                          </Button>
+                          <Button
+                            onClick={handleCreateOrgAnytime}
+                            disabled={creating}
+                            className="bg-black text-white hover:bg-gray-800 border border-white/20"
+                          >
+                            {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Create & Start
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Attempt Modal */}
+      {attemptOpen &&
+        isClient &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[10000] bg-black/35 backdrop-blur-[6px] flex items-center justify-center p-4"
+            onClick={() => setAttemptOpen(false)}
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <Card className="w-full max-w-4xl min-w-[900px] h-[90vh] min-h-[700px] max-h-[800px] bg-background shadow-2xl flex flex-col">
+                <CardHeader className="flex flex-row items-center justify-between px-6 py-4 border-b shrink-0">
+                  <CardTitle className="text-xl">Quiz</CardTitle>
+                  <Button
+                    onClick={() => setAttemptOpen(false)}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
+                    aria-label="Close modal"
+                  >
+                    <Minimize2 className="h-4 w-4" />
+                  </Button>
+                </CardHeader>
+
+                <CardContent className="flex flex-col flex-1 min-h-0 px-6 pb-6">
+                  {attemptLoading ? (
+                    <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading quiz…
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-h-0 flex items-center justify-center">
+                      <div className="w-full max-w-2xl">{renderQuestionCard()}</div>
                     </div>
                   )}
-                </div>
-              </div>
-            )}
-          </CardContent>
+                </CardContent>
+              </Card>
+            </div>
+          </div>,
+          document.body,
         )}
-      </Card>
-    </div>
-  )
-}
 
-/* Moved QuizView component from QuizPanel to QuizBar */
-function QuizView({
-  quizDoc,
-  userId,
-  onAnswer,
-  finished,
-}: {
-  quizDoc: any
-  userId: string
-  onAnswer: (idx: number) => Promise<void>
-  finished: boolean
-}) {
-  if (!quizDoc) return null
+      {/* Review Modal */}
+      {reviewOpen &&
+        isClient &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[10000] bg-black/35 backdrop-blur-[6px] flex items-center justify-center p-4"
+            onClick={() => setReviewOpen(false)}
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <Card className="w-full max-w-4xl min-w-[900px] h-[90vh] min-h-[700px] max-h-[800px] bg-background shadow-2xl flex flex-col">
+                <CardHeader className="flex flex-row items-center justify-between px-6 py-4 border-b shrink-0">
+                  <CardTitle className="text-xl">Quiz Review</CardTitle>
+                  <Button
+                    onClick={() => setReviewOpen(false)}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
+                    aria-label="Close modal"
+                  >
+                    <Minimize2 className="h-4 w-4" />
+                  </Button>
+                </CardHeader>
 
-  const qArr: any[] = Object.values(quizDoc.questions ?? {}).sort((a: any, b: any) => Number(a.id) - Number(b.id))
-  const me = quizDoc.participants?.[userId]
-  const idx: number = typeof me?.currentIndex === "number" ? me.currentIndex : 0
-  const current = qArr[idx]
-
-  if (finished) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Trophy className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold mb-2 text-foreground">Quiz Complete!</h3>
-          <p className="text-muted-foreground">Check the leaderboard below to see your results</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!current) return null
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          Question {idx + 1} of {qArr.length}
-        </div>
-      </div>
-
-      <div className="w-full bg-muted/30 rounded-full h-2">
-        <div
-          className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300"
-          style={{ width: `${((idx + 1) / qArr.length) * 100}%` }}
-        />
-      </div>
-
-      <div className="bg-background/40 backdrop-blur-sm border border-border/40 rounded-lg p-6">
-        <h3 className="text-xl font-medium mb-6 leading-relaxed text-foreground">{current.question}</h3>
-        <div className="grid gap-3">
-          {current.options.map((opt: string, i: number) => (
-            <Button
-              key={i}
-              variant="outline"
-              className="p-4 h-auto text-left justify-start hover:bg-blue-500/10 hover:border-blue-400/50 bg-background/20 backdrop-blur-sm border-border/40 transition-all duration-200"
-              onClick={() => onAnswer(i)}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center text-sm font-medium">
-                  {String.fromCharCode(65 + i)}
-                </div>
-                <span className="text-base text-foreground">{opt}</span>
-              </div>
-            </Button>
-          ))}
-        </div>
-      </div>
-    </div>
+                <CardContent className="flex flex-col flex-1 min-h-0 px-6 pb-6">
+                  {!reviewAttempt || !reviewQuizDetail ? (
+                    <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading review…
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-h-0 flex flex-col">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-base font-medium">
+                          Score: {reviewAttempt.score} / {Object.keys(reviewQuizDetail.questions).length}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Avg time: {fmtMs(reviewAttempt.stats?.avgTimeMs)} • Correct:{" "}
+                          {reviewAttempt.stats?.correctCount}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-h-0 flex items-center justify-center">
+                        <div className="w-full max-w-2xl">{renderReviewCard()}</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }

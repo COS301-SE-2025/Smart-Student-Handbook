@@ -65,25 +65,33 @@ function computeAttemptStats(ans: any[]): { avgTimeMs: number; correctCount: num
   return { avgTimeMs, correctCount };
 }
 
-async function recomputeAndStoreOrgLeaderboard(orgId: string, quizId: string, uidJustFinished: string) {
+async function recomputeAndStoreOrgLeaderboard(orgId: string, quizId: string, uidJustFinishedOrUpdated: string) {
   const quizSnap = await db.ref(`organizations/${orgId}/quizzes/${quizId}`).get();
   const q = quizSnap.val() as Quiz;
-  const me = q.participants?.[uidJustFinished];
+  const me = q?.participants?.[uidJustFinishedOrUpdated];
+
+  // If user does not exist in participants (rare), just rebuild from existing rows
   const ans = me?.answers ? (Object.values(me.answers) as any[]) : [];
   const { avgTimeMs, correctCount } = computeAttemptStats(ans);
 
   const row: LeaderboardEntry = {
-    uid: uidJustFinished,
-    name: me?.displayName ?? uidJustFinished,
+    uid: uidJustFinishedOrUpdated,
+    name: me?.displayName ?? uidJustFinishedOrUpdated,
     score: me?.score ?? 0,
     correctCount,
     avgTimeMs,
   };
 
+  // write/update my row even if unfinished
   await db
-    .ref(`organizations/${orgId}/orgAsyncResults/${quizId}/${uidJustFinished}`)
-    .set({ ...row, finishedAt: now(), totalQuestions: ans.length });
+    .ref(`organizations/${orgId}/orgAsyncResults/${quizId}/${uidJustFinishedOrUpdated}`)
+    .set({
+      ...row,
+      finishedAt: me?.finishedAt ?? null,
+      totalQuestions: Object.values(q?.questions || {}).length,
+    });
 
+  // rebuild leaderboard (top 50)
   const allResSnap = await db.ref(`organizations/${orgId}/orgAsyncResults/${quizId}`).get();
   const rows = Object.values(allResSnap.val() || {}) as any[];
   rows.sort((a: any, b: any) => b.score - a.score || a.avgTimeMs - b.avgTimeMs);
@@ -92,7 +100,8 @@ async function recomputeAndStoreOrgLeaderboard(orgId: string, quizId: string, ui
   // convenience snapshot on the quiz doc
   await db.ref(`organizations/${orgId}/quizzes/${quizId}/endSummary`).set({
     leaderboard: rows.slice(0, 50),
-    finishedAt: now(),
+    // keep finishedAt if the quiz is actually done for a user; otherwise null
+    finishedAt: me?.finished ? me?.finishedAt ?? now() : null,
   });
 }
 
@@ -267,11 +276,13 @@ export const startOrResumeOrgAsyncAttempt = onCall(async (req) => {
         connected: true,
         score: 0,
         currentIndex: 0,
+        questionStartAt: now(),
       };
       return init;
     }
     if (!p.displayName) p.displayName = displayName;
     if (p.connected === false) p.connected = true;
+    if (typeof p.questionStartAt !== "number") p.questionStartAt = now();
     return p;
   });
 
@@ -291,7 +302,6 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
 
   const quizPath = `organizations/${orgId}/quizzes/${quizId}`;
   let finishedNow = false;
-  let totalQuestions = 0;
 
   await db.ref(quizPath).transaction((q: any) => {
     if (!q || q.type !== "org-async" || q.state !== "active") return q;
@@ -302,14 +312,12 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
     const idx = typeof user.currentIndex === "number" ? user.currentIndex : 0;
     const qArr = Object.values(q.questions || {}) as QuizQuestion[];
     qArr.sort((a: any, b: any) => Number(a.id) - Number(b.id));
-    totalQuestions = qArr.length;
 
     const question = qArr[idx];
     if (!question) return q;
 
     const nowTs = now();
     const elapsed = typeof user.questionStartAt === "number" ? nowTs - user.questionStartAt : 0;
-
     const correct = optionIdx === question.correctIndex;
 
     if (!q.participants[uid!].answers) q.participants[uid!].answers = {};
@@ -317,7 +325,7 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
 
     if (correct) q.participants[uid!].score = (q.participants[uid!].score || 0) + 1;
 
-    if (idx + 1 >= totalQuestions) {
+    if (idx + 1 >= qArr.length) {
       q.participants[uid!].finished = true;
       q.participants[uid!].finishedAt = nowTs;
       delete q.participants[uid!].questionStartAt;
@@ -330,9 +338,9 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
     return q;
   });
 
-  if (finishedNow) {
-    await recomputeAndStoreOrgLeaderboard(orgId, quizId, uid!);
-  }
+  // 🔁 Update leaderboard for both partial and finished states
+  await recomputeAndStoreOrgLeaderboard(orgId, quizId, uid!);
+
   return { ok: true, finishedNow };
 });
 
@@ -406,7 +414,7 @@ export const startOrResumePersonalAsyncAttempt = onCall(async (req) => {
 
   const { quizId } = req.data as { quizId: string };
   const path = `users/${uid}/quizzes/${quizId}`;
-  const snap = await db.ref(path).get();
+  const snap = await db.ref(path).get(); // (minor) was db.ref(path)
   if (!snap.exists()) throw new HttpsError("not-found", "Quiz not found");
 
   const quiz = snap.val() as Quiz;
@@ -476,4 +484,30 @@ export const submitPersonalAsyncAnswer = onCall(async (req) => {
   });
 
   return { ok: true, finishedNow };
+});
+
+/* ------------------------------ EXTRA: detail ----------------------------- */
+/** Minimal quiz detail (with questions) for client attempt/review UIs */
+export const getOrgQuizDetail = onCall(async (req) => {
+  const uid = req.auth?.uid as string | undefined;
+  const { orgId, quizId } = req.data as { orgId: string; quizId: string };
+  await assertMember(orgId, uid);
+
+  const snap = await db.ref(`organizations/${orgId}/quizzes/${quizId}`).get();
+  if (!snap.exists()) throw new HttpsError("not-found", "Quiz not found");
+  const q = snap.val() as Quiz;
+  if (q.type !== "org-async") throw new HttpsError("failed-precondition", "Not an org-async quiz");
+
+  const questions = q.questions || {};
+  const numQuestions = Object.keys(questions).length;
+
+  const payload = {
+    id: q.id,
+    title: (q as any).title ?? "Anytime Quiz",
+    numQuestions,
+    questionDurationSec: q.questionDurationSec ?? 45,
+    questions,
+  };
+
+  return { quiz: payload };
 });

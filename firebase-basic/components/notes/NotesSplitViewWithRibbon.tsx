@@ -7,7 +7,6 @@ import { fns } from "@/lib/firebase"
 import SummaryPanel from "@/components/ai/SummaryPanel"
 import FlashCardSection from "@/components/flashcards/FlashCardSection"
 import QuizBar from "../QuizBar"
-import QuizPanel from "../QuizPanel"
 import Ribbon, { type RibbonSection } from "../ribbon/Ribbon"
 import { getAuth } from "firebase/auth"
 import Main from "../YjsEditor/OrgMain"
@@ -98,7 +97,7 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
     switch (activeRibbonSection) {
       case "summary":
         return [
-          <div key="summary" className="min-h-0">
+          <div key="summary" className="min-h-0 h-full">
             <div className="h-full border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
               <SummaryPanel
                 sourceText={plain}
@@ -114,7 +113,7 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
 
       case "flashcards":
         return [
-          <div key="flashcards" className="min-h-0">
+          <div key="flashcards" className="min-h-0 h-full">
             <div className="h-full border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
               <FlashCardSection
                 sourceText={plain}
@@ -128,8 +127,8 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
         ]
 
       case "quiz": {
-        const top = (
-          <div key="quizbar" className="min-h-0">
+        const quizComponent = (
+          <div key="quizbar" className="min-h-0 h-full">
             <div className="h-full border rounded-xl bg-white dark:bg-neutral-900 shadow">
               <QuizBar
                 orgId={orgID}
@@ -143,23 +142,7 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
           </div>
         )
 
-        const bottom = isQuizPanelOpen ? (
-          <div key="quizpanel" className="min-h-0">
-            <div className="h-full border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
-              <QuizPanel
-                orgId={orgID}
-                noteId={note.id}
-                userId={ownerId}
-                displayName="User"
-                defaultDurationSec={45}
-                defaultNumQuestions={5}
-                onClose={() => setIsQuizPanelOpen(false)}
-              />
-            </div>
-          </div>
-        ) : null
-
-        return bottom ? [top, bottom] : [top]
+        return [quizComponent]
       }
 
       default:
@@ -168,7 +151,8 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
   }
 
   const items = getRightPaneItems()
-  const hasTwo = items.length === 2
+  const isSingleSection = activeRibbonSection === "summary" || activeRibbonSection === "flashcards"
+  const isQuizSection = activeRibbonSection === "quiz"
 
   return (
     <div className="relative h-[calc(100vh-2rem)] w-full">
@@ -207,13 +191,7 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
         {/* Right content area - uniform width for all sections */}
         {!isRightContentHidden && (
           <div className="w-140 min-w-0 overflow-hidden transition-all duration-300">
-            {/* Uniform layout: 2 equal rows; single-panel sections sit in the TOP half. */}
-            <div className="h-full grid grid-rows-2 gap-4">
-              {/* Row 1 (top half) */}
-              <div className="min-h-0">{items[0] ?? null}</div>
-              {/* Row 2 (bottom half) */}
-              <div className="min-h-0">{hasTwo ? items[1] : null}</div>
-            </div>
+            <div className="h-full">{items[0]}</div>
           </div>
         )}
       </div>
