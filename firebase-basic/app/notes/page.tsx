@@ -222,11 +222,8 @@ export default function NotesPage() {
   /* ----------------------------------- UI ------------------------------------- */
   return (
     <div className="flex h-screen w-screen overflow-hidden">
-      {/* LEFT: v1-style notes structure ONLY (buttons + 3 sections) */}
 
-      {/* LEFT SIDEBAR (Notes Tree Sections) */}
       <Collapsible defaultOpen className="sticky top-0 left-0 h-screen shrink-0 border-r bg-background z-10">
-        {/* Collapse trigger */}
         <div className="flex justify-start pl-1">
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -243,7 +240,6 @@ export default function NotesPage() {
       min-h-0 w-[300px]
     "
         >
-          {/* Row 1: buttons */}
           <div className="flex gap-3">
             <Button onClick={() => handleAdd("note")} variant="default" size="sm">
               + Note
@@ -253,7 +249,6 @@ export default function NotesPage() {
             </Button>
           </div>
 
-          {/* Row 2: My Notes */}
           <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
             <div className="px-3 py-2 border-b text-sm font-semibold">My Notes</div>
             <div
@@ -274,7 +269,6 @@ export default function NotesPage() {
             </div>
           </div>
 
-          {/* Row 3: Shared Notes */}
           <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
             <div className="px-3 py-2 border-b text-sm font-semibold">Shared Notes</div>
             <div className="min-h-0 h-full overflow-auto no-scrollbar">
@@ -292,7 +286,6 @@ export default function NotesPage() {
             </div>
           </div>
 
-          {/* Row 4: Organisation Notes */}
           <div className="min-h-0 overflow-hidden rounded-lg border bg-card">
             <div className="px-3 py-2 border-b text-sm font-semibold">
               Organisation Notes{activeOrgId ? ` – ${activeOrgId}` : ""}
@@ -313,7 +306,6 @@ export default function NotesPage() {
           </div>
         </CollapsibleContent>
       </Collapsible>
-
 
       <div className="flex-1 bg-muted">
         <div className="flex-[3] flex flex-col">
@@ -337,10 +329,7 @@ export default function NotesPage() {
         </div>
       </div>
 
-
-      {/* RIGHT SIDEBAR (Summary + Flashcards) */}
       <Collapsible defaultOpen className="sticky top-0 right-0 h-screen shrink-0 border-l bg-background z-10">
-        {/* Collapse trigger */}
         <div className="flex justify-end pr-1">
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -358,7 +347,7 @@ export default function NotesPage() {
       flex flex-col gap-6 p-2
     "
         >
-          {/* Top half: Summary */}
+
           <div className="flex-1 min-h-0 bg-white dark:bg-gray-900 shadow overflow-hidden">
             <div className="h-full overflow-auto [&>*]:h-full">
               <SummaryPanel
@@ -374,7 +363,6 @@ export default function NotesPage() {
             </div>
           </div>
 
-          {/* Bottom half: Flashcards */}
           <div className="flex-1 min-h-0 bg-white dark:bg-gray-900 shadow overflow-hidden">
             <div className="h-full overflow-auto [&>*]:h-full">
               <FlashcardGenerator

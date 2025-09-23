@@ -33,64 +33,13 @@ export function YjsBlockNoteEditor({
     const observer = new MutationObserver(() => {
       setTheme(root.classList.contains('dark') ? 'dark' : 'light');
     });
+
+
     observer.observe(root, { attributes: true, attributeFilter: ['class'] });
 
-    // setTheme(root.classList.contains('dark') ? 'dark' : 'light');
+    setTheme(root.classList.contains('dark') ? 'dark' : 'light');
     return () => observer.disconnect();
   }, []);
-
-  const lightRedTheme = {
-    colors: {
-      editor: {
-        text: "#222222",
-        background: "blue",
-      },
-      menu: {
-        text: "#751346",
-        background: "#9b0000",
-      },
-      tooltip: {
-        text: "#ffffff",
-        background: "#b00000",
-      },
-      hovered: {
-        text: "#ffffff",
-        background: "#b00000",
-      },
-      selected: {
-        text: "#ffffff",
-        background: "#c50000",
-      },
-      disabled: {
-        text: "#9b0000",
-        background: "#7d0000",
-      },
-      shadow: "#640000",
-      border: "#870000",
-      sideMenu: "#bababa",
-      highlights: lightDefaultTheme.colors!.highlights,
-    },
-    borderRadius: 4,
-    fontFamily: "Helvetica Neue, sans-serif",
-  } satisfies Theme;
-
-  const darkRedTheme = {
-    ...lightRedTheme,
-    colors: {
-      ...lightRedTheme.colors,
-      editor: {
-        text: "#ffffff",
-        background: "green",
-      },
-      sideMenu: "#ffffff",
-      highlights: darkDefaultTheme.colors!.highlights,
-    },
-  } satisfies Theme;
-
-  const redTheme = {
-    light: lightRedTheme,
-    dark: darkRedTheme,
-  };
 
   const doc = useYDoc();
   const provider: any = useYjsProvider();
