@@ -199,13 +199,10 @@ export default function QuizBar({
     }
   }
 
-  // periodic LB refresh for selected quiz
-  useEffect(() => {
-    if (!selectedQuizId) return
-    refreshLeaderboard(selectedQuizId)
-    const t = setInterval(() => refreshLeaderboard(selectedQuizId), 5000)
-    return () => clearInterval(t)
-  }, [selectedQuizId])
+  // NOTE: No periodic polling; leaderboard refresh happens only on:
+  // - single-click of a quiz (to view its leaderboard),
+  // - finishing a quiz,
+  // - opening a quiz for review.
 
   // ------------------------------ Folder toggle ------------------------------
 
@@ -299,8 +296,8 @@ export default function QuizBar({
       setSelectedQuizId(quizId)
       setAttemptOpen(true)
       setSelectedAnswerIndex(null)
-      // ensure we have LB visible
-      refreshLeaderboard(quizId)
+
+      // Do NOT refresh leaderboard here
     } catch (e) {
       console.error("Start attempt failed:", e)
       alert("Could not start the quiz. See console.")
@@ -319,8 +316,6 @@ export default function QuizBar({
         quizId: selectedQuizId,
         optionIdx,
       })
-      // LB updates even for partial (backend changed)
-      refreshLeaderboard(selectedQuizId)
 
       const total = attemptQuizDetail.numQuestions
       if (data?.finishedNow) {
@@ -330,7 +325,11 @@ export default function QuizBar({
         setAttemptIndex(0)
         setSelectedAnswerIndex(null)
         await refreshLists()
+
+        // Load leaderboard ONLY now (after finishing)
+        await refreshLeaderboard(selectedQuizId)
       } else {
+        // Do NOT refresh leaderboard while answering
         setAttemptIndex((i) => Math.min(i + 1, total - 1))
         setSelectedAnswerIndex(null)
       }
@@ -369,7 +368,9 @@ export default function QuizBar({
         setReviewAttempt(data.attempt)
       }
       setSelectedQuizId(quizId)
-      refreshLeaderboard(quizId)
+
+      // Load leaderboard when opening review
+      await refreshLeaderboard(quizId)
     } catch (e) {
       console.error("Open review failed:", e)
       alert("Could not load your attempt. See console.")
@@ -399,8 +400,8 @@ export default function QuizBar({
               variant={selectedAnswerIndex === i ? "default" : "outline"}
               className={`justify-start text-left transition-all ${
                 selectedAnswerIndex === i
-                  ? "bg-blue-500 text-white border-blue-500 shadow-md"
-                  : "hover:bg-blue-50 hover:border-blue-300"
+                  ? "bg-black text-white border-black shadow-md"
+                  : "hover:bg-gray-50 hover:border-gray-300 bg-white text-black border-gray-200"
               }`}
               disabled={submittingAnswer}
               onClick={() => {
@@ -412,10 +413,6 @@ export default function QuizBar({
               {opt}
             </Button>
           ))}
-        </div>
-        <div className="text-xs text-muted-foreground">
-          // Simplified instruction text for faster flow Each question: {attemptQuizDetail.questionDurationSec}s •
-          Progress auto-saved
         </div>
       </div>
     )
@@ -445,12 +442,12 @@ export default function QuizBar({
             const isChosen = i === chosen
             const style =
               isCorrect && isChosen
-                ? "bg-green-500/20 border-green-400/40"
+                ? "bg-black text-white border-black"
                 : isCorrect
-                  ? "bg-green-500/10 border-green-400/30"
+                  ? "bg-gray-100 border-gray-300 text-black"
                   : isChosen
-                    ? "bg-red-500/10 border-red-400/30"
-                    : "bg-background/20 border-border/40"
+                    ? "bg-gray-200 border-gray-400 text-black"
+                    : "bg-white border-gray-200 text-black"
             return (
               <div key={i} className={`rounded-lg border p-3 ${style}`}>
                 <div className="text-sm">
@@ -463,17 +460,17 @@ export default function QuizBar({
 
         <div className="text-sm">
           {chosen === correct ? (
-            <span className="text-green-500 font-medium">Correct.</span>
+            <span className="text-black font-medium">Correct.</span>
           ) : (
-            <span className="text-red-500 font-medium">Incorrect.</span>
+            <span className="text-gray-600 font-medium">Incorrect.</span>
           )}{" "}
           <span className="text-muted-foreground">Time: {fmtMs(a?.timeMs)}</span>
         </div>
 
         {q.explanation && (
-          <div className="rounded-lg border border-border/40 bg-background/20 p-3 text-sm">
-            <div className="font-medium mb-1">Explanation</div>
-            <div className="text-muted-foreground">{q.explanation}</div>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+            <div className="font-medium mb-1 text-black">Explanation</div>
+            <div className="text-gray-600">{q.explanation}</div>
           </div>
         )}
 
@@ -502,22 +499,18 @@ export default function QuizBar({
   return (
     <>
       <Card className={`${wrapperClass} h-full`}>
-        <CardHeader className="flex flex-row items-center justify-between p-4 shrink-0">
-          <CardTitle className="text-lg">Quizzes</CardTitle>
-          <Button
-            onClick={() => setAttemptOpen(true)}
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
-            aria-label="Expand"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-
         <CardContent className="p-0 flex-1 min-h-0">
           <div className="h-full flex flex-col">
+            {/* -------- Top Half: Quizzes (uniform header) -------- */}
             <div className="h-1/2 border-b border-border/30 bg-background/10 flex flex-col min-h-0">
+              {/* Uniform section header */}
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <ListChecks className="h-5 w-5 text-black" />
+                  <span>Quizzes</span>
+                </div>
+              </div>
+
               <div className="flex-1 overflow-y-auto min-h-0">
                 <div className="p-4">
                   {!orgId ? (
@@ -564,7 +557,11 @@ export default function QuizBar({
                                 <div
                                   key={q.id}
                                   className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors w-full cursor-pointer"
-                                  onClick={() => handleStartQuiz(q.id)}
+                                  onClick={() => {
+                                    setSelectedQuizId(q.id)
+                                    refreshLeaderboard(q.id) // single-click => show leaderboard
+                                  }}
+                                  onDoubleClick={() => handleStartQuiz(q.id)} // double-click => open quiz attempt
                                 >
                                   <FileText className="h-4 w-4 text-black" />
                                   <div className="flex-1 min-w-0">
@@ -617,7 +614,11 @@ export default function QuizBar({
                                 <div
                                   key={q.id}
                                   className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors w-full cursor-pointer"
-                                  onClick={() => openReview(q.id)}
+                                  onClick={() => {
+                                    setSelectedQuizId(q.id)
+                                    refreshLeaderboard(q.id) // single-click => show leaderboard
+                                  }}
+                                  onDoubleClick={() => openReview(q.id)} // double-click => open review
                                 >
                                   <FileText className="h-4 w-4 text-black" />
                                   <div className="flex-1 min-w-0">
@@ -648,21 +649,25 @@ export default function QuizBar({
                     className="gap-2 bg-black text-white hover:bg-gray-800 border border-white/20"
                   >
                     {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    {creating ? "Working..." : "Create"}
+                    {creating ? "Working..." : "Create Quiz "}
                   </Button>
                 </div>
               )}
             </div>
 
+            {/* -------- Bottom Half: Leaderboard (uniform header) -------- */}
             <div className="h-1/2 bg-background/5 flex flex-col min-h-0">
+              {/* Uniform section header */}
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Trophy className="h-5 w-5 text-black" />
+                  <span>Leaderboard</span>
+                </div>
+                {loadingLeaderboard && <Loader2 className="h-4 w-4 animate-spin" />}
+              </div>
+
               <div className="flex-1 overflow-y-auto min-h-0">
                 <div className="p-4 h-full flex flex-col">
-                  <div className="flex items-center gap-2 mb-4 shrink-0">
-                    <Trophy className="h-5 w-5 text-black" />
-                    <h3 className="text-sm font-medium text-foreground">Leaderboard</h3>
-                    {loadingLeaderboard && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                  </div>
-
                   <div className="flex-1 min-h-0">
                     {!selectedQuizId ? (
                       <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -688,49 +693,67 @@ export default function QuizBar({
                             </div>
                           </div>
                         ) : (
-                          leaderboard.map((entry, index) => (
-                            <div
-                              key={entry.uid}
-                              className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 ${
-                                entry.uid === userId
-                                  ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/60 shadow-lg"
-                                  : "bg-gradient-to-r from-background/40 to-background/20 border-border/40 hover:border-border/60"
-                              }`}
-                            >
-                              <div className="flex items-center gap-4">
-                                <div
-                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-md ${
-                                    index === 0
-                                      ? "bg-gradient-to-br from-yellow-400 to-yellow-600 text-black"
-                                      : index === 1
-                                        ? "bg-gradient-to-br from-gray-300 to-gray-500 text-black"
-                                        : index === 2
-                                          ? "bg-gradient-to-br from-orange-400 to-orange-600 text-white"
-                                          : "bg-gradient-to-br from-background/60 to-background/40 text-foreground border-2 border-border/40"
-                                  }`}
-                                >
-                                  {index + 1}
-                                </div>
-                                <div>
-                                  <div className="text-sm font-semibold text-foreground">
-                                    {entry.name}
-                                    {entry.uid === userId && (
-                                      <span className="text-xs text-blue-500 ml-2 font-medium">(You)</span>
-                                    )}
+                          leaderboard.map((entry, index) => {
+                            // medal colors & shadows by rank
+                            const rowRankShadow =
+                              index === 0
+                                ? "border-[#FFD700] shadow-[0_8px_20px_rgba(255,215,0,0.35)]"
+                                : index === 1
+                                  ? "border-[#C0C0C0] shadow-[0_8px_20px_rgba(192,192,192,0.30)]"
+                                  : index === 2
+                                    ? "border-[#CD7F32] shadow-[0_8px_20px_rgba(205,127,50,0.30)]"
+                                    : "border-gray-200 hover:border-gray-300"
+
+                            const selfHighlight =
+                              entry.uid === userId
+                                ? "bg-white text-black"
+                                 : "bg-white text-black"
+                            const medalClass =
+                              index === 0
+                                ? "bg-[#FFD700] text-black shadow-[0_6px_18px_rgba(255,215,0,0.6)]"
+                                : index === 1
+                                  ? "bg-[#C0C0C0] text-black shadow-[0_6px_18px_rgba(192,192,192,0.6)]"
+                                  : index === 2
+                                    ? "bg-[#CD7F32] text-black shadow-[0_6px_18px_rgba(205,127,50,0.55)]"
+                                    : "bg-white text-black border-2 border-gray-300"
+
+                            return (
+                              <div
+                                key={entry.uid}
+                                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 ${selfHighlight} ${rowRankShadow}`}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${medalClass}`}
+                                  >
+                                    {index + 1}
                                   </div>
-                                  <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                    <span>⏱️ {fmtMs(entry.avgTimeMs)} avg</span>
-                                    <span>•</span>
-                                    <span>✅ {entry.correctCount} correct</span>
+                                  <div>
+                                    <div
+                                      className={`text-sm font-semibold text-black`}
+                                    >
+                                      {entry.uid === userId ? "You" : (entry.name || "Member")}
+                                    </div>
+                                    <div
+                                      className={`text-xs flex items-center gap-2 text-gray-500`}
+                                    >
+                                      <span>⏱️ {fmtMs(entry.avgTimeMs)} avg</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div
+                                    className={`text-lg font-bold text-black`}
+                                  >
+                                    {entry.score}
+                                  </div>
+                                  <div className={`text-xs text-gray-500`}>
+                                    /{entry.totalQuestions ?? "?"}
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-lg font-bold text-foreground">{entry.score}</div>
-                                <div className="text-xs text-muted-foreground">/{entry.totalQuestions ?? "?"}</div>
-                              </div>
-                            </div>
-                          ))
+                            )
+                          })
                         )}
                       </div>
                     )}
@@ -753,7 +776,7 @@ export default function QuizBar({
             <div onClick={(e) => e.stopPropagation()}>
               <Card className="w-full max-w-4xl min-w-[900px] h-[90vh] min-h-[700px] max-h-[800px] bg-background shadow-2xl flex flex-col">
                 <CardHeader className="flex flex-row items-center justify-between px-6 py-4 border-b shrink-0">
-                  <CardTitle className="text-xl">Create Anytime Quiz</CardTitle>
+                  <CardTitle className="text-xl">Create Quiz</CardTitle>
                   <Button
                     onClick={() => setCreateOpen(false)}
                     variant="outline"
@@ -806,9 +829,6 @@ export default function QuizBar({
                           {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                           Generate from note
                         </Button>
-                        <div className="text-xs text-muted-foreground">
-                          We'll sanitize the note and ask Gemini to produce MCQs.
-                        </div>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -929,8 +949,7 @@ export default function QuizBar({
                           Score: {reviewAttempt.score} / {Object.keys(reviewQuizDetail.questions).length}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Avg time: {fmtMs(reviewAttempt.stats?.avgTimeMs)} • Correct:{" "}
-                          {reviewAttempt.stats?.correctCount}
+                          Avg time: {fmtMs(reviewAttempt.stats?.avgTimeMs)} • Correct: {reviewAttempt.stats?.correctCount}
                         </div>
                       </div>
                       <div className="flex-1 min-h-0 flex items-center justify-center">
