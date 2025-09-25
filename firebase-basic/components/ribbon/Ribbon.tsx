@@ -40,7 +40,13 @@ export default function Ribbon({ activeSection, onSectionChange, className, onCo
   ]
 
   return (
-    <div className={cn("flex flex-col bg-sidebar border-l border-sidebar-border h-full", className)}>
+    <div
+      // moved ribbon toward the right: ml-auto (push in flex), sticky to keep it at top, right-0 as fallback
+      className={cn(
+        "flex flex-col bg-sidebar border-l border-sidebar-border h-full ml-auto sticky top-0 right-0",
+        className,
+      )}
+    >
       {items.map(({ id, icon: Icon, label, active }) => (
         <Button
           key={id}
