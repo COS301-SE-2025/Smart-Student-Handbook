@@ -1,0 +1,37 @@
+/* Adds border and shadow to editor */
+.bn-container[data-theming-css-variables-demo][data-color-scheme] {
+  --bn-colors-editor-text: black;
+  --bn-colors-editor-background: #ffffff;
+  --bn-colors-menu-text: #ffffff;
+  --bn-colors-menu-background: #02081a;
+  --bn-colors-tooltip-text: #02081a;
+  --bn-colors-tooltip-background: #ffffff;
+  --bn-colors-hovered-text: #ffffff;
+  --bn-colors-hovered-background: #02081a;
+  --bn-colors-selected-text: #02081a;
+  --bn-colors-side-menu: #bababa;
+  --bn-color-highlight-colors: #ffffff;
+  --bn-border-radius: 4px;
+  --bn-font-family: Helvetica Neue, sans-serif;
+}
+
+.bn-container[data-theming-css-variables-demo][data-color-scheme="dark"] {
+  --bn-colors-editor-text: #ffffff;
+  --bn-colors-editor-background: #00040f;
+  --bn-colors-menu-text: #ffffff;
+  --bn-colors-menu-background: #02081a;
+  --bn-colors-tooltip-text: #ffffff;
+  --bn-colors-tooltip-background: #00040f;
+  --bn-colors-hovered-text: #00040f;
+  --bn-colors-hovered-background: #0d225c;
+  --bn-colors-selected-text: #ffffff;
+  --bn-colors-selected-background: #00040f;
+  --bn-colors-disabled-text: #ffffff;
+  --bn-colors-disabled-background: #00040f;
+  --bn-colors-shadow: #00040f;
+  --bn-colors-border: #00040f;
+  --bn-colors-side-menu: #00040f;
+  --bn-color-highlight-colors: #ffffff;
+  --bn-border-radius: 4px;
+  --bn-font-family: Helvetica Neue, sans-serif;
+}
