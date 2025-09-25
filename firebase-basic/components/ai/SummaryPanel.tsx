@@ -141,8 +141,7 @@ export default function SummaryPanel({
   const lastTextRef = useRef<{ text: string; hash: string } | null>(null)
 
   // Decide storage scope:
-  // 1) explicit override via isPersonal
-  // 2) else, infer personal if ownerId === userId or orgId is falsy
+
   const useUserScope = ((): boolean => {
     if (typeof isPersonal === "boolean") return isPersonal
     if (!orgId) return true
@@ -302,21 +301,24 @@ export default function SummaryPanel({
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="flex flex-col min-h-0 h-[calc(100%-4.25rem)] p-4">
           {loadingExisting ? (
             <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading summary…
             </div>
           ) : summary ? (
-            <div className="p-3 rounded-lg bg-card text-foreground whitespace-pre-wrap break-words text-xs md:text-sm leading-snug">
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 rounded-lg bg-card text-foreground whitespace-pre-wrap break-words text-xs md:text-sm leading-snug">
               {summary}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              {disabled ? "No summary yet. Generate one to see it here." : ""}
-            </p>
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-sm text-muted-foreground">
+                {disabled ? "No summary yet. Generate one to see it here." : ""}
+              </p>
+            </div>
           )}
         </CardContent>
+
       </Card>
 
       {isExpanded &&

@@ -402,9 +402,9 @@ export default function FlashCardSection({
 
                 <CardContent className="flex flex-col flex-1 min-h-0 px-6 pb-6">
                   {isLoading ? (
-                    <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading cards…
-                    </div>
+                     <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading cards…
+            </div>
                   ) : flashCards.length > 0 && currentCard ? (
                     <div className="flex-1 flex flex-col gap-3 min-h-0">
                       <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">

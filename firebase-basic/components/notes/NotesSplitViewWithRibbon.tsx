@@ -10,13 +10,15 @@ import QuizBar from "../QuizBar"
 import Ribbon, { type RibbonSection } from "../ribbon/Ribbon"
 import { getAuth } from "firebase/auth"
 import Main from "../YjsEditor/OrgMain"
+import NotesBar from "../notes/NotesBar"
+import { Loader2 } from "lucide-react"
 
 /* --------------------------------- Types --------------------------------- */
 export type Note = {
   ownerId: string
   id: string
   name: string
-  content: string // HTML from Quill
+  content: string // HTML from Quill (legacy) or latest snapshot text
   type: "note"
   createdAt?: number
   updatedAt?: number
@@ -25,7 +27,13 @@ export type Note = {
 type NotesSplitViewProps = {
   notes: Note[]
   orgID: string
+  /** New controlled selection props */
+  selectedId?: string
+  onSelect?: (noteId: string) => void
+  /** Legacy: can still be passed, but ignored if selectedId is provided */
   initialSelectedId?: string | null
+  /** ✅ Added so page can pass loading without TS error */
+  loading?: boolean
 }
 
 /* ------------------------------ Utilities -------------------------------- */
@@ -42,27 +50,60 @@ async function callUpdateNote(path: string, note: Partial<Note>) {
 }
 
 /* ------------------------------ Main component --------------------------- */
-export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelectedId }: NotesSplitViewProps) {
+export default function NotesSplitViewWithRibbon({
+  notes,
+  orgID,
+  selectedId,
+  onSelect,
+  initialSelectedId,
+  loading,
+}: NotesSplitViewProps) {
+  /**
+   * We keep an internal copy for local edits (e.g., title input) so typing feels instant,
+   * but the selected note id is controlled by the parent when `selectedId` is provided.
+   */
   const [stateNotes, setStateNotes] = useState<Note[]>(notes)
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(initialSelectedId ?? notes[0]?.id ?? null)
 
-  // Hide only the content area (not the ribbon). When hidden, the editor expands.
+  // If parent doesn't control selection, fall back to internal initial selection.
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
+    selectedId ?? initialSelectedId ?? notes[0]?.id ?? null,
+  )
+
+  // Compute the authoritative current selected id
+  const currentSelectedNoteId = useMemo(() => {
+    // Parent-controlled takes precedence
+    if (selectedId) return selectedId
+    return internalSelectedId
+  }, [selectedId, internalSelectedId])
+
+  // Hide only the right content area (not the ribbon). When hidden, the editor expands.
   const [isRightContentHidden, setIsRightContentHidden] = useState(false)
-
   const [activeRibbonSection, setActiveRibbonSection] = useState<RibbonSection>("summary")
-  const [isQuizPanelOpen, setIsQuizPanelOpen] = useState(false)
 
   const ownerId = getAuth().currentUser?.uid ?? ""
 
+  // Keep local notes in sync with incoming prop updates (but preserve in-flight title edits where possible)
   useEffect(() => {
-    setStateNotes(notes)
-    if (initialSelectedId) setSelectedNoteId(initialSelectedId)
+    setStateNotes(() => notes)
+  }, [notes])
+
+  // If selection is uncontrolled and the incoming list changed (e.g., first load), ensure we have a valid selection.
+  useEffect(() => {
+    if (selectedId) return // parent controls; do nothing
+    if (!internalSelectedId) {
+      const first = notes[0]?.id ?? null
+      setInternalSelectedId(first)
+    } else {
+      // ensure selected still exists; if not, select first
+      const exists = notes.some((n) => n.id === internalSelectedId)
+      if (!exists) setInternalSelectedId(notes[0]?.id ?? null)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes, initialSelectedId])
+  }, [notes, selectedId])
 
   const selectedNote = useMemo(
-    () => stateNotes.find((n) => n.id === selectedNoteId) ?? null,
-    [stateNotes, selectedNoteId],
+    () => stateNotes.find((n) => n.id === currentSelectedNoteId) ?? null,
+    [stateNotes, currentSelectedNoteId],
   )
 
   const [plain, setPlain] = useState<string>("")
@@ -70,7 +111,7 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
     if (selectedNote?.content != null) setPlain(htmlToPlain(selectedNote.content))
   }, [selectedNote?.id, selectedNote?.content])
 
-  // Auto-save (debounced 1s)
+  // Auto-save (debounced 1s) for simple fields we manage here (e.g., name/content snapshot)
   useEffect(() => {
     if (!selectedNote?.id) return
     const t = setTimeout(() => {
@@ -84,15 +125,26 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
     return () => clearTimeout(t)
   }, [selectedNote?.id, selectedNote?.content, selectedNote?.name, orgID])
 
-  if (!selectedNote) {
+  // ✅ nice loading state while first fetch is in-flight
+  if (loading && (!selectedNote || !currentSelectedNoteId)) {
+    return (
+      <div className="min-h-[60vh] grid place-items-center p-6 text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading notes…
+        </div>
+      </div>
+    )
+  }
+
+  if (!selectedNote || !currentSelectedNoteId) {
     return <div className="min-h-[60vh] grid place-items-center p-6 text-muted-foreground" />
   }
 
   const note: Note = selectedNote
 
-  // Build the right-pane items as an array so we can place them into a 2-row grid:
-  // - If only one item, it goes to the TOP half (row 1), bottom row stays empty.
-  // - If two, they split evenly (row 1 & row 2).
+  // Build the right-pane items as an array so we can place them into a uniform container:
+  // - If only one item, it goes to the TOP half (row 1), bottom row stays empty (layout handled by container).
   const getRightPaneItems = () => {
     switch (activeRibbonSection) {
       case "summary":
@@ -141,8 +193,29 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
             </div>
           </div>
         )
-
         return [quizComponent]
+      }
+
+      case "notes": {
+        // Show ALL org notes; double-click chooses a note and updates the controlled selection upstream.
+        const notesList = (
+          <div key="notesbar" className="min-h-0 h-full">
+            <div className="h-full border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
+              <NotesBar
+                orgId={orgID}
+                onOpenNote={(noteId) => {
+                  // Prefer parent-controlled selection if provided
+                  if (onSelect) {
+                    onSelect(noteId)
+                  } else {
+                    setInternalSelectedId(noteId)
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )
+        return [notesList]
       }
 
       default:
@@ -151,15 +224,11 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
   }
 
   const items = getRightPaneItems()
-  const isSingleSection = activeRibbonSection === "summary" || activeRibbonSection === "flashcards"
-  const isQuizSection = activeRibbonSection === "quiz"
 
   return (
     <div className="relative h-[calc(100vh-2rem)] w-full">
       {/* Main content area with editor and sections */}
       <div className="flex h-full gap-4 pr-12">
-        {" "}
-        {/* Added right padding for ribbon space */}
         {/* Editor pane — expands when right content is hidden */}
         <div
           className={`${
@@ -179,15 +248,17 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
           </div>
 
           <div className="flex-1 min-h-0">
+            {/* Yjs editor consumes the current selected note id */}
             <Main
               searchParams={{
-                doc: selectedNoteId as any,
+                doc: currentSelectedNoteId as any,
                 ownerId: orgID ?? undefined,
                 username: "Organisation Member",
               }}
             />
           </div>
         </div>
+
         {/* Right content area - uniform width for all sections */}
         {!isRightContentHidden && (
           <div className="w-140 min-w-0 overflow-hidden transition-all duration-300">
@@ -196,12 +267,13 @@ export default function NotesSplitViewWithRibbon({ notes, orgID, initialSelected
         )}
       </div>
 
+      {/* Ribbon pinned at the far right */}
       <div className="absolute top-0 right-0 h-full">
         <Ribbon
           activeSection={activeRibbonSection}
           onSectionChange={(sec) => {
             setActiveRibbonSection(sec)
-            if (sec === null) {
+            if ((sec as any) === null) {
               // collapse content, keep ribbon on the right, editor expands
               setIsRightContentHidden(true)
             } else {

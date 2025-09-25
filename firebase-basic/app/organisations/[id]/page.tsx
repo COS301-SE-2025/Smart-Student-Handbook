@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { httpsCallable } from "firebase/functions"   // ⬅️ use SDK callable
+import { httpsCallable } from "firebase/functions"   
 import { fns } from "@/lib/firebase"
 import {
   getDatabase,

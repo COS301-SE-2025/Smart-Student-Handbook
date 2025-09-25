@@ -532,7 +532,7 @@ export default function QuizBar({
             {/* -------- Top Half: Quizzes (uniform header) -------- */}
             <div className="h-1/2 border-b border-border/30 bg-background/10 flex flex-col min-h-0">
               {/* Uniform section header */}
-              <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
+              <div className="sticky top-0 z-0 pr-[84px] flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <ListChecks className="h-5 w-5 text-black" />
                   <span>Quizzes</span>
@@ -567,7 +567,6 @@ export default function QuizBar({
                           )}
                           <span className="text-base font-medium text-foreground">
                             Active Quizzes ({activeQuizzes.length})
-                            {loadingActiveQuizzes && <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />}
                           </span>
                         </button>
 
@@ -624,7 +623,6 @@ export default function QuizBar({
                           )}
                           <span className="text-base font-medium text-foreground">
                             Completed Quizzes ({completedQuizzes.length})
-                            {loadingCompletedQuizzes && <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />}
                           </span>
                         </button>
 
@@ -961,7 +959,8 @@ export default function QuizBar({
                           Score: {reviewAttempt.score} / {Object.keys(reviewQuizDetail.questions).length}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Avg time: {fmtMs(reviewAttempt.stats?.avgTimeMs)} • Correct: {reviewAttempt.stats?.correctCount}
+                          Avg time: {fmtMs(reviewAttempt.stats?.avgTimeMs)} • Correct:{" "}
+                          {reviewAttempt.stats?.correctCount}
                         </div>
                       </div>
                       <div className="flex-1 min-h-0 flex items-center justify-center">

@@ -1,4 +1,4 @@
-// app/organisations/[id]/notes/page.tsx (or your route file)
+// app/organisations/[id]/notes/page.tsx
 "use client"
 
 import { Suspense, useEffect, useMemo, useState } from "react"
@@ -6,7 +6,7 @@ import { useParams, useSearchParams } from "next/navigation"
 import { onValue, ref } from "firebase/database"
 import { db } from "@/lib/firebase"
 
-// ⬇️ use the ribbon version
+// ⬇️ updated to support controlled selection
 import NotesSplitViewWithRibbon, { type Note } from "@/components/notes/NotesSplitViewWithRibbon"
 
 export const dynamic = "force-dynamic"
@@ -19,11 +19,19 @@ function OrgNotesInner() {
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
 
-  // If a noteId is in the URL, prefer it; otherwise use the newest note
+  // Most-recent (or preselected) note id computed from the list
   const activeNoteId = useMemo(() => {
     if (preselectId) return preselectId
     return notes.length > 0 ? notes[0].id : undefined
   }, [preselectId, notes])
+
+  // 🔹 Controlled selection lives here (page level)
+  const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
+
+  // Keep selectedId in sync when notes/preselect change
+  useEffect(() => {
+    setSelectedId(activeNoteId)
+  }, [activeNoteId])
 
   useEffect(() => {
     if (!orgId) return
@@ -51,12 +59,17 @@ function OrgNotesInner() {
 
   return (
     <div className="px-4 md:px-6">
-      {/* The ribbon component renders Summary / Flashcards / Quiz on the right */}
       <div className="mt-4">
         <NotesSplitViewWithRibbon
           notes={notes}
           orgID={orgId}
+          // 🔹 Make the component controlled
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          // (Optional) if your component still supports initialSelectedId internally,
+          // keeping it here is harmless, but `selectedId` is the source of truth now.
           initialSelectedId={activeNoteId ?? undefined}
+          loading={loading}
         />
       </div>
     </div>
