@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useCreateBlockNote } from "@blocknote/react";
-import { BlockNoteView } from "@blocknote/mantine";
+import { BlockNoteView, darkDefaultTheme, lightDefaultTheme, Theme } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
 
 import { useYDoc, useYjsProvider } from "@y-sweet/react";
@@ -12,6 +12,8 @@ import { Note } from "@/types/note";
 import { fetchNoteById, fetchNoteWithOwner } from "@/lib/note/treeActions";
 import { ref, set } from "@firebase/database";
 import { db } from "@/lib";
+
+import "./styles.css";
 
 interface YjsBlockNoteEditorProps {
   noteID: string;
@@ -31,12 +33,13 @@ export function YjsBlockNoteEditor({
     const observer = new MutationObserver(() => {
       setTheme(root.classList.contains('dark') ? 'dark' : 'light');
     });
+
+
     observer.observe(root, { attributes: true, attributeFilter: ['class'] });
 
     setTheme(root.classList.contains('dark') ? 'dark' : 'light');
     return () => observer.disconnect();
   }, []);
-
 
   const doc = useYDoc();
   const provider: any = useYjsProvider();
@@ -90,7 +93,6 @@ export function YjsBlockNoteEditor({
     return () => { mounted = false; };
   }, [noteID, ownerID]);
 
-  // Track provider status
   useEffect(() => {
     if (!provider) return;
 
@@ -102,7 +104,6 @@ export function YjsBlockNoteEditor({
     return () => { provider.off("status", handleStatus); };
   }, [provider]);
 
-  // Insert initial content once provider is ready
   useEffect(() => {
     if (!providerReady || !editor || !Array.isArray(initialContent)) return;
 
@@ -112,7 +113,6 @@ export function YjsBlockNoteEditor({
     }
   }, [providerReady, initialContent, editor]);
 
-  // Auto-save every 5 seconds
   useEffect(() => {
     if (!editor) return;
 
@@ -145,13 +145,13 @@ export function YjsBlockNoteEditor({
               e.currentTarget.blur();
             }
           }}
-          className="border-b-4 border-black-100 border-solid text-2xl font-bold text-left 
+          className="border-b-4 text-2xl font-bold text-left 
                    text-gray-900 dark:text-gray-100 pb-4 pl-12 bg-transparent outline-none w-full"
         />
       </div>
 
       <div className="flex-1 overflow-auto h-[calc(100vh-16px)]">
-        <BlockNoteView editor={editor} theme={theme} />
+        <BlockNoteView editor={editor} data-theming-css-variables-demo/>
       </div>
     </div>
   );
