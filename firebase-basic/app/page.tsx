@@ -95,7 +95,7 @@ export default function Home() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <div className="text-center space-y-8">
             <div className="space-y-4">
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
+              <h1 className="text-5xl md:text-6xl text-gray-900 font-bold tracking-tight">
                 Welcome to Your
                 <span className="block text-gray-400">Learning Journey</span>
               </h1>
@@ -235,7 +235,7 @@ export default function Home() {
       {/* CTA Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-4xl mx-auto text-center space-y-8">
-          <h2 className="text-3xl md:text-4xl font-bold">Ready to Transform Your Learning?</h2>
+          <h2 className="text-3xl md:text-4xl text-gray-900 font-bold">Ready to Transform Your Learning?</h2>
           <p className="text-gray-700">
             Join thousands of students already using Smart Student Handbook to enhance their academic journey.
           </p>
