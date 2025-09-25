@@ -13,7 +13,6 @@ import {
   FolderOpen,
   Folder,
   Plus,
-  Maximize2,
   Minimize2,
 } from "lucide-react"
 import { createPortal } from "react-dom"
@@ -186,19 +185,43 @@ export default function QuizBar({
   // ------------------------------ Leaderboard ------------------------------
 
   async function refreshLeaderboard(quizId: string | null) {
-    if (!orgId || !quizId) return
+    if (!orgId || !quizId) {
+      setLeaderboard([])
+      return
+    }
     setLoadingLeaderboard(true)
     try {
       const lbFn = httpsCallable(fns, "getOrgAsyncLeaderboard")
-      const { data }: any = await lbFn({ orgId, quizId })
-      setLeaderboard((data?.items || []) as LeaderboardRow[])
+      // 🔗 NOTE-SCOPED
+      const { data }: any = await lbFn({ orgId, noteId, quizId })
+
+      // Coerce RTDB shape to array
+      let items: any[] = data?.items ?? []
+      if (!Array.isArray(items)) items = Object.values(items || {})
+
+      // Fallback denominator from local quiz metadata
+      const quizMeta = orgQuizzes.find((q) => q.id === quizId)
+      const fallbackTotal = quizMeta?.numQuestions
+
+      // Normalize & enrich
+      const normalized: LeaderboardRow[] = (items || []).map((r: any) => ({
+        uid: r.uid,
+        name: r.name || (r.uid === userId ? displayName : "Member"),
+        score: Number(r.score ?? 0),
+        correctCount: Number(r.correctCount ?? 0),
+        avgTimeMs: Number(r.avgTimeMs ?? 0),
+        totalQuestions: Number(r.totalQuestions ?? fallbackTotal ?? 0),
+        finishedAt: r.finishedAt ?? null,
+      }))
+
+      setLeaderboard(normalized)
     } catch (error) {
       console.error("Failed to load leaderboard:", error)
+      setLeaderboard([])
     } finally {
       setLoadingLeaderboard(false)
     }
   }
-
   // NOTE: No periodic polling; leaderboard refresh happens only on:
   // - single-click of a quiz (to view its leaderboard),
   // - finishing a quiz,
@@ -277,7 +300,8 @@ export default function QuizBar({
 
   async function loadQuizDetail(quizId: string) {
     const getFn = httpsCallable(fns, "getOrgQuizDetail")
-    const { data }: any = await getFn({ orgId, quizId })
+    // 🔗 NOTE-SCOPED
+    const { data }: any = await getFn({ orgId, noteId, quizId })
     return data?.quiz as OrgQuizDetail
   }
 
@@ -287,7 +311,8 @@ export default function QuizBar({
     try {
       // start or resume
       const startFn = httpsCallable(fns, "startOrResumeOrgAsyncAttempt")
-      const { data }: any = await startFn({ orgId, quizId, displayName })
+      // 🔗 NOTE-SCOPED
+      const { data }: any = await startFn({ orgId, noteId, quizId, displayName })
 
       // load details
       const quiz = await loadQuizDetail(quizId)
@@ -311,8 +336,10 @@ export default function QuizBar({
     setSubmittingAnswer(true)
     try {
       const submitFn = httpsCallable(fns, "submitOrgAsyncAnswer")
+      // 🔗 NOTE-SCOPED
       const { data }: any = await submitFn({
         orgId,
+        noteId,
         quizId: selectedQuizId,
         optionIdx,
       })
@@ -355,7 +382,8 @@ export default function QuizBar({
       setReviewQuizDetail(detail || null)
 
       const mineFn = httpsCallable(fns, "getMyOrgAsyncAttempt")
-      const { data }: any = await mineFn({ orgId, quizId })
+      // 🔗 NOTE-SCOPED
+      const { data }: any = await mineFn({ orgId, noteId, quizId })
       if (!data?.attempt) {
         setReviewAttempt({
           score: 0,
@@ -444,10 +472,10 @@ export default function QuizBar({
               isCorrect && isChosen
                 ? "bg-black text-white border-black"
                 : isCorrect
-                  ? "bg-gray-100 border-gray-300 text-black"
-                  : isChosen
-                    ? "bg-gray-200 border-gray-400 text-black"
-                    : "bg-white border-gray-200 text-black"
+                ? "bg-gray-100 border-gray-300 text-black"
+                : isChosen
+                ? "bg-gray-200 border-gray-400 text-black"
+                : "bg-white border-gray-200 text-black"
             return (
               <div key={i} className={`rounded-lg border p-3 ${style}`}>
                 <div className="text-sm">
@@ -677,84 +705,68 @@ export default function QuizBar({
                         </div>
                       </div>
                     ) : loadingLeaderboard ? (
+                      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading leaderboard…
+                      </div>
+                    ) : leaderboard.length === 0 ? (
                       <div className="flex items-center justify-center h-full text-muted-foreground">
-                        <div className="text-center">
-                          <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin" />
-                          <p>Loading leaderboard...</p>
-                        </div>
+                        <div className="text-center">No entries yet</div>
                       </div>
                     ) : (
-                      <div className="space-y-2 h-full overflow-y-auto">
-                        {leaderboard.length === 0 ? (
-                          <div className="flex items-center justify-center h-full text-muted-foreground">
-                            <div className="text-center">
-                              <Trophy className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                              <p className="text-xs">No entries yet.</p>
-                            </div>
-                          </div>
-                        ) : (
-                          leaderboard.map((entry, index) => {
-                            // medal colors & shadows by rank
-                            const rowRankShadow =
-                              index === 0
-                                ? "border-[#FFD700] shadow-[0_8px_20px_rgba(255,215,0,0.35)]"
-                                : index === 1
-                                  ? "border-[#C0C0C0] shadow-[0_8px_20px_rgba(192,192,192,0.30)]"
-                                  : index === 2
-                                    ? "border-[#CD7F32] shadow-[0_8px_20px_rgba(205,127,50,0.30)]"
-                                    : "border-gray-200 hover:border-gray-300"
+                      <div className="space-y-2">
+                        {leaderboard.map((entry, index) => {
+                          // medal colors & shadows by rank
+                          const rowRankShadow =
+                            index === 0
+                              ? "border-[#FFD700] shadow-[0_8px_20px_rgba(255,215,0,0.35)]"
+                              : index === 1
+                              ? "border-[#C0C0C0] shadow-[0_8px_20px_rgba(192,192,192,0.30)]"
+                              : index === 2
+                              ? "border-[#CD7F32] shadow-[0_8px_20px_rgba(205,127,50,0.30)]"
+                              : "border-gray-200 hover:border-gray-300"
 
-                            const selfHighlight =
-                              entry.uid === userId
-                                ? "bg-white text-black"
-                                 : "bg-white text-black"
-                            const medalClass =
-                              index === 0
-                                ? "bg-[#FFD700] text-black shadow-[0_6px_18px_rgba(255,215,0,0.6)]"
-                                : index === 1
-                                  ? "bg-[#C0C0C0] text-black shadow-[0_6px_18px_rgba(192,192,192,0.6)]"
-                                  : index === 2
-                                    ? "bg-[#CD7F32] text-black shadow-[0_6px_18px_rgba(205,127,50,0.55)]"
-                                    : "bg-white text-black border-2 border-gray-300"
+                          const selfHighlight = "bg-white text-black"
+                          const medalClass =
+                            index === 0
+                              ? "bg-[#FFD700] text-black shadow-[0_6px_18px_rgba(255,215,0,0.6)]"
+                              : index === 1
+                              ? "bg-[#C0C0C0] text-black shadow-[0_6px_18px_rgba(192,192,192,0.6)]"
+                              : index === 2
+                              ? "bg-[#CD7F32] text-black shadow-[0_6px_18px_rgba(205,127,50,0.55)]"
+                              : "bg-white text-black border-2 border-gray-300"
 
-                            return (
-                              <div
-                                key={entry.uid}
-                                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 ${selfHighlight} ${rowRankShadow}`}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${medalClass}`}
-                                  >
-                                    {index + 1}
-                                  </div>
-                                  <div>
-                                    <div
-                                      className={`text-sm font-semibold text-black`}
-                                    >
-                                      {entry.uid === userId ? "You" : (entry.name || "Member")}
-                                    </div>
-                                    <div
-                                      className={`text-xs flex items-center gap-2 text-gray-500`}
-                                    >
-                                      <span>⏱️ {fmtMs(entry.avgTimeMs)} avg</span>
-                                    </div>
-                                  </div>
+                          return (
+                            <div
+                              key={`${entry.uid ?? "row"}-${index}`}
+                              className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 ${selfHighlight} ${rowRankShadow}`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${medalClass}`}
+                                >
+                                  {index + 1}
                                 </div>
-                                <div className="text-right">
-                                  <div
-                                    className={`text-lg font-bold text-black`}
-                                  >
-                                    {entry.score}
+                                <div>
+                                  <div className="text-sm font-semibold text-black flex items-center gap-2">
+                                    <span>{entry.name || "Member"}</span>
+                                    {entry.uid === userId && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-600">
+                                        you
+                                      </span>
+                                    )}
                                   </div>
-                                  <div className={`text-xs text-gray-500`}>
-                                    /{entry.totalQuestions ?? "?"}
+                                  <div className="text-xs flex items-center gap-2 text-gray-500">
+                                    <span>⏱️ {fmtMs(entry.avgTimeMs)} avg</span>
                                   </div>
                                 </div>
                               </div>
-                            )
-                          })
-                        )}
+                              <div className="text-right">
+                                <div className="text-lg font-bold text-black">{entry.score}</div>
+                                <div className="text-xs text-gray-500">/{entry.totalQuestions ?? "?"}</div>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                   </div>

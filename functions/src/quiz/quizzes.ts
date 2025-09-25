@@ -1,18 +1,21 @@
 // functions/src/quiz/quizzes.ts
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import * as admin from "firebase-admin";
 import { db } from "../firebaseAdmin";
 import { now } from "../quiz/utils/time";
+
 import type {
   CreateQuizInput,
   QuizQuestion,
   Quiz,
   Participant,
-  LeaderboardEntry,
   QuizType, // "org-async" | "personal-async"
 } from "./quiz";
 
-/* -------------------------------- helpers -------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*  Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
 
 async function assertMember(orgId: string | undefined, uid?: string) {
   if (!uid) throw new HttpsError("unauthenticated", "Login required");
@@ -65,54 +68,124 @@ function computeAttemptStats(ans: any[]): { avgTimeMs: number; correctCount: num
   return { avgTimeMs, correctCount };
 }
 
-async function recomputeAndStoreOrgLeaderboard(orgId: string, quizId: string, uidJustFinishedOrUpdated: string) {
-  const quizSnap = await db.ref(`organizations/${orgId}/quizzes/${quizId}`).get();
-  const q = quizSnap.val() as Quiz;
-  const me = q?.participants?.[uidJustFinishedOrUpdated];
+/**
+ * Prefer RTDB profile (UserSettings: name + surname) like the Profile page uses.
+ * Fallback to Firestore users/{uid}, then Firebase Auth.
+ */
+async function resolveProfileDisplayName(uid: string): Promise<string | undefined> {
+  if (!uid) return undefined;
 
-  // If user does not exist in participants (rare), just rebuild from existing rows
-  const ans = me?.answers ? (Object.values(me.answers) as any[]) : [];
-  const { avgTimeMs, correctCount } = computeAttemptStats(ans);
+  // 1) RTDB: users/{uid}/UserSettings
+  try {
+    const s = await db.ref(`users/${uid}/UserSettings`).get();
+    if (s.exists()) {
+      const d = s.val() || {};
+      const first = String(d?.name ?? "").trim();
+      const last = String(d?.surname ?? "").trim();
+      const two = [first, last].filter(Boolean).join(" ").trim();
+      if (two) return two;
+      const display = String(d?.displayName ?? "").trim();
+      if (display) return display;
+    }
+  } catch {
+    /* noop */
+  }
 
-  const row: LeaderboardEntry = {
-    uid: uidJustFinishedOrUpdated,
-    name: me?.displayName ?? uidJustFinishedOrUpdated,
-    score: me?.score ?? 0,
-    correctCount,
-    avgTimeMs,
-  };
+  // 2) Firestore: users/{uid}
+  try {
+    const fsUserDoc = await admin.firestore().collection("users").doc(uid).get();
+    if (fsUserDoc.exists) {
+      const d = (fsUserDoc.data() || {}) as any;
+      const display = String(d?.displayName ?? d?.name ?? "").trim();
+      if (display) return display;
+    }
+  } catch {
+    /* noop */
+  }
 
-  // write/update my row even if unfinished
-  await db
-    .ref(`organizations/${orgId}/orgAsyncResults/${quizId}/${uidJustFinishedOrUpdated}`)
-    .set({
-      ...row,
-      finishedAt: me?.finishedAt ?? null,
-      totalQuestions: Object.values(q?.questions || {}).length,
-    });
-
-  // rebuild leaderboard (top 50)
-  const allResSnap = await db.ref(`organizations/${orgId}/orgAsyncResults/${quizId}`).get();
-  const rows = Object.values(allResSnap.val() || {}) as any[];
-  rows.sort((a: any, b: any) => b.score - a.score || a.avgTimeMs - b.avgTimeMs);
-  await db.ref(`organizations/${orgId}/orgAsyncLeaderboards/${quizId}`).set(rows.slice(0, 50));
-
-  // convenience snapshot on the quiz doc
-  await db.ref(`organizations/${orgId}/quizzes/${quizId}/endSummary`).set({
-    leaderboard: rows.slice(0, 50),
-    // keep finishedAt if the quiz is actually done for a user; otherwise null
-    finishedAt: me?.finished ? me?.finishedAt ?? now() : null,
-  });
+  // 3) Auth
+  try {
+    const u = await admin.auth().getUser(uid);
+    return u.displayName || u.email || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
-/* ------------------------------- CREATE APIs ------------------------------ */
+/**
+ * Recompute RTDB leaderboard from Firestore attempts.
+ * Stored at: organizations/{orgId}/notes/{noteId}/quizzes/{quizId}/leaderboard
+ * Each item includes an explicit `position`.
+ */
+async function recomputeAndStoreOrgLeaderboard(
+  orgId: string,
+  noteId: string,
+  quizId: string,
+  _uidJustFinishedOrUpdated: string
+) {
+  const firestore = admin.firestore();
+
+  // Read canonical attempt docs (one per uid)
+  const attemptsSnap = await firestore
+    .collection(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}/attempts`)
+    .get();
+
+  // Fallback denominator from RTDB quiz questions
+  let totalFromRTDB: number | undefined;
+  try {
+    const qSnap = await db
+      .ref(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}/questions`)
+      .get();
+    if (qSnap.exists()) totalFromRTDB = Object.keys(qSnap.val() || {}).length;
+  } catch {
+    /* noop */
+  }
+
+  const rows: any[] = [];
+
+  for (const doc of attemptsSnap.docs) {
+    const data = doc.data() as any;
+    const uid = String(data.uid);
+
+    let displayName: string | undefined = String(data?.name ?? "").trim() || undefined;
+    if (!displayName) {
+      displayName = await resolveProfileDisplayName(uid);
+    }
+
+    rows.push({
+      uid,
+      name: displayName || uid,
+      score: data.score ?? 0,
+      correctCount: data.correctCount ?? 0,
+      avgTimeMs: data.avgTimeMs ?? 0,
+      totalQuestions: data.totalQuestions ?? totalFromRTDB ?? null,
+      finishedAt: data.finishedAt ?? null,
+    });
+  }
+
+  // Sort: score desc, then avg time asc
+  rows.sort((a, b) => b.score - a.score || (a.avgTimeMs ?? 0) - (b.avgTimeMs ?? 0));
+
+  // Annotate explicit positions (1-based)
+  const itemsWithPosition = rows.map((r, i) => ({ position: i + 1, ...r }));
+
+  await db
+    .ref(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}/leaderboard`)
+    .set({
+      items: itemsWithPosition,
+      updatedAt: Date.now(),
+    });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  CREATE APIs                                                                */
+/* -------------------------------------------------------------------------- */
 
 /**
  * Create an ORG anytime quiz from an org note.
- * Client MUST provide `questions` (already generated by LLM on the client).
- * Writes (under org):
- * - organizations/{orgId}/quizzes/{quizId}
- * - organizations/{orgId}/orgAsyncQuizzes/{noteId}/{quizId}
+ * Writes under note scope:
+ * - organizations/{orgId}/notes/{noteId}/quizzes/{quizId}
+ * - organizations/{orgId}/notes/{noteId}/quizzesIndex/{quizId}
  */
 export const createOrgAsyncQuiz = onCall(async (req) => {
   const uid = req.auth?.uid as string | undefined;
@@ -124,11 +197,11 @@ export const createOrgAsyncQuiz = onCall(async (req) => {
   if (!Array.isArray(questions) || questions.length === 0)
     throw new HttpsError("invalid-argument", "questions are required (generate on client first)");
 
-  // Ensure note exists (but we do not parse/sanitize here)
+  // Ensure note exists
   const noteSnap = await db.ref(`organizations/${orgId}/notes/${noteId}`).get();
   if (!noteSnap.exists()) throw new HttpsError("not-found", "Note not found");
 
-  const quizId = db.ref(`organizations/${orgId}/quizzes`).push().key!;
+  const quizId = db.ref(`organizations/${orgId}/notes/${noteId}/quizzes`).push().key!;
   const finalQuestions = normalizeQuestions(questions);
 
   const quiz: Quiz = {
@@ -148,9 +221,8 @@ export const createOrgAsyncQuiz = onCall(async (req) => {
     participants: {},
   };
 
-  const updates: Record<string, any> = {};
-  updates[`organizations/${orgId}/quizzes/${quizId}`] = quiz;
-  updates[`organizations/${orgId}/orgAsyncQuizzes/${noteId}/${quizId}`] = {
+  const base = `organizations/${orgId}/notes/${noteId}`;
+  const indexEntry = {
     id: quizId,
     title: "Anytime Quiz",
     numQuestions: finalQuestions.length,
@@ -158,14 +230,17 @@ export const createOrgAsyncQuiz = onCall(async (req) => {
     createdAt: quiz.createdAt,
   };
 
+  const updates: Record<string, any> = {};
+  updates[`${base}/quizzes/${quizId}`] = quiz;
+  updates[`${base}/quizzesIndex/${quizId}`] = indexEntry;
+
   await db.ref().update(updates);
   return { quizId, type: "org-async" as QuizType };
 });
 
 /**
  * Create a SELF (personal-async) quiz from an org or personal note.
- * Client MUST provide `questions` (already generated by LLM on the client).
- * Writes (under user):
+ * Writes under user:
  * - users/{uid}/quizzes/{quizId}
  * - userAsyncQuizzes/{uid}/{noteId}/{quizId}
  */
@@ -188,7 +263,7 @@ export const createSelfAsyncQuiz = onCall(async (req) => {
     notePath = `users/${uid}/notes/${noteId}`;
   }
 
-  // Ensure note exists (but we do not parse/sanitize here)
+  // Ensure note exists
   const noteSnap = await db.ref(notePath).get();
   if (!noteSnap.exists()) throw new HttpsError("not-found", "Note not found");
 
@@ -225,17 +300,20 @@ export const createSelfAsyncQuiz = onCall(async (req) => {
   return { quizId, type: "personal-async" as QuizType };
 });
 
-/* ---------------------------------- LIST --------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*  LIST                                                                       */
+/* -------------------------------------------------------------------------- */
 
 export const listOrgAsyncQuizzes = onCall(async (req) => {
   const uid = req.auth?.uid as string | undefined;
   const { orgId, noteId } = req.data as { orgId: string; noteId: string };
   await assertMember(orgId, uid);
 
-  const snap = await db.ref(`organizations/${orgId}/orgAsyncQuizzes/${noteId}`).get();
+  // lightweight index per note
+  const snap = await db.ref(`organizations/${orgId}/notes/${noteId}/quizzesIndex`).get();
   const val = snap.val() || {};
   const items = Object.values(val);
-  items.sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  (items as any[]).sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
   return { items };
 });
 
@@ -247,32 +325,37 @@ export const listPersonalAsyncQuizzes = onCall(async (req) => {
   const snap = await db.ref(`userAsyncQuizzes/${uid}/${noteId}`).get();
   const val = snap.val() || {};
   const items = Object.values(val);
-  items.sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  (items as any[]).sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
   return { items };
 });
 
-/* ------------------------------ ORG-ASYNC -------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*  ORG-ASYNC ATTEMPTS                                                         */
+/* -------------------------------------------------------------------------- */
 
 export const startOrResumeOrgAsyncAttempt = onCall(async (req) => {
   const uid = req.auth?.uid as string | undefined;
-  const { orgId, quizId, displayName } = req.data as {
+  const { orgId, noteId, quizId, displayName } = req.data as {
     orgId: string;
+    noteId: string;
     quizId: string;
-    displayName: string;
+    displayName?: string; // optional; we'll resolve if absent
   };
   await assertMember(orgId, uid);
 
-  const path = `organizations/${orgId}/quizzes/${quizId}`;
+  const path = `organizations/${orgId}/notes/${noteId}/quizzes/${quizId}`;
   const snap = await db.ref(path).get();
   if (!snap.exists()) throw new HttpsError("not-found", "Quiz not found");
   const quiz = snap.val() as Quiz;
   if (quiz.type !== "org-async") throw new HttpsError("failed-precondition", "Not an Anytime (org) quiz");
 
+  const resolvedName = displayName?.trim() || (await resolveProfileDisplayName(uid!)) || uid!;
+
   await db.ref(`${path}/participants/${uid}`).transaction((p: any) => {
     if (!p) {
       const init: Partial<Participant> = {
         joinedAt: now(),
-        displayName,
+        displayName: resolvedName,
         connected: true,
         score: 0,
         currentIndex: 0,
@@ -280,7 +363,7 @@ export const startOrResumeOrgAsyncAttempt = onCall(async (req) => {
       };
       return init;
     }
-    if (!p.displayName) p.displayName = displayName;
+    if (!p.displayName) p.displayName = resolvedName;
     if (p.connected === false) p.connected = true;
     if (typeof p.questionStartAt !== "number") p.questionStartAt = now();
     return p;
@@ -293,74 +376,132 @@ export const startOrResumeOrgAsyncAttempt = onCall(async (req) => {
 
 export const submitOrgAsyncAnswer = onCall(async (req) => {
   const uid = req.auth?.uid as string | undefined;
-  const { orgId, quizId, optionIdx } = req.data as {
+  const { orgId, noteId, quizId, optionIdx } = req.data as {
     orgId: string;
+    noteId: string;
     quizId: string;
     optionIdx: number;
   };
   await assertMember(orgId, uid);
 
-  const quizPath = `organizations/${orgId}/quizzes/${quizId}`;
+  const quizPath = `organizations/${orgId}/notes/${noteId}/quizzes/${quizId}`;
   let finishedNow = false;
 
-  await db.ref(quizPath).transaction((q: any) => {
-    if (!q || q.type !== "org-async" || q.state !== "active") return q;
+  try {
+    await db.ref(quizPath).transaction((q: any) => {
+      if (!q || q.type !== "org-async" || q.state !== "active") return q;
+      if (!q.participants || typeof q.participants !== "object") return q;
 
-    const user = q.participants?.[uid!];
-    if (!user || user.finished) return q;
+      const user = q.participants?.[uid!];
+      if (!user || user.finished) return q;
 
-    const idx = typeof user.currentIndex === "number" ? user.currentIndex : 0;
-    const qArr = Object.values(q.questions || {}) as QuizQuestion[];
-    qArr.sort((a: any, b: any) => Number(a.id) - Number(b.id));
+      const idx = typeof user.currentIndex === "number" ? user.currentIndex : 0;
+      const qArr = Object.values(q.questions || {}) as QuizQuestion[];
+      qArr.sort((a: any, b: any) => Number(a.id) - Number(b.id));
 
-    const question = qArr[idx];
-    if (!question) return q;
+      const question = qArr[idx];
+      if (!question) return q;
 
-    const nowTs = now();
-    const elapsed = typeof user.questionStartAt === "number" ? nowTs - user.questionStartAt : 0;
-    const correct = optionIdx === question.correctIndex;
+      const nowTs = now();
+      const elapsed = typeof user.questionStartAt === "number" ? nowTs - user.questionStartAt : 0;
+      const correct = optionIdx === question.correctIndex;
 
-    if (!q.participants[uid!].answers) q.participants[uid!].answers = {};
-    q.participants[uid!].answers[idx] = { optionIdx, timeMs: elapsed, correct };
+      if (!q.participants[uid!]) q.participants[uid!] = {};
+      if (!q.participants[uid!].answers) q.participants[uid!].answers = {};
+      q.participants[uid!].answers[idx] = { optionIdx, timeMs: elapsed, correct };
 
-    if (correct) q.participants[uid!].score = (q.participants[uid!].score || 0) + 1;
+      if (correct) q.participants[uid!].score = (q.participants[uid!].score || 0) + 1;
 
-    if (idx + 1 >= qArr.length) {
-      q.participants[uid!].finished = true;
-      q.participants[uid!].finishedAt = nowTs;
-      delete q.participants[uid!].questionStartAt;
-      finishedNow = true;
-    } else {
-      q.participants[uid!].currentIndex = idx + 1;
-      q.participants[uid!].questionStartAt = nowTs;
+      if (idx + 1 >= qArr.length) {
+        q.participants[uid!].finished = true;
+        q.participants[uid!].finishedAt = nowTs;
+        delete q.participants[uid!].questionStartAt;
+        finishedNow = true;
+      } else {
+        q.participants[uid!].currentIndex = idx + 1;
+        q.participants[uid!].questionStartAt = nowTs;
+      }
+
+      return q;
+    });
+  } catch (err) {
+    console.error("submitOrgAsyncAnswer transaction failed:", err);
+    throw new HttpsError("internal", "Could not submit answer. See logs.");
+  }
+
+  if (finishedNow) {
+    try {
+      // resolve proper name and backfill participant.displayName
+      const bestName = (await resolveProfileDisplayName(uid!)) || uid!;
+      try {
+        await db.ref(`${quizPath}/participants/${uid}/displayName`).set(bestName);
+      } catch {
+        /* ignore */
+      }
+
+      // Compute stats from answers
+      const partSnap = await db.ref(`${quizPath}/participants/${uid}`).get();
+      const p = partSnap.exists() ? (partSnap.val() as any) : null;
+      const answersArr = p?.answers ? (Object.values(p.answers) as any[]) : [];
+      const { avgTimeMs, correctCount } = computeAttemptStats(answersArr);
+
+      // Derive total questions
+      const quizSnap = await db.ref(quizPath).get();
+      const qVal = quizSnap.exists() ? (quizSnap.val() as any) : null;
+      const totalQuestions = qVal?.questions ? Object.keys(qVal.questions).length : undefined;
+
+      // Write/update attempt doc (one per uid) under new Firestore path
+      await admin
+        .firestore()
+        .collection(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}/attempts`)
+        .doc(uid!)
+        .set({
+          uid,
+          name: bestName,
+          score: p?.score ?? 0,
+          correctCount,
+          avgTimeMs,
+          finishedAt: now(),
+          totalQuestions: totalQuestions ?? null,
+        });
+    } catch (err) {
+      console.error("Failed to persist attempt doc:", err);
     }
+  }
 
-    return q;
-  });
-
-  // 🔁 Update leaderboard for both partial and finished states
-  await recomputeAndStoreOrgLeaderboard(orgId, quizId, uid!);
+  try {
+    await recomputeAndStoreOrgLeaderboard(orgId, noteId, quizId, uid!);
+  } catch (err) {
+    console.error("recomputeAndStoreOrgLeaderboard failed", err);
+  }
 
   return { ok: true, finishedNow };
 });
 
 export const getOrgAsyncLeaderboard = onCall(async (req) => {
   const uid = req.auth?.uid as string | undefined;
-  const { orgId, quizId } = req.data as { orgId: string; quizId: string };
+  const { orgId, noteId, quizId } = req.data as { orgId: string; noteId: string; quizId: string };
   await assertMember(orgId, uid);
 
-  const snap = await db.ref(`organizations/${orgId}/orgAsyncLeaderboards/${quizId}`).get();
-  const items = (snap.val() as any[]) || [];
-  return { items };
+  const snap = await db
+    .ref(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}/leaderboard`)
+    .get();
+
+  const val = snap.val() || {};
+  const items = Array.isArray(val.items) ? val.items : Object.values(val.items || {});
+  return { items, updatedAt: val.updatedAt ?? null };
 });
 
 /** Get my detailed attempt for a given org quiz (for review) */
 export const getMyOrgAsyncAttempt = onCall(async (req) => {
   const uid = req.auth?.uid as string | undefined;
-  const { orgId, quizId } = req.data as { orgId: string; quizId: string };
+  const { orgId, noteId, quizId } = req.data as { orgId: string; noteId: string; quizId: string };
   await assertMember(orgId, uid);
 
-  const pSnap = await db.ref(`organizations/${orgId}/quizzes/${quizId}/participants/${uid}`).get();
+  const pSnap = await db
+    .ref(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}/participants/${uid}`)
+    .get();
+
   if (!pSnap.exists()) return { attempt: null };
 
   const p = pSnap.val();
@@ -369,7 +510,7 @@ export const getMyOrgAsyncAttempt = onCall(async (req) => {
   return {
     attempt: {
       uid,
-      displayName: p?.displayName ?? uid,
+      displayName: p?.displayName ?? (await resolveProfileDisplayName(uid!)) ?? uid,
       score: p?.score ?? 0,
       finished: !!p?.finished,
       finishedAt: p?.finishedAt ?? null,
@@ -385,13 +526,15 @@ export const listMyOrgAsyncAttempts = onCall(async (req) => {
   const { orgId, noteId } = req.data as { orgId: string; noteId: string };
   await assertMember(orgId, uid);
 
-  const idxSnap = await db.ref(`organizations/${orgId}/orgAsyncQuizzes/${noteId}`).get();
+  const idxSnap = await db.ref(`organizations/${orgId}/notes/${noteId}/quizzesIndex`).get();
   const idx = idxSnap.val() || {};
   const quizIds: string[] = Object.keys(idx);
 
   const attempts: any[] = [];
   for (const qid of quizIds) {
-    const pSnap = await db.ref(`organizations/${orgId}/quizzes/${qid}/participants/${uid}`).get();
+    const pSnap = await db
+      .ref(`organizations/${orgId}/notes/${noteId}/quizzes/${qid}/participants/${uid}`)
+      .get();
     if (pSnap.exists()) {
       const p = pSnap.val();
       attempts.push({
@@ -406,7 +549,9 @@ export const listMyOrgAsyncAttempts = onCall(async (req) => {
   return { attempts };
 });
 
-/* --------------------------- PERSONAL-ASYNC APIs -------------------------- */
+/* -------------------------------------------------------------------------- */
+/*  PERSONAL-ASYNC ATTEMPTS                                                   */
+/* -------------------------------------------------------------------------- */
 
 export const startOrResumePersonalAsyncAttempt = onCall(async (req) => {
   const uid = req.auth?.uid as string | undefined;
@@ -414,7 +559,7 @@ export const startOrResumePersonalAsyncAttempt = onCall(async (req) => {
 
   const { quizId } = req.data as { quizId: string };
   const path = `users/${uid}/quizzes/${quizId}`;
-  const snap = await db.ref(path).get(); // (minor) was db.ref(path)
+  const snap = await db.ref(path).get();
   if (!snap.exists()) throw new HttpsError("not-found", "Quiz not found");
 
   const quiz = snap.val() as Quiz;
@@ -428,9 +573,11 @@ export const startOrResumePersonalAsyncAttempt = onCall(async (req) => {
         connected: true,
         score: 0,
         currentIndex: 0,
+        questionStartAt: now(),
       };
     }
     if (p.connected === false) p.connected = true;
+    if (typeof p.questionStartAt !== "number") p.questionStartAt = now();
     return p;
   });
 
@@ -486,14 +633,17 @@ export const submitPersonalAsyncAnswer = onCall(async (req) => {
   return { ok: true, finishedNow };
 });
 
-/* ------------------------------ EXTRA: detail ----------------------------- */
+/* -------------------------------------------------------------------------- */
+/*  QUIZ DETAIL                                                                */
+/* -------------------------------------------------------------------------- */
+
 /** Minimal quiz detail (with questions) for client attempt/review UIs */
 export const getOrgQuizDetail = onCall(async (req) => {
   const uid = req.auth?.uid as string | undefined;
-  const { orgId, quizId } = req.data as { orgId: string; quizId: string };
+  const { orgId, noteId, quizId } = req.data as { orgId: string; noteId: string; quizId: string };
   await assertMember(orgId, uid);
 
-  const snap = await db.ref(`organizations/${orgId}/quizzes/${quizId}`).get();
+  const snap = await db.ref(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}`).get();
   if (!snap.exists()) throw new HttpsError("not-found", "Quiz not found");
   const q = snap.val() as Quiz;
   if (q.type !== "org-async") throw new HttpsError("failed-precondition", "Not an org-async quiz");

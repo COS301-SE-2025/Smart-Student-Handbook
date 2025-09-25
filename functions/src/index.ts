@@ -6,3 +6,5 @@ export * from "./organizations";
 export * from "./orgFlashcards";  
 export * from "./orgSummaries";  
 export *from "./quiz/quizzes";
+export * from "./orgnotes"
+export * from  "./friends"
