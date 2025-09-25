@@ -1,12 +1,8 @@
-/* -------------------------------------------------------------------------- */
-/*          Organisation Details Page – activity tab removed (DYNAMIC)       */
-/* -------------------------------------------------------------------------- */
-
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { httpsCallableFromURL } from "firebase/functions"
+import { httpsCallable } from "firebase/functions"   // ⬅️ use SDK callable
 import { fns } from "@/lib/firebase"
 import {
   getDatabase,
@@ -81,11 +77,11 @@ interface Note {
 interface OrgActivity {
   id: string
   type:
-  | "member_joined"
-  | "member_left"
-  | "note_created"
-  | "note_updated"
-  | "org_updated"
+    | "member_joined"
+    | "member_left"
+    | "note_created"
+    | "note_updated"
+    | "org_updated"
   description: string
   user: string
   timestamp: number
@@ -147,91 +143,61 @@ export default function OrganizationDetailsPage() {
   const db = getDatabase()
 
   /* ---------------------------------------------------------------------- */
-  /*                              Callables                                 */
+  /*                              Callables (SDK)                           */
   /* ---------------------------------------------------------------------- */
   const getOrganizationDetails = useMemo(
     () =>
-      httpsCallableFromURL<{ orgId: string }, OrganizationDetails>(
+      httpsCallable<{ orgId: string }, OrganizationDetails>(
         fns,
-        "https://getorganizationdetails-omrwo3ykaa-uc.a.run.app",
+        "getOrganizationDetails"
       ),
-    [],
+    []
   )
 
-  const handleAddNote = async () => {
-    try {
-      setCreatingNote(true)
-
-      const notesRef = ref(db, `organizations/${orgId}/notes`)
-      const newNoteRef = push(notesRef)
-      const noteId = newNoteRef.key!
-
-      const newNote: Note = {
-        id: noteId,
-        title: "Untitled Note",
-        content: "",
-        author: "Anonymous",
-        ownerId: orgId,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }
-
-      await set(newNoteRef, newNote)
-
-    } catch (err) {
-      console.error("Error adding note:", err)
-    } finally {
-      setCreatingNote(false)
-    }
-  }
-
-  const updateOrganization = useMemo(
+  const updateOrganizationFn = useMemo(
     () =>
-      httpsCallableFromURL<
+      httpsCallable<
         { orgId: string; organization: Partial<{ name: string; description: string; isPrivate: boolean }> },
         OrganizationDetails
-      >(fns, "https://updateorganization-omrwo3ykaa-uc.a.run.app"),
-    [],
+      >(fns, "updateOrganization"),
+    []
   )
+
   const joinOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(
-        fns,
-        "https://joinorganization-omrwo3ykaa-uc.a.run.app",
-      ),
-    [],
+    () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "joinOrganization"),
+    []
   )
+
   const leaveOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(
-        fns,
-        "https://leaveorganization-omrwo3ykaa-uc.a.run.app",
-      ),
-    [],
+    () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "leaveOrganization"),
+    []
   )
+
   const removeMemberFn = useMemo(
     () =>
-      httpsCallableFromURL<
-        { orgId: string; userId: string },
-        { success: boolean }
-      >(fns, "https://removemember-omrwo3ykaa-uc.a.run.app"),
-    [],
+      httpsCallable<{ orgId: string; userId: string }, { success: boolean }>(
+        fns,
+        "removeMember"
+      ),
+    []
   )
+
   const addMemberFn = useMemo(
     () =>
-      httpsCallableFromURL<
-        { orgId: string; userId: string },
-        { success: boolean }
-      >(fns, "https://addmember-omrwo3ykaa-uc.a.run.app"),
-    [],
-  )
-  const deleteOrganization = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, { success: boolean }>(
+      httpsCallable<{ orgId: string; userId: string }, { success: boolean }>(
         fns,
-        "https://deleteorganization-omrwo3ykaa-uc.a.run.app",
+        "addMember"
       ),
-    [],
+    []
+  )
+
+  const deleteOrganizationFn = useMemo(
+    () =>
+      httpsCallable<{ orgId: string }, { success: boolean }>(
+        fns,
+        "deleteOrganization"
+      ),
+    []
   )
 
   /* ---------------------------------------------------------------------- */
@@ -394,6 +360,32 @@ export default function OrganizationDetailsPage() {
   /* ---------------------------------------------------------------------- */
   /*                             Other helpers                              */
   /* ---------------------------------------------------------------------- */
+  const handleAddNote = async () => {
+    try {
+      setCreatingNote(true)
+
+      const notesRef = ref(db, `organizations/${orgId}/notes`)
+      const newNoteRef = push(notesRef)
+      const noteId = newNoteRef.key!
+
+      const newNote: Note = {
+        id: noteId,
+        title: "Untitled Note",
+        content: "",
+        author: "Anonymous",
+        ownerId: orgId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }
+
+      await set(newNoteRef, newNote)
+    } catch (err) {
+      console.error("Error adding note:", err)
+    } finally {
+      setCreatingNote(false)
+    }
+  }
+
   const handleToggleFavorite = async () => {
     if (!userId || !organization) return
     const next = !isFavorite
@@ -411,7 +403,7 @@ export default function OrganizationDetailsPage() {
     if (!organization || !isAdmin || savingEdit) return
     setSavingEdit(true)
     try {
-      const { data } = await updateOrganization({
+      const { data } = await updateOrganizationFn({
         orgId,
         organization: {
           name: editName.trim(),
@@ -507,7 +499,7 @@ export default function OrganizationDetailsPage() {
     if (!confirmed) return
     setDeletingOrg(true)
     try {
-      await deleteOrganization({ orgId })
+      await deleteOrganizationFn({ orgId })
       toast.success("Organisation deleted.")
       router.push("/organisations")
     } catch (e: any) {
@@ -676,7 +668,7 @@ export default function OrganizationDetailsPage() {
                 </div>
               </div>
 
-              {/* Right-side actions: consistent sizes + alignment */}
+              {/* Right-side actions */}
               <div className="flex flex-col gap-2 min-w-[240px]">
                 {!isMember && !organization.isPrivate && (
                   <Button size="lg" onClick={handleJoin} disabled={isJoining} className="w-full">
@@ -710,7 +702,6 @@ export default function OrganizationDetailsPage() {
                   </Button>
                 )}
 
-                {/* Make favorite toggle match sizing + alignment */}
                 <Button size="lg" variant="outline" onClick={handleToggleFavorite} className="w-full">
                   <Heart className={`h-5 w-5 mr-2 ${isFavorite ? "fill-red-500 text-red-500" : ""}`} />
                   {isFavorite ? "Remove Favorite" : "Add Favorite"}

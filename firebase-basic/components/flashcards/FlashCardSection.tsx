@@ -1,4 +1,3 @@
-// components/flashcards/FlashCardSection.tsx
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
@@ -45,7 +44,11 @@ type FlashCardSectionProps = {
 
 /* ----------------------------- Parse helpers ----------------------------- */
 const tidy = (s: string) =>
-  s.replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\s+/g, " ").trim()
+  s
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\s+/g, " ")
+    .trim()
 const normalizeQ = (s: string) => tidy(s).toLowerCase()
 const stripFences = (s: string) => s.trim().replace(/^```[\w-]*\s*|\s*```$/g, "")
 
@@ -53,32 +56,39 @@ function tryJson(text: string) {
   try {
     const cleaned = stripFences(text)
     const obj = JSON.parse(cleaned)
-    const arr =
-      Array.isArray(obj)
-        ? obj
-        : Array.isArray((obj as any).cards)
-          ? (obj as any).cards
-          : Array.isArray((obj as any).flashcards)
-            ? (obj as any).flashcards
-            : null
+    const arr = Array.isArray(obj)
+      ? obj
+      : Array.isArray((obj as any).cards)
+        ? (obj as any).cards
+        : Array.isArray((obj as any).flashcards)
+          ? (obj as any).flashcards
+          : null
     if (!arr) return null
     const out: Array<{ front: string; back: string }> = []
     for (const item of arr) {
-      let front = "", back = ""
+      let front = "",
+        back = ""
       if (typeof item === "string") {
         const m = item.match(/^(.*?)\s*::\s*(.+)$/)
-        if (m) { front = m[1]; back = m[2] }
+        if (m) {
+          front = m[1]
+          back = m[2]
+        }
       } else if (Array.isArray(item) && item.length >= 2) {
-        front = String(item[0]); back = String(item[1])
+        front = String(item[0])
+        back = String(item[1])
       } else if (typeof item === "object" && item) {
         front = (item as any).front ?? (item as any).question ?? (item as any).q ?? ""
         back = (item as any).back ?? (item as any).answer ?? (item as any).a ?? ""
       }
-      front = tidy(front); back = tidy(back)
+      front = tidy(front)
+      back = tidy(back)
       if (front && back) out.push({ front, back })
     }
     return out.length ? out : null
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 function tryQARegex(text: string) {
@@ -86,19 +96,24 @@ function tryQARegex(text: string) {
   const re = /^Q\s*[:\-–]\s*(.*?)\nA\s*[:\-–]\s*([\s\S]*?)(?=\nQ\s*[:\-–]|$)/gim
   const out: Array<{ front: string; back: string }> = []
   for (const m of t.matchAll(re)) {
-    const front = tidy(m[1]), back = tidy(m[2])
+    const front = tidy(m[1]),
+      back = tidy(m[2])
     if (front && back) out.push({ front, back })
   }
   return out.length ? out : null
 }
 
 function tryLinePairs(text: string) {
-  const lines = stripFences(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  const lines = stripFences(text)
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
   const out: Array<{ front: string; back: string }> = []
   for (const line of lines) {
     const m = line.match(/^(.*?)\s*(?:::|->|—|-{1,2}>)\s*(.+)$/)
     if (m) {
-      const front = tidy(m[1]), back = tidy(m[2])
+      const front = tidy(m[1]),
+        back = tidy(m[2])
       if (front && back) out.push({ front, back })
     }
   }
@@ -106,24 +121,30 @@ function tryLinePairs(text: string) {
 }
 
 function tryAdjacentPairs(text: string) {
-  const lines = stripFences(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  const lines = stripFences(text)
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
   if (lines.length < 2) return null
   const out: Array<{ front: string; back: string }> = []
   for (let i = 0; i < lines.length - 1; i += 2) {
-    const front = tidy(lines[i]), back = tidy(lines[i + 1])
+    const front = tidy(lines[i]),
+      back = tidy(lines[i + 1])
     if (front && back) out.push({ front, back })
   }
   return out.length ? out : null
 }
 
 function parseFlashcards(raw: string) {
-  const candidates =
-    tryJson(raw) ?? tryQARegex(raw) ?? tryLinePairs(raw) ?? tryAdjacentPairs(raw) ?? []
+  const candidates = tryJson(raw) ?? tryQARegex(raw) ?? tryLinePairs(raw) ?? tryAdjacentPairs(raw) ?? []
   const seen = new Set<string>()
   const deduped: Array<{ front: string; back: string }> = []
   for (const c of candidates) {
     const key = normalizeQ(c.front)
-    if (key && !seen.has(key)) { seen.add(key); deduped.push(c) }
+    if (key && !seen.has(key)) {
+      seen.add(key)
+      deduped.push(c)
+    }
   }
   return deduped
 }
@@ -200,7 +221,7 @@ export default function FlashCardSection({
           const res: any = await callLoadUserPack({ userId, noteId })
           const cards = (res?.data?.cards ?? []) as Array<{ number: number; question: string; answer: string }>
           if (!cancelled) {
-            const mapped: FlashCardUI[] = cards.map(c => ({
+            const mapped: FlashCardUI[] = cards.map((c) => ({
               number: c.number,
               front: tidy(c.question),
               back: tidy(c.answer),
@@ -214,7 +235,7 @@ export default function FlashCardSection({
           const res: any = await callLoadOrgPack({ orgId, noteId })
           const cards = (res?.data?.cards ?? []) as Array<{ number: number; question: string; answer: string }>
           if (!cancelled) {
-            const mapped: FlashCardUI[] = cards.map(c => ({
+            const mapped: FlashCardUI[] = cards.map((c) => ({
               number: c.number,
               front: tidy(c.question),
               back: tidy(c.answer),
@@ -237,7 +258,9 @@ export default function FlashCardSection({
     }
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [useUserScope, userId, orgId, noteId])
 
   /* -------------------- Generate + SAVE pack (replace) -------------------- */
@@ -261,7 +284,7 @@ export default function FlashCardSection({
       setCurrentCardIndex(0)
 
       // Persist pack (replace)
-      const cardsForSave = mapped.map(m => ({ question: m.front, answer: m.back }))
+      const cardsForSave = mapped.map((m) => ({ question: m.front, answer: m.back }))
 
       try {
         if (useUserScope) {
@@ -317,27 +340,28 @@ export default function FlashCardSection({
     // (Optional) Persist delete by re-saving pack here if you want live deletes saved.
   }
 
-  const toggleFlip = () => setIsFlipped(f => !f)
+  const toggleFlip = () => setIsFlipped((f) => !f)
   const nextCard = () => {
     if (currentCardIndex < flashCards.length - 1) {
-      setCurrentCardIndex(i => i + 1)
+      setCurrentCardIndex((i) => i + 1)
       setIsFlipped(false)
     }
   }
   const prevCard = () => {
     if (currentCardIndex > 0) {
-      setCurrentCardIndex(i => i - 1)
+      setCurrentCardIndex((i) => i - 1)
       setIsFlipped(false)
     }
   }
 
-  const toggleExpanded = () => setIsExpanded(e => !e)
+  const toggleExpanded = () => setIsExpanded((e) => !e)
   const currentCard = flashCards[currentCardIndex]
 
   return (
     <>
       {/* Modal via portal */}
-      {isExpanded && isClient &&
+      {isExpanded &&
+        isClient &&
         createPortal(
           <div
             className="fixed inset-0 z-[10000] bg-black/35 backdrop-blur-[6px] flex items-center justify-center p-4"
@@ -462,8 +486,8 @@ export default function FlashCardSection({
                                 </div>
                                 <Button
                                   onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteCurrentCard();
+                                    e.stopPropagation()
+                                    deleteCurrentCard()
                                   }}
                                   variant="ghost"
                                   size="sm"
@@ -481,7 +505,6 @@ export default function FlashCardSection({
                               </div>
                             </CardContent>
                           </Card>
-
                         </div>
                       </div>
 
@@ -500,9 +523,8 @@ export default function FlashCardSection({
               </Card>
             </div>
           </div>,
-          document.body
-        )
-      }
+          document.body,
+        )}
 
       {/* Inline card view */}
       {!isExpanded && (
@@ -617,14 +639,12 @@ export default function FlashCardSection({
                       <CardContent className="h-full min-h-0 flex flex-col relative p-4 pt-14">
                         <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
                           <div className="inline-flex items-center justify-center px-3 py-1 rounded-lg bg-white border-2 border-black">
-                            <span className="font-semibold text-sm uppercase tracking-wide text-black">
-                              answer
-                            </span>
+                            <span className="font-semibold text-sm uppercase tracking-wide text-black">answer</span>
                           </div>
                           <Button
                             onClick={(e) => {
-                              e.stopPropagation();
-                              deleteCurrentCard();
+                              e.stopPropagation()
+                              deleteCurrentCard()
                             }}
                             variant="ghost"
                             size="sm"
@@ -643,7 +663,6 @@ export default function FlashCardSection({
                         </div>
                       </CardContent>
                     </Card>
-
                   </div>
                 </div>
 

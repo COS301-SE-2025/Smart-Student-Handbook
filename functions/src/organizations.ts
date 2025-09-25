@@ -1,4 +1,3 @@
-// functions/src/organizations.ts
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https'
 import { db } from './firebaseAdmin'
 
@@ -34,6 +33,92 @@ async function loadOrg(orgId: string): Promise<Org> {
   }
   return snap.val() as Org
 }
+
+/* -------------------------------------------------------------------------- */
+/*                     getOrganizationDetails (added)                         */
+/* -------------------------------------------------------------------------- */
+export const getOrganizationDetails = onCall(
+  async (req: CallableRequest<{ orgId: string }>) => {
+    const orgId = req.data?.orgId
+    if (!orgId) throw new HttpsError('invalid-argument', 'Missing orgId')
+
+    const org = await loadOrg(orgId)
+
+    const members = org.members || {}
+    const memberIds = Object.keys(members)
+
+    const memberDetails = await Promise.all(
+      memberIds.map(async (uid) => {
+        try {
+          const snap = await db.ref(`users/${uid}/UserSettings`).get()
+          const us = snap.val() || {}
+          const name =
+            us?.name ? `${us.name}${us.surname ? " " + us.surname : ""}` : `User ${uid.slice(0, 6)}`
+          const email = us?.email ?? ""
+          return {
+            id: uid,
+            name,
+            email,
+            role: members[uid] as 'Admin' | 'Member',
+            joinedAt: us?.createdAt ?? org.createdAt,
+          }
+        } catch {
+          return {
+            id: uid,
+            name: `User ${uid.slice(0, 6)}`,
+            email: "",
+            role: members[uid] as 'Admin' | 'Member',
+            joinedAt: org.createdAt,
+          }
+        }
+      })
+    )
+
+    return {
+      id: org.id,
+      ownerId: org.ownerId,
+      name: org.name,
+      description: org.description,
+      isPrivate: org.isPrivate,
+      image: org.image,
+      members: org.members,
+      createdAt: org.createdAt,
+      memberDetails,
+      activities: [], // populate if you track activity logs
+      notes: [],      // notes are read live from RTDB on the client
+    }
+  }
+)
+
+/* -------------------------------------------------------------------------- */
+/*                     updateOrganization (added)                             */
+/* -------------------------------------------------------------------------- */
+export const updateOrganization = onCall(
+  async (req: CallableRequest<{ orgId: string; organization: Partial<{ name: string; description: string; isPrivate: boolean }> }>) => {
+    const uid = req.auth?.uid
+    const { orgId, organization } = req.data || ({} as any)
+
+    if (!uid) throw new HttpsError('unauthenticated', 'Login required')
+    if (!orgId) throw new HttpsError('invalid-argument', 'Missing orgId')
+
+    const org = await loadOrg(orgId)
+    if (org.ownerId !== uid && org.members?.[uid] !== 'Admin') {
+      throw new HttpsError('permission-denied', 'Admin only')
+    }
+
+    const updates: Record<string, any> = {}
+    if (typeof organization?.name === 'string') updates.name = organization.name.trim()
+    if (typeof organization?.description === 'string') updates.description = organization.description.trim()
+    if (typeof organization?.isPrivate === 'boolean') updates.isPrivate = organization.isPrivate
+
+    if (Object.keys(updates).length) {
+      await db.ref(`organizations/${orgId}`).update(updates)
+    }
+
+    const updated = { ...org, ...updates }
+    return updated
+  }
+)
 
 /* -------------------------------------------------------------------------- */
 /*                               create org (1)                               */
