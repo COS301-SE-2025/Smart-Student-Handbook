@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trash2, ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2 } from "lucide-react"
+import { Trash2, ChevronLeft, ChevronRight, Loader2, Maximize2, X } from "lucide-react"
 import { generateFlashcards } from "@/lib/gemini"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
@@ -395,16 +395,16 @@ export default function FlashCardSection({
                       className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
                       aria-label="Close modal"
                     >
-                      <Minimize2 className="h-4 w-4" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
 
                 <CardContent className="flex flex-col flex-1 min-h-0 px-6 pb-6">
                   {isLoading ? (
-                     <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading cards…
-            </div>
+                    <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading cards…
+                    </div>
                   ) : flashCards.length > 0 && currentCard ? (
                     <div className="flex-1 flex flex-col gap-3 min-h-0">
                       <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
@@ -515,7 +515,7 @@ export default function FlashCardSection({
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
                       <p className="text-muted-foreground text-lg text-center">
-                        No flash cards yet. Generate flash cards to see them here.
+                        No flash cards yet.
                       </p>
                     </div>
                   )}
@@ -526,21 +526,11 @@ export default function FlashCardSection({
           document.body,
         )}
 
-      {/* Inline card view */}
       {!isExpanded && (
-        <Card className={`${className ?? ""} h-full w-full`}>
-          <CardHeader className="flex flex-row items-center justify-between p-4">
-            <CardTitle className="text-lg">Flash Cards</CardTitle>
+        <div className={`${className ?? ""} h-full w-full flex flex-col`}>
+          <div className="flex flex-row items-center justify-between p-4 border-b border-border/30 bg-background/70 backdrop-blur">
+            <h3 className="text-lg font-semibold">Flash Cards</h3>
             <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setIsExpanded(true)}
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
-                aria-label="Expand"
-              >
-                <Maximize2 className="h-4 w-4" />
-              </Button>
               <Button
                 onClick={generateFromAI}
                 disabled={!canGenerate}
@@ -557,56 +547,65 @@ export default function FlashCardSection({
                   "Generate Flash Cards"
                 )}
               </Button>
+              <Button
+                onClick={() => setIsExpanded(true)}
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
+                aria-label="Expand"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
             </div>
-          </CardHeader>
+          </div>
 
-          <CardContent className="flex flex-col min-h-0 h-[calc(100%-4.25rem)] p-4">
+          <div className="flex-1 min-h-0 p-6 flex items-center justify-center">
             {isLoading ? (
-              <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading cards…
+              <div className="flex items-center justify-center text-lg text-muted-foreground">
+                <Loader2 className="h-5 w-5 mr-3 animate-spin" /> Loading cards…
               </div>
             ) : flashCards.length > 0 && currentCard ? (
-              <div className="flex-1 flex flex-col gap-3 min-h-0">
-                <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
+              <div className="w-full max-w-2xl h-full flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-2 text-base text-muted-foreground">
                   <span className="whitespace-nowrap font-medium">
                     {currentCardIndex + 1} of {flashCards.length}
                   </span>
-                  <div className="flex gap-1">
+                  <div className="flex gap-2">
                     <Button
                       onClick={prevCard}
                       variant="outline"
                       size="sm"
                       disabled={currentCardIndex === 0}
-                      className="h-8 w-8 p-0 shrink-0 hover:bg-accent disabled:opacity-50 bg-transparent"
+                      className="h-10 w-10 p-0 shrink-0 hover:bg-accent disabled:opacity-50 bg-transparent"
                       aria-label="Previous card"
                     >
-                      <ChevronLeft className="w-4 h-4" />
+                      <ChevronLeft className="w-5 h-5" />
                     </Button>
                     <Button
                       onClick={nextCard}
                       variant="outline"
                       size="sm"
                       disabled={currentCardIndex === flashCards.length - 1}
-                      className="h-8 w-8 p-0 shrink-0 hover:bg-accent disabled:opacity-50 bg-transparent"
+                      className="h-10 w-10 p-0 shrink-0 hover:bg-accent disabled:opacity-50 bg-transparent"
                       aria-label="Next card"
                     >
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-5 h-5" />
                     </Button>
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-0 flex justify-center items-center overflow-hidden p-2">
+                <div className="flex-1 min-h-0 flex justify-center items-center overflow-hidden">
                   <div
-                    className="cursor-pointer transition-transform duration-500 hover:shadow-lg [transform-style:preserve-3d] relative rounded-2xl border w-full h-full min-h-[200px] max-h-[280px]"
+                    className="cursor-pointer transition-transform duration-500 hover:shadow-lg [transform-style:preserve-3d] relative rounded-2xl border w-full h-full min-h-[300px] max-h-[400px]"
                     onClick={toggleFlip}
                     style={{ transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
                   >
                     {/* Front */}
-                    <Card className="absolute inset-0 [backface-visibility:hidden] border bg-background overflow-hidden rounded-2xl">
-                      <CardContent className="h-full flex flex-col justify-center items-center relative p-4">
-                        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                          <div className="inline-flex items-center justify-center px-3 py-1 rounded-lg bg-white border-2 border-black">
-                            <span className="font-semibold text-sm uppercase tracking-wide text-black">Question</span>
+                    <Card className="absolute inset-0 [backface-visibility:hidden] border bg-white shadow-sm overflow-hidden rounded-2xl">
+                      <CardContent className="h-full flex flex-col justify-center items-center relative p-6">
+                        <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+                          <div className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-gray-800 text-white">
+                            <span className="font-semibold text-sm uppercase tracking-wide">Question</span>
                           </div>
                           <Button
                             onClick={(e) => {
@@ -621,9 +620,9 @@ export default function FlashCardSection({
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                        <div className="text-center w-full px-4 overflow-y-auto max-h-full">
+                        <div className="text-center w-full px-6 overflow-y-auto max-h-full">
                           <div className="px-2">
-                            <p className="font-medium leading-relaxed text-foreground break-words text-sm md:text-base">
+                            <p className="font-medium leading-relaxed text-gray-900 break-words text-lg">
                               {currentCard.front}
                             </p>
                           </div>
@@ -633,13 +632,13 @@ export default function FlashCardSection({
 
                     {/* Back */}
                     <Card
-                      className="absolute inset-0 [backface-visibility:hidden] border bg-background overflow-hidden rounded-2xl"
+                      className="absolute inset-0 [backface-visibility:hidden] border bg-white shadow-sm overflow-hidden rounded-2xl"
                       style={{ transform: "rotateY(180deg)" }}
                     >
-                      <CardContent className="h-full min-h-0 flex flex-col relative p-4 pt-14">
-                        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                          <div className="inline-flex items-center justify-center px-3 py-1 rounded-lg bg-white border-2 border-black">
-                            <span className="font-semibold text-sm uppercase tracking-wide text-black">answer</span>
+                      <CardContent className="h-full min-h-0 flex flex-col relative p-6 pt-16">
+                        <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+                          <div className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-gray-800 text-white">
+                            <span className="font-semibold text-sm uppercase tracking-wide">Answer</span>
                           </div>
                           <Button
                             onClick={(e) => {
@@ -656,8 +655,8 @@ export default function FlashCardSection({
                         </div>
 
                         {/* Scrollable content */}
-                        <div className="flex-1 min-h-0 w-full overflow-y-auto px-4 text-center">
-                          <p className="font-medium leading-relaxed text-foreground break-words text-sm md:text-base">
+                        <div className="flex-1 min-h-0 w-full overflow-y-auto px-6 text-center">
+                          <p className="font-medium leading-relaxed text-gray-900 break-words text-lg">
                             {currentCard.back}
                           </p>
                         </div>
@@ -666,13 +665,15 @@ export default function FlashCardSection({
                   </div>
                 </div>
 
-                <p className="text-center text-muted-foreground text-xs">Click card to flip • Use arrows to navigate</p>
+                <p className="text-center text-muted-foreground text-sm">Click card to flip • Use arrows to navigate</p>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm"> </p>
+              <p className="text-lg text-muted-foreground text-center">
+                No flash cards yet.
+              </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </>
   )

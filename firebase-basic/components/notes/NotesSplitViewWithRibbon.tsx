@@ -27,13 +27,20 @@ export type Note = {
 type NotesSplitViewProps = {
   notes: Note[]
   orgID: string
-  /** New controlled selection props */
+
+  /** Controlled selection */
   selectedId?: string
   onSelect?: (noteId: string) => void
-  /** Legacy: can still be passed, but ignored if selectedId is provided */
+
+  /** Legacy: ignored if selectedId is provided */
   initialSelectedId?: string | null
-  /** ✅ Added so page can pass loading without TS error */
+
+  /** Page-level loading passthrough */
   loading?: boolean
+
+  /** NEW: page-level title rendered inside the editor border */
+  title?: string
+  onTitleChange?: (name: string) => void
 }
 
 /* ------------------------------ Utilities -------------------------------- */
@@ -57,11 +64,10 @@ export default function NotesSplitViewWithRibbon({
   onSelect,
   initialSelectedId,
   loading,
+  title,
+  onTitleChange,
 }: NotesSplitViewProps) {
-  /**
-   * We keep an internal copy for local edits (e.g., title input) so typing feels instant,
-   * but the selected note id is controlled by the parent when `selectedId` is provided.
-   */
+  // Local mirror for content snapshots only (NOT title)
   const [stateNotes, setStateNotes] = useState<Note[]>(notes)
 
   // If parent doesn't control selection, fall back to internal initial selection.
@@ -69,32 +75,30 @@ export default function NotesSplitViewWithRibbon({
     selectedId ?? initialSelectedId ?? notes[0]?.id ?? null,
   )
 
-  // Compute the authoritative current selected id
-  const currentSelectedNoteId = useMemo(() => {
-    // Parent-controlled takes precedence
-    if (selectedId) return selectedId
-    return internalSelectedId
-  }, [selectedId, internalSelectedId])
-
   // Hide only the right content area (not the ribbon). When hidden, the editor expands.
   const [isRightContentHidden, setIsRightContentHidden] = useState(false)
   const [activeRibbonSection, setActiveRibbonSection] = useState<RibbonSection>("summary")
 
   const ownerId = getAuth().currentUser?.uid ?? ""
 
-  // Keep local notes in sync with incoming prop updates (but preserve in-flight title edits where possible)
+  // Keep local notes in sync with incoming prop updates
   useEffect(() => {
     setStateNotes(() => notes)
   }, [notes])
 
-  // If selection is uncontrolled and the incoming list changed (e.g., first load), ensure we have a valid selection.
+  // Compute the authoritative current selected id
+  const currentSelectedNoteId = useMemo(() => {
+    if (selectedId) return selectedId
+    return internalSelectedId
+  }, [selectedId, internalSelectedId])
+
+  // Ensure we have a valid selection when uncontrolled
   useEffect(() => {
     if (selectedId) return // parent controls; do nothing
     if (!internalSelectedId) {
       const first = notes[0]?.id ?? null
       setInternalSelectedId(first)
     } else {
-      // ensure selected still exists; if not, select first
       const exists = notes.some((n) => n.id === internalSelectedId)
       if (!exists) setInternalSelectedId(notes[0]?.id ?? null)
     }
@@ -111,21 +115,20 @@ export default function NotesSplitViewWithRibbon({
     if (selectedNote?.content != null) setPlain(htmlToPlain(selectedNote.content))
   }, [selectedNote?.id, selectedNote?.content])
 
-  // Auto-save (debounced 1s) for simple fields we manage here (e.g., name/content snapshot)
+  // Auto-save (debounced 1s) for content snapshots only
   useEffect(() => {
     if (!selectedNote?.id) return
     const t = setTimeout(() => {
       const path = `organizations/${orgID}/notes/${selectedNote.id}`
       callUpdateNote(path, {
         content: selectedNote.content,
-        name: selectedNote.name,
         updatedAt: Date.now(),
       })
     }, 1000)
     return () => clearTimeout(t)
-  }, [selectedNote?.id, selectedNote?.content, selectedNote?.name, orgID])
+  }, [selectedNote?.id, selectedNote?.content, orgID])
 
-  // ✅ nice loading state while first fetch is in-flight
+  // Loading / empty states
   if (loading && (!selectedNote || !currentSelectedNoteId)) {
     return (
       <div className="min-h-[60vh] grid place-items-center p-6 text-muted-foreground">
@@ -143,81 +146,57 @@ export default function NotesSplitViewWithRibbon({
 
   const note: Note = selectedNote
 
-  // Build the right-pane items as an array so we can place them into a uniform container:
-  // - If only one item, it goes to the TOP half (row 1), bottom row stays empty (layout handled by container).
+  // Build the right-pane items
   const getRightPaneItems = () => {
     switch (activeRibbonSection) {
       case "summary":
         return [
           <div key="summary" className="min-h-0 h-full">
-            <div className="h-full border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
-              <SummaryPanel
-                sourceText={plain}
-                title="Summary"
-                className="h-full"
-                orgId={orgID}
-                ownerId={ownerId}
-                noteId={note.id}
-              />
-            </div>
+            <SummaryPanel
+              sourceText={plain}
+              title="Summary"
+              className="h-full"
+              orgId={orgID}
+              ownerId={ownerId}
+              noteId={note.id}
+            />
           </div>,
         ]
-
       case "flashcards":
         return [
           <div key="flashcards" className="min-h-0 h-full">
-            <div className="h-full border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
-              <FlashCardSection
-                sourceText={plain}
-                className="h-full"
-                orgId={orgID}
-                ownerId={ownerId}
-                noteId={note.id}
-              />
-            </div>
+            <FlashCardSection sourceText={plain} className="h-full" orgId={orgID} ownerId={ownerId} noteId={note.id} />
           </div>,
         ]
-
       case "quiz": {
         const quizComponent = (
           <div key="quizbar" className="min-h-0 h-full">
-            <div className="h-full border rounded-xl bg-white dark:bg-neutral-900 shadow">
-              <QuizBar
-                orgId={orgID}
-                noteId={note.id}
-                userId={ownerId}
-                displayName="User"
-                defaultDurationSec={45}
-                defaultNumQuestions={5}
-              />
-            </div>
+            <QuizBar
+              orgId={orgID}
+              noteId={note.id}
+              userId={ownerId}
+              displayName="User"
+              defaultDurationSec={45}
+              defaultNumQuestions={5}
+            />
           </div>
         )
         return [quizComponent]
       }
-
       case "notes": {
-        // Show ALL org notes; double-click chooses a note and updates the controlled selection upstream.
         const notesList = (
           <div key="notesbar" className="min-h-0 h-full">
-            <div className="h-full border rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
-              <NotesBar
-                orgId={orgID}
-                onOpenNote={(noteId) => {
-                  // Prefer parent-controlled selection if provided
-                  if (onSelect) {
-                    onSelect(noteId)
-                  } else {
-                    setInternalSelectedId(noteId)
-                  }
-                }}
-              />
-            </div>
+            <NotesBar
+              orgId={orgID}
+              onOpenNote={(noteId) => {
+                if (onSelect) onSelect(noteId)
+                else setInternalSelectedId(noteId)
+              }}
+            />
           </div>
         )
         return [notesList]
       }
-
       default:
         return []
     }
@@ -228,23 +207,23 @@ export default function NotesSplitViewWithRibbon({
   return (
     <div className="relative h-[calc(100vh-2rem)] w-full">
       {/* Main content area with editor and sections */}
-      <div className="flex h-full gap-4 pr-12">
+      <div className="flex h-full gap-4 pr-4">
         {/* Editor pane — expands when right content is hidden */}
         <div
           className={`${
             isRightContentHidden ? "flex-1" : "flex-[3]"
-          } border rounded-xl p-3 bg-white dark:bg-neutral-900 shadow overflow-hidden flex flex-col min-h-0 transition-all duration-300`}
+          } border border-gray-200 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow overflow-hidden flex flex-col min-h-0 transition-all duration-300`}
         >
-          <div className="flex items-center justify-between mb-2">
+          {/* Title header inside the editor border */}
+          <div className="mb-4 px-2">
             <input
-              className="text-xl font-semibold bg-transparent border-none focus:outline-none flex-1 truncate"
-              value={note.name}
-              onChange={(e) => {
-                const name = e.target.value
-                const id = note.id
-                setStateNotes((prev) => prev.map((n) => (n.id === id ? { ...n, name } : n)))
-              }}
+              className="w-full text-3xl font-bold bg-transparent border-none focus:outline-none"
+              placeholder="Untitled note"
+              value={typeof title === "string" ? title : ""}
+              onChange={(e) => onTitleChange?.(e.target.value)}
+              disabled={!onTitleChange}
             />
+            <div className="mt-2 border-b border-muted-foreground/30" />
           </div>
 
           <div className="flex-1 min-h-0">
@@ -259,30 +238,24 @@ export default function NotesSplitViewWithRibbon({
           </div>
         </div>
 
-        {/* Right content area - uniform width for all sections */}
         {!isRightContentHidden && (
           <div className="w-140 min-w-0 overflow-hidden transition-all duration-300">
-            <div className="h-full">{items[0]}</div>
+            <div className="h-full border border-gray-200 rounded-xl bg-white dark:bg-neutral-900 shadow overflow-hidden">
+              {items[0]}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Ribbon pinned at the far right */}
-      <div className="absolute top-0 right-0 h-full">
+      <div className="absolute top-0 right-0">
         <Ribbon
           activeSection={activeRibbonSection}
           onSectionChange={(sec) => {
             setActiveRibbonSection(sec)
-            if ((sec as any) === null) {
-              // collapse content, keep ribbon on the right, editor expands
-              setIsRightContentHidden(true)
-            } else {
-              // reopen content with same width for all sections
-              setIsRightContentHidden(false)
-            }
+            if ((sec as any) === null) setIsRightContentHidden(true)
+            else setIsRightContentHidden(false)
           }}
           onCollapse={() => setIsRightContentHidden(true)}
-          className="w-12 h-full"
         />
       </div>
     </div>

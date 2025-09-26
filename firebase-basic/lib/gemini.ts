@@ -5,10 +5,9 @@ if (!API_KEY) {
   throw new Error("Missing env var NEXT_PUBLIC_GEMINI_API_KEY");
 }
 
-const MODEL_NAME = "gemini-1.5-pro";
+const MODEL_NAME = "gemini-2.0-flash";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-/* ----------------------------- keep these as-is ---------------------------- */
 
 export async function summarizeNote(content: string): Promise<string> {
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -43,26 +42,19 @@ ${note}
   return text.trim();
 }
 
-/* ---------------------------------- types --------------------------------- */
 
 export type ClientQuizItem = {
   question: string;
-  options: string[];     // length 4
-  answerIndex: number;   // 0..3
+  options: string[];     
+  answerIndex: number;   
   explanation?: string;
 };
 
-/* -------------------------- minimal sanitization --------------------------- */
-/**
- * Convert your stored rich-note JSON (array of nodes with {content:[{text:"..."}]})
- * into plain text suitable for prompting the LLM.
- * If the input is already a string, it’s lightly cleaned.
- */
 function sanitizeRichNoteToPlain(input: unknown): string {
   const s = String(input ?? "");
   if (!s) return "";
 
-  // If it's JSON, walk it; otherwise treat as plain text and strip tags/urls/whitespace.
+
   try {
     const parsed = JSON.parse(s);
     const lines: string[] = [];
@@ -79,7 +71,7 @@ function sanitizeRichNoteToPlain(input: unknown): string {
         return;
       }
       if (typeof node === "object") {
-        // Your DB shape: array of blocks; each block has content: [{ type:"text", text:"..." }]
+        //  DB shape: array of blocks; each block has content: [{ type:"text", text:"..." }]
         if (Array.isArray((node as any).content)) {
           for (const part of (node as any).content) {
             if (part && typeof part.text === "string" && part.text.trim()) {
@@ -102,12 +94,12 @@ function sanitizeRichNoteToPlain(input: unknown): string {
     walk(parsed);
     return lines
       .join(" ")
-      .replace(/<[^>]*>/g, " ")          // strip html
-      .replace(/\bhttps?:\/\/\S+/gi, " ") // strip urls
+      .replace(/<[^>]*>/g, " ")          
+      .replace(/\bhttps?:\/\/\S+/gi, " ") 
       .replace(/\s+/g, " ")
       .trim();
   } catch {
-    // Not JSON — treat as plain text
+    
     return s
       .replace(/<[^>]*>/g, " ")
       .replace(/\bhttps?:\/\/\S+/gi, " ")
@@ -116,7 +108,7 @@ function sanitizeRichNoteToPlain(input: unknown): string {
   }
 }
 
-/* ------------------------- tiny output normalizer -------------------------- */
+
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
@@ -139,7 +131,6 @@ function sanitizeItem(raw: any): ClientQuizItem {
   return { question: q, options, answerIndex: idx, explanation };
 }
 
-/* ------------------------ MCQ generator (minimal) ------------------------- */
 /**
  * Strictly: provide sanitized text + ask for the JSON shape. No extra guidance.
  */
@@ -166,7 +157,7 @@ Use ONLY the following NOTE_TEXT as source:
 """${plain}"""
 `.trim();
 
-  // IMPORTANT: Gemini wants UPPERCASE types and does not support "additionalProperties".
+
   const generationConfig: any = {
     responseMimeType: "application/json",
     responseSchema: {
@@ -198,7 +189,7 @@ Use ONLY the following NOTE_TEXT as source:
 
   const raw = (await result.response).text().trim();
 
-  // Parse robustly
+  
   let parsed: any;
   try {
     parsed = JSON.parse(raw);

@@ -81,9 +81,7 @@ async function fetchOrgNotes(orgId: string): Promise<NoteListItem[]> {
   for (const [id, n] of Object.entries(raw)) {
     const anyN: any = n ?? {}
     let title =
-      (typeof anyN.title === "string" && anyN.title.trim()) ||
-      (typeof anyN.name === "string" && anyN.name.trim()) ||
-      ""
+      (typeof anyN.title === "string" && anyN.title.trim()) || (typeof anyN.name === "string" && anyN.name.trim()) || ""
 
     if (!title) {
       // Try derive from content (BlockNote JSON string at notes/{id}/content)
@@ -159,14 +157,14 @@ export default function NotesBar({ orgId, onOpenNote }: NotesBarProps) {
       <CardContent className="p-0 flex-1 min-h-0">
         <div className="h-full flex flex-col">
           {/* Fixed header so height never jumps */}
-            <div className="sticky top-0 z-0 pr-[84px] flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
+          <div className="sticky top-0 z-0 pr-[84px] flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
             <Notebook className="h-5 w-5 text-black" />
             <span className="text-sm font-medium text-foreground">Notes</span>
             <div className="ml-auto flex items-center gap-2">
               {loading && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
             </div>
-          </div> {/* ✅ close header */}
-
+          </div>{" "}
+          {/* ✅ close header */}
           {/* Scrollable content area */}
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="p-4">
@@ -175,9 +173,7 @@ export default function NotesBar({ orgId, onOpenNote }: NotesBarProps) {
                   Open this page inside an organization to view notes.
                 </div>
               ) : error ? (
-                <div className="text-xs text-red-700 p-2 border border-red-200 bg-red-50 rounded">
-                  {error}
-                </div>
+                <div className="text-xs text-red-700 p-2 border border-red-200 bg-red-50 rounded">{error}</div>
               ) : loading ? (
                 <div className="text-xs text-muted-foreground p-2 flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -202,38 +198,37 @@ export default function NotesBar({ orgId, onOpenNote }: NotesBarProps) {
                     ) : (
                       <Folder className="h-4 w-4 text-black" />
                     )}
-                    <span className="text-base font-medium text-foreground">
-                      All Notes ({notes.length})
-                    </span>
+                    <span className="text-base font-medium text-foreground">All Notes ({notes.length})</span>
                   </button>
 
                   {expanded && (
                     <div className="ml-6 space-y-1">
-                    {notes.map((n) => (
-                      <div
-                        key={n.id}
-                        className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors w-full cursor-pointer"
-                        onDoubleClick={() => onOpenNote?.(n.id)}   // ✅ open on double click
-                        // (optional: keep single-click as a no-op or use it to highlight selection)
-                        title="Double-click to open in editor"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === "Enter") onOpenNote?.(n.id) }} // accessibility: Enter to open
-                      >
-                        <FileText className="h-4 w-4 text-black" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-base font-medium text-foreground truncate">{n.title}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {n.updatedAt
-                              ? `Updated ${fmtWhen(n.updatedAt)}`
-                              : n.createdAt
-                                ? `Created ${fmtWhen(n.createdAt)}`
-                                : "No timestamp"}
+                      {notes.map((n) => (
+                        <div
+                          key={n.id}
+                          className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors w-full cursor-pointer"
+                          onDoubleClick={() => onOpenNote?.(n.id)} // ✅ open on double click
+                          // (optional: keep single-click as a no-op or use it to highlight selection)
+                          title="Double-click to open in editor"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") onOpenNote?.(n.id)
+                          }} // accessibility: Enter to open
+                        >
+                          <FileText className="h-4 w-4 text-black" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-base font-medium text-foreground truncate">{n.title}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {n.updatedAt
+                                ? `Updated ${fmtWhen(n.updatedAt)}`
+                                : n.createdAt
+                                  ? `Created ${fmtWhen(n.createdAt)}`
+                                  : "No timestamp"}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-
+                      ))}
                     </div>
                   )}
                 </div>

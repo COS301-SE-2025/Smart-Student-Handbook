@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { FileText, CreditCard, HelpCircle, Notebook } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -16,6 +15,7 @@ interface RibbonProps {
 
 export default function Ribbon({ activeSection, onSectionChange, className, onCollapse }: RibbonProps) {
   const [lastClickTime, setLastClickTime] = useState<Record<string, number>>({})
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   const handleIconClick = (section: RibbonSection) => {
     if (!section) return
@@ -42,35 +42,53 @@ export default function Ribbon({ activeSection, onSectionChange, className, onCo
   return (
     <div
       className={cn(
-        // fixed, offset below header and nudged left of the viewport edge so it doesn't cover scrollbar
-        "fixed top-[var(--app-header-height,56px)] bottom-0 right-4 z-50",
-        // increased width to better fit larger icons and text
-        "w-[80px] min-w-[80px] flex flex-col bg-sidebar border-l border-sidebar-border",
+        "fixed top-[var(--app-header-height,56px)] bottom-0 right-6 z-50",
+        "w-[50px] min-w-[50px] flex flex-col bg-white/95 backdrop-blur-md rounded-lg shadow-sm border border-gray-100",
         className,
       )}
       aria-hidden={false}
     >
-      {items.map(({ id, icon: Icon, label, active }) => (
-        <Button
-          key={id}
-          variant="ghost"
-          size="sm"
-          className={cn(
-            // taller buttons and more spacing for readability
-            "h-20 w-full p-0 rounded-none border-b border-sidebar-border hover:bg-sidebar-accent",
-            "flex flex-col items-center justify-center gap-2 px-1",
-            active && "bg-sidebar-accent text-sidebar-accent-foreground",
-          )}
-          onClick={() => handleIconClick(id)}
-          title={`${label} (double-click to collapse)`}
-          aria-pressed={active}
-          aria-label={label}
-        >
-          <Icon className="h-7 w-7" />
-          <span className="text-sm font-semibold leading-none mt-1 text-center truncate">{label}</span>
-        </Button>
-      ))}
-      <div className="flex-1" />
+      <div className="flex flex-col py-2">
+        {items.map(({ id, icon: Icon, label, active }) => (
+          <div
+            key={id}
+            className="relative group"
+            onMouseEnter={() => setHoveredItem(id)}
+            onMouseLeave={() => setHoveredItem(null)}
+          >
+            <div
+              className={cn(
+                "h-12 w-full flex items-center justify-center cursor-pointer",
+                "transition-all duration-200 ease-in-out",
+                "hover:bg-blue-50 hover:scale-105",
+                active && "bg-blue-100 shadow-sm",
+                "mx-1 my-0.5 rounded-md",
+              )}
+              onClick={() => handleIconClick(id)}
+              title={`${label} (double-click to collapse)`}
+              aria-pressed={active}
+              aria-label={label}
+            >
+              <Icon
+                className={cn(
+                  "h-5 w-5 transition-colors duration-200",
+                  active ? "text-blue-700" : "text-gray-600",
+                  "group-hover:text-blue-700",
+                )}
+              />
+            </div>
+
+            {hoveredItem === id && (
+              <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 z-60">
+                <div className="bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg">
+                  {label}
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-900"></div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

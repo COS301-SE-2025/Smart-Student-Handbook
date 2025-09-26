@@ -387,6 +387,11 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
   const quizPath = `organizations/${orgId}/notes/${noteId}/quizzes/${quizId}`;
   let finishedNow = false;
 
+  
+  let lastScore: number | null = null;
+  let lastCorrectCount: number | null = null;
+  let lastTotalQuestions: number | null = null;
+
   try {
     await db.ref(quizPath).transaction((q: any) => {
       if (!q || q.type !== "org-async" || q.state !== "active") return q;
@@ -417,6 +422,12 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
         q.participants[uid!].finishedAt = nowTs;
         delete q.participants[uid!].questionStartAt;
         finishedNow = true;
+
+        // snapshot for return
+        lastScore = q.participants[uid!].score || 0;
+        lastTotalQuestions = qArr.length;
+        const answersArr = Object.values(q.participants[uid!].answers || {});
+        lastCorrectCount = answersArr.filter((a: any) => a?.correct).length;
       } else {
         q.participants[uid!].currentIndex = idx + 1;
         q.participants[uid!].questionStartAt = nowTs;
@@ -448,9 +459,14 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
       // Derive total questions
       const quizSnap = await db.ref(quizPath).get();
       const qVal = quizSnap.exists() ? (quizSnap.val() as any) : null;
-      const totalQuestions = qVal?.questions ? Object.keys(qVal.questions).length : undefined;
+      const totalQuestions = qVal?.questions ? Object.keys(qVal.questions).length : null;
 
-      // Write/update attempt doc (one per uid) under new Firestore path
+      // normalize return values with authoritative data
+      lastScore = typeof p?.score === "number" ? p.score : (lastScore ?? 0);
+      lastCorrectCount = typeof correctCount === "number" ? correctCount : (lastCorrectCount ?? 0);
+      lastTotalQuestions = typeof totalQuestions === "number" ? totalQuestions : (lastTotalQuestions ?? null);
+
+      // Write/update attempt doc (one per uid) under Firestore
       await admin
         .firestore()
         .collection(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}/attempts`)
@@ -458,11 +474,11 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
         .set({
           uid,
           name: bestName,
-          score: p?.score ?? 0,
-          correctCount,
+          score: lastScore ?? 0,
+          correctCount: lastCorrectCount ?? 0,
           avgTimeMs,
           finishedAt: now(),
-          totalQuestions: totalQuestions ?? null,
+          totalQuestions: lastTotalQuestions,
         });
     } catch (err) {
       console.error("Failed to persist attempt doc:", err);
@@ -475,7 +491,14 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
     console.error("recomputeAndStoreOrgLeaderboard failed", err);
   }
 
-  return { ok: true, finishedNow };
+  // IMPORTANT: return stats on finish so client can show accurate mark/percentage immediately
+  return {
+    ok: true,
+    finishedNow,
+    score: finishedNow ? (lastScore ?? 0) : undefined,
+    correctCount: finishedNow ? (lastCorrectCount ?? 0) : undefined,
+    totalQuestions: finishedNow ? (lastTotalQuestions ?? null) : undefined,
+  };
 });
 
 export const getOrgAsyncLeaderboard = onCall(async (req) => {

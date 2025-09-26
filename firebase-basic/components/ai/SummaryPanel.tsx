@@ -5,7 +5,7 @@ import { useRef, useState, useCallback, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Maximize2, Minimize2 } from "lucide-react"
+import { Loader2, Maximize2, X } from "lucide-react"
 import { summarizeNote } from "@/lib/gemini"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
@@ -275,19 +275,10 @@ export default function SummaryPanel({
 
   return (
     <>
-      <Card className={className}>
-        <CardHeader className="flex flex-row items-center justify-between p-4">
-          <CardTitle className="text-lg">{title}</CardTitle>
+      <div className={`${className} h-full flex flex-col`}>
+        <div className="flex flex-row items-center justify-between p-4 border-b border-border/30 bg-background/70 backdrop-blur">
+          <h3 className="text-lg font-semibold">{title}</h3>
           <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setIsExpanded(true)}
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
-              aria-label="Expand"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </Button>
             <Button onClick={handleSummarize} disabled={!canSummarize || loadingExisting} variant="default" size="sm">
               {loading ? (
                 <>
@@ -298,29 +289,38 @@ export default function SummaryPanel({
                 buttonText
               )}
             </Button>
+            <Button
+              onClick={() => setIsExpanded(true)}
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
+              aria-label="Expand"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="flex flex-col min-h-0 h-[calc(100%-4.25rem)] p-4">
+        <div className="flex-1 min-h-0 p-6 flex items-center justify-center">
           {loadingExisting ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading summary…
+            <div className="flex items-center justify-center text-lg text-muted-foreground">
+              <Loader2 className="h-5 w-5 mr-3 animate-spin" /> Loading summary…
             </div>
           ) : summary ? (
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 rounded-lg bg-card text-foreground whitespace-pre-wrap break-words text-xs md:text-sm leading-snug">
-              {summary}
+            <div className="w-full max-w-4xl h-full overflow-y-auto p-6 rounded-lg bg-white border border-gray-200 shadow-sm">
+              <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-gray-900">{summary}</div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-center">
+              <p className="text-lg text-muted-foreground text-center">
                 {disabled ? "No summary yet. Generate one to see it here." : ""}
               </p>
             </div>
           )}
-        </CardContent>
+        </div>
+      </div>
 
-      </Card>
-
+      {/* Modal remains the same */}
       {isExpanded &&
         isClient &&
         createPortal(
@@ -356,7 +356,7 @@ export default function SummaryPanel({
                       className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
                       aria-label="Close modal"
                     >
-                      <Minimize2 className="h-4 w-4" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>

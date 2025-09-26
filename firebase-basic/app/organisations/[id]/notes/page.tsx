@@ -1,12 +1,13 @@
 // app/organisations/[id]/notes/page.tsx
 "use client"
 
-import { Suspense, useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import { onValue, ref } from "firebase/database"
-import { db } from "@/lib/firebase"
+import { db, fns } from "@/lib/firebase"
+import { httpsCallable } from "firebase/functions"
 
-// ⬇️ updated to support controlled selection
+// Controlled selection + split view
 import NotesSplitViewWithRibbon, { type Note } from "@/components/notes/NotesSplitViewWithRibbon"
 
 export const dynamic = "force-dynamic"
@@ -19,29 +20,26 @@ function OrgNotesInner() {
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Most-recent (or preselected) note id computed from the list
+  // Sort / preselect logic
   const activeNoteId = useMemo(() => {
     if (preselectId) return preselectId
     return notes.length > 0 ? notes[0].id : undefined
   }, [preselectId, notes])
 
-  // 🔹 Controlled selection lives here (page level)
+  // Controlled selection
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
-
-  // Keep selectedId in sync when notes/preselect change
   useEffect(() => {
     setSelectedId(activeNoteId)
   }, [activeNoteId])
 
+  // Live load notes
   useEffect(() => {
     if (!orgId) return
     const notesRef = ref(db, `organizations/${orgId}/notes`)
     const unsub = onValue(notesRef, (snap) => {
       const raw = (snap.val() as Record<string, Note> | null) ?? null
       let arr = raw ? Object.values(raw) : []
-      // newest first by updatedAt or createdAt
       arr.sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0))
-      // if preselectId exists, move that note to the front
       if (preselectId) {
         const idx = arr.findIndex((n) => n.id === preselectId)
         if (idx > 0) {
@@ -55,6 +53,42 @@ function OrgNotesInner() {
     return () => unsub()
   }, [orgId, preselectId])
 
+  // ---------- Page-level title state + debounced save ----------
+  const updateNoteAtPath = useMemo(() => httpsCallable(fns, "updateNoteAtPath"), [])
+  const currentNote = useMemo(
+    () => (selectedId ? (notes.find((n) => n.id === selectedId) ?? null) : null),
+    [notes, selectedId],
+  )
+
+  const [pageTitle, setPageTitle] = useState<string>("")
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Sync pageTitle when selection or notes change
+  useEffect(() => {
+    setPageTitle(currentNote?.name ?? "")
+  }, [currentNote?.id, currentNote?.name])
+
+  // Debounced save of title to RTDB
+  useEffect(() => {
+    if (!orgId || !selectedId) return
+    if (!currentNote) return
+
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await updateNoteAtPath({
+          path: `organizations/${orgId}/notes/${selectedId}`,
+          note: { name: pageTitle, updatedAt: Date.now() },
+        })
+      } catch {
+        // optional: toast error
+      }
+    }, 500)
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+    }
+  }, [pageTitle, orgId, selectedId, updateNoteAtPath, currentNote])
+
   if (!orgId) return <div className="p-6 text-sm text-muted-foreground">Missing org id.</div>
 
   return (
@@ -63,13 +97,13 @@ function OrgNotesInner() {
         <NotesSplitViewWithRibbon
           notes={notes}
           orgID={orgId}
-          // 🔹 Make the component controlled
           selectedId={selectedId}
           onSelect={setSelectedId}
-          // (Optional) if your component still supports initialSelectedId internally,
-          // keeping it here is harmless, but `selectedId` is the source of truth now.
           initialSelectedId={activeNoteId ?? undefined}
           loading={loading}
+          /* NEW: render the title inside the editor's border */
+          title={pageTitle}
+          onTitleChange={setPageTitle}
         />
       </div>
     </div>
