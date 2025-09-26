@@ -1,32 +1,19 @@
-//Notesbar that we should mimic the ui 
+//Notesbar that we should mimic the ui
 "use client"
 
 import { useEffect, useState } from "react"
-import { getAuth, onAuthStateChanged, User } from "@firebase/auth"
-import { get, ref, update } from "@firebase/database"
+import { getAuth, onAuthStateChanged, type User } from "@firebase/auth"
+import { ref, update } from "@firebase/database"
 import { db } from "@/lib/firebase"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import NoteTree from "@/components/notes/NoteTree"
 
-import {
-  Plus,
-  FolderPlus,
-  Loader2,
-  Notebook,
-  ChevronDown,
-  ChevronRight,
-  Folder,
-  FolderOpen,
-} from "lucide-react"
+import { Plus, FolderPlus, Loader2, Notebook, ChevronDown, ChevronRight, Folder, FolderOpen } from "lucide-react"
 
 import type { FileNode } from "@/types/note"
-import {
-  addNode,
-  moveNode,
-  sortTree,
-} from "@/lib/note/treeActions"
+import { addNode, moveNode, sortTree } from "@/lib/note/treeActions"
 import {
   buildSharedTreeFromRealtimeDB,
   buildTreeFromRealtimeDB,
@@ -67,7 +54,6 @@ export default function RightNotesPanel({
   /* --------------------------- Load personal + shared --------------------------- */
   useEffect(() => {
     if (!userId) return
-
     ;(async () => {
       try {
         setLoadingMy(true)
@@ -77,7 +63,6 @@ export default function RightNotesPanel({
         setLoadingMy(false)
       }
     })()
-
     ;(async () => {
       try {
         setLoadingShared(true)
@@ -90,36 +75,35 @@ export default function RightNotesPanel({
   }, [userId])
 
   /* --------------------------------- Handlers ---------------------------------- */
-  const handleAdd = async (
-    scope: "my" | "shared",
-    type: "note" | "folder",
-  ) => {
+  const handleAdd = async (scope: "my" | "shared", type: "note" | "folder") => {
     if (!userId) return
 
     // Preserve existing create semantics: create under user's path,
     // let your sharing model expose into sharedTree.
     if (scope === "my") {
-      const create = type === "folder"
-        ? () => createFolderInDB(userId, "New Folder", null)
-        : () => createNoteInDB(userId, "Untitled Note", null)
+      const create =
+        type === "folder"
+          ? () => createFolderInDB(userId, "New Folder", null)
+          : () => createNoteInDB(userId, "Untitled Note", null)
       const newNode = await create()
-      setMyTree(prev => addNode(prev, null, type, newNode.id, newNode.name))
+      setMyTree((prev) => addNode(prev, null, type, newNode.id, newNode.name))
       return
     }
 
     if (scope === "shared") {
-      const create = type === "folder"
-        ? () => createFolderInDB(userId, "New Shared Folder", null)
-        : () => createNoteInDB(userId, "Untitled Shared Note", null)
+      const create =
+        type === "folder"
+          ? () => createFolderInDB(userId, "New Shared Folder", null)
+          : () => createNoteInDB(userId, "Untitled Shared Note", null)
       const newNode = await create()
-      setSharedTree(prev => addNode(prev, null, type, newNode.id, newNode.name))
+      setSharedTree((prev) => addNode(prev, null, type, newNode.id, newNode.name))
       return
     }
   }
 
   const handleMoveMy = (draggedId: string, targetFolderId: string | null) => {
     if (!userId) return
-    setMyTree(prev => {
+    setMyTree((prev) => {
       const updated = moveNode(prev, draggedId, targetFolderId)
       update(ref(db, `users/${userId}/notes/${draggedId}`), { parentId: targetFolderId ?? null })
       return sortTree(updated)
@@ -130,7 +114,7 @@ export default function RightNotesPanel({
     // Preserve your existing shared semantics — if your model writes under user path,
     // this mirrors the personal move. If shared is read-only, you can no-op here.
     if (!userId) return
-    setSharedTree(prev => {
+    setSharedTree((prev) => {
       const updated = moveNode(prev, draggedId, targetFolderId)
       update(ref(db, `users/${userId}/notes/${draggedId}`), { parentId: targetFolderId ?? null })
       return sortTree(updated)
@@ -140,15 +124,15 @@ export default function RightNotesPanel({
   const handleRename = async (id: string, newName: string) => {
     if (!userId) return
     // Update both trees optimistically (node might exist in either)
-    setMyTree(prev => renameInTree(prev, id, newName))
-    setSharedTree(prev => renameInTree(prev, id, newName))
+    setMyTree((prev) => renameInTree(prev, id, newName))
+    setSharedTree((prev) => renameInTree(prev, id, newName))
     await renameNodeInDB(userId, id, newName)
   }
 
   const handleDelete = async (id: string) => {
     if (!userId) return
-    setMyTree(prev => deleteFrom(clone(prev), id))
-    setSharedTree(prev => deleteFrom(clone(prev), id))
+    setMyTree((prev) => deleteFrom(clone(prev), id))
+    setSharedTree((prev) => deleteFrom(clone(prev), id))
     await deleteNodeInDB(userId, id)
   }
 
@@ -162,12 +146,12 @@ export default function RightNotesPanel({
     )
   }
   function clone(nodes: FileNode[]): FileNode[] {
-    return nodes.map(n => ({ ...n, children: n.children ? clone(n.children) : undefined }))
+    return nodes.map((n) => ({ ...n, children: n.children ? clone(n.children) : undefined }))
   }
   function deleteFrom(nodes: FileNode[], deleteId: string): FileNode[] {
     return nodes
-      .filter(n => n.id !== deleteId)
-      .map(n => ({ ...n, children: n.children ? deleteFrom(n.children, deleteId) : undefined }))
+      .filter((n) => n.id !== deleteId)
+      .map((n) => ({ ...n, children: n.children ? deleteFrom(n.children, deleteId) : undefined }))
   }
   function findNodeById(nodes: FileNode[], id: string): FileNode | null {
     for (const node of nodes) {
@@ -206,14 +190,10 @@ export default function RightNotesPanel({
           {/* collapsible "All Notes" row (org notes style) */}
           <div className="px-4 pt-3">
             <button
-              onClick={() => setExpandedMy(p => !p)}
+              onClick={() => setExpandedMy((p) => !p)}
               className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
             >
-              {expandedMy ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
+              {expandedMy ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               {expandedMy ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
               <span className="text-base font-medium">All Notes</span>
             </button>
@@ -263,14 +243,10 @@ export default function RightNotesPanel({
           {/* collapsible "All Notes" row (org notes style) */}
           <div className="px-4 pt-3">
             <button
-              onClick={() => setExpandedShared(p => !p)}
+              onClick={() => setExpandedShared((p) => !p)}
               className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
             >
-              {expandedShared ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
+              {expandedShared ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               {expandedShared ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
               <span className="text-base font-medium">All Notes</span>
             </button>

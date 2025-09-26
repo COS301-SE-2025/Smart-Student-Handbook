@@ -1,24 +1,36 @@
+// components/notes/UserNotesSplitViewWithRibbon.tsx
 "use client"
 
+import dynamic from "next/dynamic"
 import { useEffect, useMemo, useState } from "react"
+import Ribbon, { type RibbonSection } from "@/components/ribbon/Ribbon"
+import EditorMain from "@/components/YjsEditor/EditorMain"
+import RightNotesPanel from "./RightNotesPanel"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
-import SummaryPanel from "@/components/ai/SummaryPanel"
-import FlashCardSection from "@/components/flashcards/FlashCardSection"
-import QuizBar from "../QuizBar"
-import Ribbon, { type RibbonSection } from "../ribbon/Ribbon"
-import { getAuth } from "firebase/auth"
-import Main from "../YjsEditor/OrgMain"
 
-// ⬇️ use the notes ribbon panel that expects userId + setOwnerId
-import RightNotesPanel from "../notes/RightNotesPanel"
+/** Defensive dynamic panels to avoid hard crashes if a file is missing */
+const SummaryPanel = dynamic(
+  () =>
+    import("@/components/ai/SummaryPanel")
+      .then((m) => m.default)
+      .catch(() => () => <div className="p-4 text-sm text-muted-foreground">Summary unavailable.</div>),
+  { ssr: false, loading: () => <div className="p-4 text-sm text-muted-foreground">Loading summary…</div> },
+)
+const FlashCardSection = dynamic(
+  () =>
+    import("@/components/flashcards/FlashCardSection")
+      .then((m) => m.default)
+      .catch(() => () => <div className="p-4 text-sm text-muted-foreground">Flashcards unavailable.</div>),
+  { ssr: false, loading: () => <div className="p-4 text-sm text-muted-foreground">Loading flashcards…</div> },
+)
 
 /* --------------------------------- Types --------------------------------- */
 export type Note = {
   ownerId: string
   id: string
   name: string
-  content: string // HTML from Quill (legacy) or latest snapshot text
+  content: string
   type: "note"
   createdAt?: number
   updatedAt?: number
@@ -26,23 +38,13 @@ export type Note = {
 
 type NotesSplitViewProps = {
   notes: Note[]
-  orgID: string
-
-  /** Controlled selection */
+  userID: string
   selectedId?: string
   onSelect?: (noteId: string) => void
-
-  /** Legacy: ignored if selectedId is provided */
   initialSelectedId?: string | null
-
-  /** Page-level loading passthrough */
   loading?: boolean
-
-  /** Page-level title rendered inside the editor border */
   title?: string
   onTitleChange?: (name: string) => void
-
-  /** Commit title save when user is done typing (blur/Enter) */
   onTitleCommit?: () => void
 }
 
@@ -60,9 +62,9 @@ async function callUpdateNote(path: string, note: Partial<Note>) {
 }
 
 /* ------------------------------ Main component --------------------------- */
-export default function NotesSplitViewWithRibbon({
+export default function UserNotesSplitViewWithRibbon({
   notes,
-  orgID,
+  userID,
   selectedId,
   onSelect,
   initialSelectedId,
@@ -71,38 +73,26 @@ export default function NotesSplitViewWithRibbon({
   onTitleChange,
   onTitleCommit,
 }: NotesSplitViewProps) {
-  // Local mirror for content snapshots only (NOT title)
   const [stateNotes, setStateNotes] = useState<Note[]>(notes)
 
-  // If parent doesn't control selection, fall back to internal initial selection.
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
     selectedId ?? initialSelectedId ?? notes[0]?.id ?? null,
   )
+  const [currentOwnerId, setCurrentOwnerId] = useState<string>(userID)
 
-  // Hide only the right content area (not the ribbon). When hidden, the editor expands.
   const [isRightContentHidden, setIsRightContentHidden] = useState(false)
   const [activeRibbonSection, setActiveRibbonSection] = useState<RibbonSection>("summary")
 
-  // The signed-in user; used as default owner for personal/shared ribbon panel
-  const authedUserId = getAuth().currentUser?.uid ?? ""
+  useEffect(() => setStateNotes(() => notes), [notes])
 
-  // Owner used for editor & AI panels (can change when selecting from "Shared")
-  const [currentOwnerId, setCurrentOwnerId] = useState<string>(authedUserId)
+  const currentSelectedNoteId = useMemo(
+    () => (selectedId ? selectedId : internalSelectedId),
+    [selectedId, internalSelectedId],
+  )
 
-  // Keep local notes in sync with incoming prop updates
+  // keep selection valid if uncontrolled
   useEffect(() => {
-    setStateNotes(() => notes)
-  }, [notes])
-
-  // Compute the authoritative current selected id
-  const currentSelectedNoteId = useMemo(() => {
-    if (selectedId) return selectedId
-    return internalSelectedId
-  }, [selectedId, internalSelectedId])
-
-  // Ensure we have a valid selection when uncontrolled
-  useEffect(() => {
-    if (selectedId) return // parent controls; do nothing
+    if (selectedId) return
     if (!internalSelectedId) {
       const first = notes[0]?.id ?? null
       setInternalSelectedId(first)
@@ -121,100 +111,87 @@ export default function NotesSplitViewWithRibbon({
   const [plain, setPlain] = useState<string>("")
   useEffect(() => {
     if (selectedNote?.content != null) setPlain(htmlToPlain(selectedNote.content))
+    else setPlain("")
   }, [selectedNote?.id, selectedNote?.content])
 
-  // Auto-save (debounced 1s) for content snapshots only — remains on org path for this org page
+  // Debounced autosave of content snapshots to users/{userID}/notes
   useEffect(() => {
     if (!selectedNote?.id) return
     const t = setTimeout(() => {
-      const path = `organizations/${orgID}/notes/${selectedNote.id}`
-      callUpdateNote(path, {
-        content: selectedNote.content,
-        updatedAt: Date.now(),
-      })
+      const path = `users/${currentOwnerId || userID}/notes/${selectedNote.id}`
+      callUpdateNote(path, { content: selectedNote.content, updatedAt: Date.now() })
     }, 1000)
     return () => clearTimeout(t)
-  }, [selectedNote?.id, selectedNote?.content, orgID])
+  }, [selectedNote?.id, selectedNote?.content, userID, currentOwnerId])
 
-  if (!selectedNote || !currentSelectedNoteId) {
-    return <div className="min-h-[60vh] grid place-items-center p-6 text-muted-foreground" />
-  }
+  const showLoader = loading && stateNotes.length === 0
 
-  const note: Note = selectedNote
-
-  // Right pane items
-  const getRightPaneItems = () => {
+  // Right pane content
+  const rightPane = (() => {
     switch (activeRibbonSection) {
       case "summary":
-        return [
-          <div key="summary" className="min-h-0 h-full">
-            <SummaryPanel
-              sourceText={plain}
-              title="Summary"
-              className="h-full"
-              orgId={orgID}
-              ownerId={currentOwnerId || authedUserId}
-              noteId={note.id}
-            />
-          </div>,
-        ]
+        return (
+          <div className="min-h-0 h-full">
+            {selectedNote ? (
+              <SummaryPanel
+                sourceText={plain}
+                title="Summary"
+                className="h-full"
+                ownerId={currentOwnerId || userID}
+                userId={userID}
+                noteId={selectedNote.id}
+                isPersonal
+              />
+            ) : (
+              <div className="p-4 text-sm text-muted-foreground">Select a note to summarize.</div>
+            )}
+          </div>
+        )
       case "flashcards":
-        return [
-          <div key="flashcards" className="min-h-0 h-full">
-            <FlashCardSection
-              sourceText={plain}
-              className="h-full"
-              orgId={orgID}
-              ownerId={currentOwnerId || authedUserId}
-              noteId={note.id}
-            />
-          </div>,
-        ]
-      case "quiz":
-        return [
-          <div key="quizbar" className="min-h-0 h-full">
-            <QuizBar
-              orgId={orgID}
-              noteId={note.id}
-              userId={currentOwnerId || authedUserId}
-              displayName="User"
-              defaultDurationSec={45}
-              defaultNumQuestions={5}
-            />
-          </div>,
-        ]
+        return (
+          <div className="min-h-0 h-full">
+            {selectedNote ? (
+              <FlashCardSection
+                sourceText={plain}
+                className="h-full"
+                ownerId={currentOwnerId || userID}
+                userId={userID}
+                noteId={selectedNote.id}
+                isPersonal
+              />
+            ) : (
+              <div className="p-4 text-sm text-muted-foreground">Select a note to generate flashcards.</div>
+            )}
+          </div>
+        )
       case "notes":
-        // ⬇️ FIX: Use RightNotesPanel with the CORRECT props (userId + setOwnerId). No orgId prop here.
-        return [
-          <div key="notespanel" className="min-h-0 h-full">
+        return (
+          <div className="min-h-0 h-full">
             <RightNotesPanel
-              userId={authedUserId}
+              userId={userID}
               onOpenNote={(noteId) => {
                 if (onSelect) onSelect(noteId)
                 else setInternalSelectedId(noteId)
               }}
               setOwnerId={(owner) => setCurrentOwnerId(owner)}
             />
-          </div>,
-        ]
+          </div>
+        )
       default:
-        return []
+        return null
     }
-  }
-
-  const items = getRightPaneItems()
+  })()
 
   return (
     <div className="relative h-[calc(100vh-2rem)] w-full">
-      {/* Main content area with editor and sections */}
       <div className="flex h-full min-h-0 gap-4 pr-4">
-        {/* Editor pane — expands when right content is hidden */}
+        {/* Editor pane */}
         <div
           className={`${
             isRightContentHidden ? "flex-1" : "flex-[3]"
           } border border-gray-200 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow flex flex-col min-h-0 transition-all duration-300`}
         >
-          {/* Title header inside the editor border */}
+          {/* Title header */}
           <div className="mb-4 px-2">
             <input
               className="w-full text-3xl font-bold bg-transparent border-none focus:outline-none"
@@ -234,28 +211,39 @@ export default function NotesSplitViewWithRibbon({
             <div className="mt-2 border-b border-muted-foreground/30" />
           </div>
 
-          {/* Scrollable editor area with always-invisible scrollbar */}
+          {/* Editor body */}
           <div className="flex-1 min-h-0 overflow-y-auto scroll-invisible">
-            <Main
-              searchParams={{
-                doc: currentSelectedNoteId as any,
-                // For org page we still open the org-owned doc in the Org editor:
-                ownerId: orgID ?? undefined,
-                username: "Organisation Member",
-              }}
-            />
+            {showLoader ? (
+              <div className="h-full grid place-items-center text-sm text-muted-foreground">Loading notes…</div>
+            ) : selectedNote ? (
+              <EditorMain
+                searchParams={{
+                  doc: currentSelectedNoteId as any,
+                  ownerId: (currentOwnerId || userID) as any,
+                  username: "You",
+                }}
+              />
+            ) : (
+              <div className="h-full grid place-items-center text-sm text-muted-foreground px-6 text-center">
+                <div>
+                  <div className="font-semibold mb-1">No note selected</div>
+                  <div>Open the Notes tab on the ribbon to pick or create a note.</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {!isRightContentHidden && (
-          <div className="w-140 min-w-0 min-h-0 transition-all duration-300">
+          <div className="max-w-md min-w-[20rem] w-[28rem] min-h-0 transition-all duration-300">
             <div className="h-full min-h-0 border border-gray-200 rounded-xl bg-white dark:bg-neutral-900 shadow">
-              {items[0]}
+              {rightPane}
             </div>
           </div>
         )}
       </div>
 
+      {/* Fixed ribbon on the far right */}
       <div className="absolute top-0 right-0">
         <Ribbon
           activeSection={activeRibbonSection}
@@ -268,13 +256,13 @@ export default function NotesSplitViewWithRibbon({
         />
       </div>
 
-      {/* Invisible scrollbar styles (still scrollable) */}
+      {/* Invisible scrollbar styles */}
       <style jsx>{`
         .scroll-invisible {
-          scrollbar-width: none;        /* Firefox */
-          -ms-overflow-style: none;     /* IE/Edge legacy */
+          scrollbar-width: none;
+          -ms-overflow-style: none;
         }
-        .scroll-invisible::-webkit-scrollbar { /* Chrome/Safari/Edge (Chromium) */
+        .scroll-invisible::-webkit-scrollbar {
           width: 0;
           height: 0;
         }

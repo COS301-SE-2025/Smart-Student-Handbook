@@ -53,7 +53,7 @@ function OrgNotesInner() {
     return () => unsub()
   }, [orgId, preselectId])
 
-  // ---------- Page-level title state + debounced save ----------
+  // ---------- Page-level title state + commit-on-finish save ----------
   const updateNoteAtPath = useMemo(() => httpsCallable(fns, "updateNoteAtPath"), [])
   const currentNote = useMemo(
     () => (selectedId ? (notes.find((n) => n.id === selectedId) ?? null) : null),
@@ -61,33 +61,31 @@ function OrgNotesInner() {
   )
 
   const [pageTitle, setPageTitle] = useState<string>("")
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastCommittedRef = useRef<string>("")
 
   // Sync pageTitle when selection or notes change
   useEffect(() => {
-    setPageTitle(currentNote?.name ?? "")
+    const nextTitle = currentNote?.name ?? ""
+    setPageTitle(nextTitle)
+    lastCommittedRef.current = nextTitle
   }, [currentNote?.id, currentNote?.name])
 
-  // Debounced save of title to RTDB
-  useEffect(() => {
+  // Save only when the user is done typing (explicit commit)
+  async function commitTitleSave() {
     if (!orgId || !selectedId) return
     if (!currentNote) return
-
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      try {
-        await updateNoteAtPath({
-          path: `organizations/${orgId}/notes/${selectedId}`,
-          note: { name: pageTitle, updatedAt: Date.now() },
-        })
-      } catch {
-        // optional: toast error
-      }
-    }, 500)
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
+    // Avoid unnecessary writes if nothing changed
+    if (pageTitle === lastCommittedRef.current) return
+    try {
+      await updateNoteAtPath({
+        path: `organizations/${orgId}/notes/${selectedId}`,
+        note: { name: pageTitle, updatedAt: Date.now() },
+      })
+      lastCommittedRef.current = pageTitle
+    } catch {
+      // optional: toast error
     }
-  }, [pageTitle, orgId, selectedId, updateNoteAtPath, currentNote])
+  }
 
   if (!orgId) return <div className="p-6 text-sm text-muted-foreground">Missing org id.</div>
 
@@ -104,6 +102,7 @@ function OrgNotesInner() {
           /* NEW: render the title inside the editor's border */
           title={pageTitle}
           onTitleChange={setPageTitle}
+          onTitleCommit={commitTitleSave}  
         />
       </div>
     </div>

@@ -20,19 +20,18 @@ export function YjsBlockNoteEditor({
   ownerID,
   username,
 }: YjsBlockNoteEditorProps) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     const root = document.documentElement;
     const observer = new MutationObserver(() => {
-      setTheme(root.classList.contains('dark') ? 'dark' : 'light');
+      setTheme(root.classList.contains("dark") ? "dark" : "light");
     });
-    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
 
-    setTheme(root.classList.contains('dark') ? 'dark' : 'light');
+    setTheme(root.classList.contains("dark") ? "dark" : "light");
     return () => observer.disconnect();
   }, []);
-
 
   const doc = useYDoc();
   const provider: any = useYjsProvider();
@@ -43,12 +42,12 @@ export function YjsBlockNoteEditor({
   const editor = useCreateBlockNote(
     provider
       ? {
-        collaboration: {
-          provider,
-          fragment: doc.getXmlFragment("blocknote"),
-          user: { name: username, color: "#005ac2ff" },
-        },
-      }
+          collaboration: {
+            provider,
+            fragment: doc.getXmlFragment("blocknote"),
+            user: { name: username, color: "#005ac2ff" },
+          },
+        }
       : {}
   );
 
@@ -67,7 +66,9 @@ export function YjsBlockNoteEditor({
     }
 
     fetchNote();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [noteID, ownerID]);
 
   useEffect(() => {
@@ -78,7 +79,9 @@ export function YjsBlockNoteEditor({
     };
 
     provider.on("status", handleStatus);
-    return () => { provider.off("status", handleStatus); };
+    return () => {
+      provider.off("status", handleStatus);
+    };
   }, [provider]);
 
   useEffect(() => {
@@ -106,8 +109,13 @@ export function YjsBlockNoteEditor({
     return () => clearInterval(interval);
   }, [editor, noteID, ownerID]);
 
+  // Centered loader (same vibe as dashboard)
   if (!provider || !providerReady || initialContent === null) {
-    return <div>Loading editor…</div>;
+    return (
+       <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   return <BlockNoteView editor={editor} theme={theme} />;
