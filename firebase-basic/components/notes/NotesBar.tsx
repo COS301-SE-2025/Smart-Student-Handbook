@@ -1,301 +1,273 @@
-//Notesbar that we should mimic the ui 
 "use client"
 
-import { useEffect, useState } from "react"
-import { getAuth, onAuthStateChanged, User } from "@firebase/auth"
-import { get, ref, update } from "@firebase/database"
-import { db } from "@/lib/firebase"
-
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import NoteTree from "@/components/notes/NoteTree"
-
 import {
-  Plus,
-  FolderPlus,
-  Loader2,
-  Notebook,
   ChevronDown,
   ChevronRight,
+  FileText,
   Folder,
   FolderOpen,
+  Loader2,
+  Notebook,
 } from "lucide-react"
 
-import type { FileNode } from "@/types/note"
-import {
-  addNode,
-  moveNode,
-  sortTree,
-} from "@/lib/note/treeActions"
-import {
-  buildSharedTreeFromRealtimeDB,
-  buildTreeFromRealtimeDB,
-  createFolderInDB,
-  createNoteInDB,
-  deleteNodeInDB,
-  renameNodeInDB,
-} from "@/lib/DBTree"
+import { getDatabase, ref, get, onValue } from "@firebase/database"
+import { getAuth } from "@firebase/auth"
 
-export default function RightNotesPanel({
-  userId,
-  onOpenNote,
-  setOwnerId,
-}: {
-  userId: string
-  onOpenNote: (noteId: string) => void
-  setOwnerId: (ownerId: string) => void
-}) {
-  const [user, setUser] = useState<User | null>(null)
+/* ------------------------------ Types ------------------------------ */
 
-  // Trees
-  const [myTree, setMyTree] = useState<FileNode[]>([])
-  const [sharedTree, setSharedTree] = useState<FileNode[]>([])
+type NoteListItem = {
+  id: string
+  title: string
+  ownerId?: string
+  updatedAt?: number
+  createdAt?: number
+}
 
-  // UI state (org-style headers & collapsibles)
-  const [loadingMy, setLoadingMy] = useState(false)
-  const [loadingShared, setLoadingShared] = useState(false)
-  const [expandedMy, setExpandedMy] = useState(true)
-  const [expandedShared, setExpandedShared] = useState(true)
+/* ------------------------------ Helpers ------------------------------ */
 
-  /* ------------------------------- Auth bootstrap ------------------------------ */
-  useEffect(() => {
-    const auth = getAuth()
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => setUser(firebaseUser))
-    return () => unsub()
-  }, [])
-
-  /* --------------------------- Load personal + shared --------------------------- */
-  useEffect(() => {
-    if (!userId) return
-
-    ;(async () => {
-      try {
-        setLoadingMy(true)
-        const personal = await buildTreeFromRealtimeDB(userId)
-        setMyTree(personal)
-      } finally {
-        setLoadingMy(false)
+/** Try to pull a human-friendly title from a BlockNote JSON array string. */
+function titleFromContentJSON(jsonStr: string): string | null {
+  try {
+    const parsed = JSON.parse(jsonStr)
+    if (!Array.isArray(parsed)) return null
+    // walk top-level blocks; return first non-empty text-ish content
+    for (const block of parsed) {
+      if (block?.content && Array.isArray(block.content)) {
+        for (const span of block.content) {
+          const t = span?.text?.trim?.()
+          if (t) return t
+        }
       }
-    })()
-
-    ;(async () => {
-      try {
-        setLoadingShared(true)
-        const shared = await buildSharedTreeFromRealtimeDB(userId)
-        setSharedTree(shared)
-      } finally {
-        setLoadingShared(false)
+      const propText = block?.props?.text
+      if (typeof propText === "string" && propText.trim().length > 0) {
+        return propText.trim()
       }
-    })()
-  }, [userId])
-
-  /* --------------------------------- Handlers ---------------------------------- */
-  const handleAdd = async (
-    scope: "my" | "shared",
-    type: "note" | "folder",
-  ) => {
-    if (!userId) return
-
-    // Preserve existing create semantics: create under user's path,
-    // let your sharing model expose into sharedTree.
-    if (scope === "my") {
-      const create = type === "folder"
-        ? () => createFolderInDB(userId, "New Folder", null)
-        : () => createNoteInDB(userId, "Untitled Note", null)
-      const newNode = await create()
-      setMyTree(prev => addNode(prev, null, type, newNode.id, newNode.name))
-      return
     }
-
-    if (scope === "shared") {
-      const create = type === "folder"
-        ? () => createFolderInDB(userId, "New Shared Folder", null)
-        : () => createNoteInDB(userId, "Untitled Shared Note", null)
-      const newNode = await create()
-      setSharedTree(prev => addNode(prev, null, type, newNode.id, newNode.name))
-      return
-    }
+  } catch {
+    /* ignore parse errors */
   }
+  return null
+}
 
-  const handleMoveMy = (draggedId: string, targetFolderId: string | null) => {
-    if (!userId) return
-    setMyTree(prev => {
-      const updated = moveNode(prev, draggedId, targetFolderId)
-      update(ref(db, `users/${userId}/notes/${draggedId}`), { parentId: targetFolderId ?? null })
-      return sortTree(updated)
+function fmtWhen(n?: number): string {
+  if (!n) return "No timestamp"
+  try {
+    return new Date(n).toLocaleString()
+  } catch {
+    return "No timestamp"
+  }
+}
+
+/* ------------------------------ Loader (one-off helper, still used for fallback) ------------------------------ */
+async function fetchOrgNotes(orgId: string): Promise<NoteListItem[]> {
+  const db = getDatabase()
+  const notesRef = ref(db, `organizations/${orgId}/notes`)
+  const snap = await get(notesRef)
+  if (!snap.exists()) return []
+
+  const raw = snap.val() as Record<string, any>
+  const items: NoteListItem[] = []
+
+  for (const [id, n] of Object.entries(raw)) {
+    const anyN: any = n ?? {}
+    let title =
+      (typeof anyN.title === "string" && anyN.title.trim()) ||
+      (typeof anyN.name === "string" && anyN.name.trim()) ||
+      ""
+
+    if (!title) {
+      const content = anyN.content
+      if (typeof content === "string" && content.length > 0) {
+        const t = titleFromContentJSON(content)
+        if (t) title = t
+      }
+    }
+    if (!title) title = "Untitled Note"
+
+    items.push({
+      id,
+      title,
+      ownerId: typeof anyN.ownerId === "string" ? anyN.ownerId : undefined,
+      updatedAt: typeof anyN.updatedAt === "number" ? anyN.updatedAt : undefined,
+      createdAt: typeof anyN.createdAt === "number" ? anyN.createdAt : undefined,
     })
   }
 
-  const handleMoveShared = (draggedId: string, targetFolderId: string | null) => {
-    // Preserve your existing shared semantics — if your model writes under user path,
-    // this mirrors the personal move. If shared is read-only, you can no-op here.
-    if (!userId) return
-    setSharedTree(prev => {
-      const updated = moveNode(prev, draggedId, targetFolderId)
-      update(ref(db, `users/${userId}/notes/${draggedId}`), { parentId: targetFolderId ?? null })
-      return sortTree(updated)
-    })
-  }
+  items.sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0))
+  return items
+}
 
-  const handleRename = async (id: string, newName: string) => {
-    if (!userId) return
-    // Update both trees optimistically (node might exist in either)
-    setMyTree(prev => renameInTree(prev, id, newName))
-    setSharedTree(prev => renameInTree(prev, id, newName))
-    await renameNodeInDB(userId, id, newName)
-  }
+/* ------------------------------ Component ------------------------------ */
 
-  const handleDelete = async (id: string) => {
-    if (!userId) return
-    setMyTree(prev => deleteFrom(clone(prev), id))
-    setSharedTree(prev => deleteFrom(clone(prev), id))
-    await deleteNodeInDB(userId, id)
-  }
+type NotesBarProps = {
+  orgId?: string
+  /** Called when user chooses a note (double click row). */
+  onOpenNote?: (noteId: string) => void
+}
 
-  function renameInTree(nodes: FileNode[], id: string, newName: string): FileNode[] {
-    return sortTree(
-      nodes.map((node) =>
-        node.id === id
-          ? { ...node, name: newName }
-          : { ...node, children: node.children ? renameInTree(node.children, id, newName) : undefined },
-      ),
+export default function NotesBar({ orgId, onOpenNote }: NotesBarProps) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [notes, setNotes] = useState<NoteListItem[]>([])
+  const [expanded, setExpanded] = useState(true)
+
+  const auth = useMemo(() => getAuth(), [])
+
+  useEffect(() => {
+    setError(null)
+    setNotes([])
+
+    if (!orgId) return
+
+    const user = auth.currentUser
+    if (!user) {
+      setError("You must be signed in to view notes.")
+      return
+    }
+
+    const db = getDatabase()
+    const notesRef = ref(db, `organizations/${orgId}/notes`)
+
+    setLoading(true)
+
+    // Live subscription: keeps titles/timestamps in sync as they change
+    const unsubscribe = onValue(
+      notesRef,
+      (snap) => {
+        if (!snap.exists()) {
+          setNotes([])
+          setLoading(false)
+          return
+        }
+
+        const raw = snap.val() as Record<string, any>
+        const items: NoteListItem[] = []
+
+        for (const [id, n] of Object.entries(raw)) {
+          const anyN: any = n ?? {}
+          // Prefer `name` (your org notes use `name`), fall back to `title`
+          let title =
+            (typeof anyN.name === "string" && anyN.name.trim()) ||
+            (typeof anyN.title === "string" && anyN.title.trim()) ||
+            ""
+
+          if (!title) {
+            // Optional: try to derive from content if it's BlockNote JSON string
+            const content = anyN.content
+            if (typeof content === "string" && content.length > 0) {
+              const t = titleFromContentJSON(content)
+              if (t) title = t
+            }
+          }
+          if (!title) title = "Untitled Note"
+
+          items.push({
+            id,
+            title,
+            ownerId: typeof anyN.ownerId === "string" ? anyN.ownerId : undefined,
+            updatedAt: typeof anyN.updatedAt === "number" ? anyN.updatedAt : undefined,
+            createdAt: typeof anyN.createdAt === "number" ? anyN.createdAt : undefined,
+          })
+        }
+
+        items.sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0))
+        setNotes(items)
+        setExpanded(true)
+        setLoading(false)
+      },
+      (err) => {
+        console.error("[NotesBar] subscription error:", err)
+        setError(err?.message || "Failed to load notes.")
+        setLoading(false)
+      },
     )
-  }
-  function clone(nodes: FileNode[]): FileNode[] {
-    return nodes.map(n => ({ ...n, children: n.children ? clone(n.children) : undefined }))
-  }
-  function deleteFrom(nodes: FileNode[], deleteId: string): FileNode[] {
-    return nodes
-      .filter(n => n.id !== deleteId)
-      .map(n => ({ ...n, children: n.children ? deleteFrom(n.children, deleteId) : undefined }))
-  }
-  function findNodeById(nodes: FileNode[], id: string): FileNode | null {
-    for (const node of nodes) {
-      if (node.id === id) return node
-      if (node.children) {
-        const found = findNodeById(node.children, id)
-        if (found) return found
-      }
+
+    return () => {
+      // unsubscribe from onValue
+      unsubscribe()
     }
-    return null
-  }
+  }, [orgId, auth])
 
-  /* ----------------------------------- UI ------------------------------------- */
   return (
-    <div className="h-full flex flex-col gap-3 p-2">
-      {/* ------------------------------ MY NOTES ------------------------------ */}
-      <Card className="h-[50%] rounded-xl bg-white dark:bg-neutral-900 border shadow flex flex-col">
-        <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
-          {/* org-style sticky header */}
+    <Card className="h-full">
+      <CardContent className="p-0 flex-1 min-h-0">
+        <div className="h-full flex flex-col">
+          {/* Fixed header so height never jumps */}
           <div className="sticky top-0 z-0 pr-[84px] flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
-            <div className="flex items-center gap-2">
-              <Notebook className="h-5 w-5" />
-              <span className="text-sm font-medium">My Notes</span>
-            </div>
+            <Notebook className="h-5 w-5 text-black" />
+            <span className="text-sm font-medium text-foreground">Notes</span>
             <div className="ml-auto flex items-center gap-2">
-              <Button size="sm" variant="secondary" className="gap-2" onClick={() => handleAdd("my", "folder")}>
-                <FolderPlus className="w-4 h-4" /> New folder
-              </Button>
-              <Button size="sm" className="gap-2" onClick={() => handleAdd("my", "note")}>
-                <Plus className="w-4 h-4" /> New note
-              </Button>
-              {loadingMy && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
             </div>
           </div>
-
-          {/* collapsible "All Notes" row (org notes style) */}
-          <div className="px-4 pt-3">
-            <button
-              onClick={() => setExpandedMy(p => !p)}
-              className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
-            >
-              {expandedMy ? (
-                <ChevronDown className="h-4 w-4" />
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="p-4">
+              {!orgId ? (
+                <div className="text-xs text-muted-foreground p-2">
+                  Open this page inside an organization to view notes.
+                </div>
+              ) : error ? (
+                <div className="text-xs text-red-700 p-2 border border-red-200 bg-red-50 rounded">{error}</div>
+              ) : notes.length === 0 ? (
+                <div className="text-xs text-muted-foreground p-2">This organisation has no notes yet.</div>
               ) : (
-                <ChevronRight className="h-4 w-4" />
+                <div className="space-y-2">
+                  {/* Single â€œAll Notesâ€ folder (mirrors Quizzes section style) */}
+                  <button
+                    onClick={() => setExpanded((p) => !p)}
+                    className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
+                  >
+                    {expanded ? (
+                      <ChevronDown className="h-4 w-4 text-black" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-black" />
+                    )}
+                    {expanded ? (
+                      <FolderOpen className="h-4 w-4 text-black" />
+                    ) : (
+                      <Folder className="h-4 w-4 text-black" />
+                    )}
+                    <span className="text-base font-medium text-foreground">All Notes ({notes.length})</span>
+                  </button>
+
+                  {expanded && (
+                    <div className="ml-6 space-y-1">
+                      {notes.map((n) => (
+                        <div
+                          key={n.id}
+                          className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors w-full cursor-pointer"
+                          onDoubleClick={() => onOpenNote?.(n.id)} // open on double click
+                          title="Double-click to open in editor"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") onOpenNote?.(n.id)
+                          }}
+                        >
+                          <FileText className="h-4 w-4 text-black" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-base font-medium text-foreground truncate">{n.title}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {n.updatedAt
+                                ? `Updated ${fmtWhen(n.updatedAt)}`
+                                : n.createdAt
+                                ? `Created ${fmtWhen(n.createdAt)}`
+                                : "No timestamp"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
-              {expandedMy ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
-              <span className="text-base font-medium">All Notes</span>
-            </button>
-          </div>
-
-          {/* tree area */}
-          <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
-            {expandedMy && (
-              <div className="ml-6">
-                <NoteTree
-                  treeData={myTree}
-                  onSelect={(id: string) => {
-                    onOpenNote(id)
-                    const node = findNodeById(myTree, id)
-                    setOwnerId(node?.ownerId ?? userId)
-                  }}
-                  onRename={handleRename}
-                  onDelete={handleDelete}
-                  onDropNode={handleMoveMy}
-                />
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ---------------------------- SHARED NOTES ---------------------------- */}
-      <Card className="h-[50%] rounded-xl bg-white dark:bg-neutral-900 border shadow flex flex-col">
-        <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
-          {/* org-style sticky header */}
-          <div className="sticky top-0 z-0 pr-[84px] flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
-            <div className="flex items-center gap-2">
-              <Notebook className="h-5 w-5" />
-              <span className="text-sm font-medium">Shared Notes</span>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <Button size="sm" variant="secondary" className="gap-2" onClick={() => handleAdd("shared", "folder")}>
-                <FolderPlus className="w-4 h-4" /> New folder
-              </Button>
-              <Button size="sm" className="gap-2" onClick={() => handleAdd("shared", "note")}>
-                <Plus className="w-4 h-4" /> New note
-              </Button>
-              {loadingShared && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
             </div>
           </div>
-
-          {/* collapsible "All Notes" row (org notes style) */}
-          <div className="px-4 pt-3">
-            <button
-              onClick={() => setExpandedShared(p => !p)}
-              className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
-            >
-              {expandedShared ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-              {expandedShared ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
-              <span className="text-base font-medium">All Notes</span>
-            </button>
-          </div>
-
-          {/* tree area */}
-          <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
-            {expandedShared && (
-              <div className="ml-6">
-                <NoteTree
-                  treeData={sharedTree}
-                  onSelect={(id: string) => {
-                    onOpenNote(id)
-                    const node = findNodeById(sharedTree, id)
-                    setOwnerId(node?.ownerId ?? userId)
-                  }}
-                  onRename={handleRename}
-                  onDelete={handleDelete}
-                  onDropNode={handleMoveShared}
-                />
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

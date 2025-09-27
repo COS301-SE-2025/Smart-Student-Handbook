@@ -403,7 +403,7 @@ export default function FlashCardSection({
                 <CardContent className="flex flex-col flex-1 min-h-0 px-6 pb-6">
                   {isLoading ? (
                     <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading cards…
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     </div>
                   ) : flashCards.length > 0 && currentCard ? (
                     <div className="flex-1 flex flex-col gap-3 min-h-0">
@@ -515,7 +515,7 @@ export default function FlashCardSection({
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
                       <p className="text-muted-foreground text-lg text-center">
-                        No flash cards yet.
+                      
                       </p>
                     </div>
                   )}
@@ -562,7 +562,7 @@ export default function FlashCardSection({
           <div className="flex-1 min-h-0 p-6 flex items-center justify-center">
             {isLoading ? (
               <div className="flex items-center justify-center text-lg text-muted-foreground">
-                <Loader2 className="h-5 w-5 mr-3 animate-spin" /> Loading cards…
+                <Loader2 className="h-5 w-5 mr-3 animate-spin" /> 
               </div>
             ) : flashCards.length > 0 && currentCard ? (
               <div className="w-full max-w-2xl h-full flex flex-col gap-4">
@@ -669,7 +669,7 @@ export default function FlashCardSection({
               </div>
             ) : (
               <p className="text-lg text-muted-foreground text-center">
-                No flash cards yet.
+                
               </p>
             )}
           </div>

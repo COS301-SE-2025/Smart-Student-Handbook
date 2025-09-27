@@ -1,4 +1,4 @@
-// app/organisations/[id]/notes/page.tsx
+
 "use client"
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react"
@@ -8,7 +8,7 @@ import { db, fns } from "@/lib/firebase"
 import { httpsCallable } from "firebase/functions"
 
 // Controlled selection + split view
-import NotesSplitViewWithRibbon, { type Note } from "@/components/notes/NotesSplitViewWithRibbon"
+import NotesSplitViewWithRibbon, { type Note } from "@/components/notes/OrgNotesSplitViewWithRibbon"
 
 export const dynamic = "force-dynamic"
 
@@ -83,7 +83,7 @@ function OrgNotesInner() {
       })
       lastCommittedRef.current = pageTitle
     } catch {
-      // optional: toast error
+     
     }
   }
 
@@ -99,7 +99,6 @@ function OrgNotesInner() {
           onSelect={setSelectedId}
           initialSelectedId={activeNoteId ?? undefined}
           loading={loading}
-          /* NEW: render the title inside the editor's border */
           title={pageTitle}
           onTitleChange={setPageTitle}
           onTitleCommit={commitTitleSave}  

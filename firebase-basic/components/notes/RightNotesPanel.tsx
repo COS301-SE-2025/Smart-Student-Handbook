@@ -1,4 +1,3 @@
-//Notesbar that we should mimic the ui
 "use client"
 
 import { useEffect, useState } from "react"

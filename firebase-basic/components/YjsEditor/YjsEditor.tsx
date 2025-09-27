@@ -129,7 +129,7 @@ export function YjsBlockNoteEditor({
   }, [editor, noteID, ownerID]);
 
   if (!provider || !providerReady || initialContent === null) {
-    return <div>Loading editor…</div>;
+    return <div></div>;
   }
 
   return (

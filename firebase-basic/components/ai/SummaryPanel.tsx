@@ -304,8 +304,7 @@ export default function SummaryPanel({
         <div className="flex-1 min-h-0 p-6 flex items-center justify-center">
           {loadingExisting ? (
             <div className="flex items-center justify-center text-lg text-muted-foreground">
-              <Loader2 className="h-5 w-5 mr-3 animate-spin" /> Loading summary…
-            </div>
+              <Loader2 className="h-5 w-5 mr-3 animate-spin" />             </div>
           ) : summary ? (
             <div className="w-full max-w-4xl h-full overflow-y-auto p-6 rounded-lg bg-white border border-gray-200 shadow-sm">
               <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-gray-900">{summary}</div>
@@ -364,7 +363,7 @@ export default function SummaryPanel({
                 <CardContent className="flex flex-col flex-1 min-h-0 px-6 pb-6">
                   {loadingExisting ? (
                     <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading summary…
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> 
                     </div>
                   ) : summary ? (
                     <div className="flex-1 min-h-0">

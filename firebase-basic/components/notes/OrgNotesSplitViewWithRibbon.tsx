@@ -1,5 +1,3 @@
-"use client"
-
 import { useEffect, useMemo, useState } from "react"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
@@ -9,9 +7,7 @@ import QuizBar from "../QuizBar"
 import Ribbon, { type RibbonSection } from "../ribbon/Ribbon"
 import { getAuth } from "firebase/auth"
 import Main from "../YjsEditor/OrgMain"
-
-// ⬇️ use the notes ribbon panel that expects userId + setOwnerId
-import RightNotesPanel from "../notes/RightNotesPanel"
+import NotesBar from "./NotesBar"
 
 /* --------------------------------- Types --------------------------------- */
 export type Note = {
@@ -83,11 +79,7 @@ export default function NotesSplitViewWithRibbon({
   const [isRightContentHidden, setIsRightContentHidden] = useState(false)
   const [activeRibbonSection, setActiveRibbonSection] = useState<RibbonSection>("summary")
 
-  // The signed-in user; used as default owner for personal/shared ribbon panel
-  const authedUserId = getAuth().currentUser?.uid ?? ""
-
-  // Owner used for editor & AI panels (can change when selecting from "Shared")
-  const [currentOwnerId, setCurrentOwnerId] = useState<string>(authedUserId)
+  const ownerId = getAuth().currentUser?.uid ?? ""
 
   // Keep local notes in sync with incoming prop updates
   useEffect(() => {
@@ -123,7 +115,7 @@ export default function NotesSplitViewWithRibbon({
     if (selectedNote?.content != null) setPlain(htmlToPlain(selectedNote.content))
   }, [selectedNote?.id, selectedNote?.content])
 
-  // Auto-save (debounced 1s) for content snapshots only — remains on org path for this org page
+  // Auto-save (debounced 1s) for content snapshots only
   useEffect(() => {
     if (!selectedNote?.id) return
     const t = setTimeout(() => {
@@ -153,7 +145,7 @@ export default function NotesSplitViewWithRibbon({
               title="Summary"
               className="h-full"
               orgId={orgID}
-              ownerId={currentOwnerId || authedUserId}
+              ownerId={ownerId}
               noteId={note.id}
             />
           </div>,
@@ -161,13 +153,7 @@ export default function NotesSplitViewWithRibbon({
       case "flashcards":
         return [
           <div key="flashcards" className="min-h-0 h-full">
-            <FlashCardSection
-              sourceText={plain}
-              className="h-full"
-              orgId={orgID}
-              ownerId={currentOwnerId || authedUserId}
-              noteId={note.id}
-            />
+            <FlashCardSection sourceText={plain} className="h-full" orgId={orgID} ownerId={ownerId} noteId={note.id} />
           </div>,
         ]
       case "quiz":
@@ -176,7 +162,7 @@ export default function NotesSplitViewWithRibbon({
             <QuizBar
               orgId={orgID}
               noteId={note.id}
-              userId={currentOwnerId || authedUserId}
+              userId={ownerId}
               displayName="User"
               defaultDurationSec={45}
               defaultNumQuestions={5}
@@ -184,16 +170,14 @@ export default function NotesSplitViewWithRibbon({
           </div>,
         ]
       case "notes":
-        // ⬇️ FIX: Use RightNotesPanel with the CORRECT props (userId + setOwnerId). No orgId prop here.
         return [
-          <div key="notespanel" className="min-h-0 h-full">
-            <RightNotesPanel
-              userId={authedUserId}
+          <div key="notesbar" className="min-h-0 h-full">
+            <NotesBar
+              orgId={orgID}
               onOpenNote={(noteId) => {
                 if (onSelect) onSelect(noteId)
                 else setInternalSelectedId(noteId)
               }}
-              setOwnerId={(owner) => setCurrentOwnerId(owner)}
             />
           </div>,
         ]
@@ -208,7 +192,7 @@ export default function NotesSplitViewWithRibbon({
     <div className="relative h-[calc(100vh-2rem)] w-full">
       {/* Main content area with editor and sections */}
       <div className="flex h-full min-h-0 gap-4 pr-4">
-        {/* Editor pane — expands when right content is hidden */}
+        {/* Editor pane â€” expands when right content is hidden */}
         <div
           className={`${
             isRightContentHidden ? "flex-1" : "flex-[3]"
@@ -239,7 +223,6 @@ export default function NotesSplitViewWithRibbon({
             <Main
               searchParams={{
                 doc: currentSelectedNoteId as any,
-                // For org page we still open the org-owned doc in the Org editor:
                 ownerId: orgID ?? undefined,
                 username: "Organisation Member",
               }}
