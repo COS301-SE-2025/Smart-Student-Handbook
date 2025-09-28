@@ -500,40 +500,6 @@ export function SmartHeader() {
   return requestId
 }
 
-async function acceptFriendRequest(requestId: string, otherUid: string) {
-  const auth = getAuth()
-  const me = auth.currentUser
-  if (!me) throw new Error("Not authenticated")
-
-  const db = getDatabase()
-
-  // 1) Mark request accepted
-  await dbUpdate(dbRef(db, `friendRequests/${requestId}`), { status: "accepted" })
-
-  // 2) Add each other to friends (simple adjacency list)
-  await dbUpdate(dbRef(db, `friends/${me.uid}`), { [otherUid]: true })
-  await dbUpdate(dbRef(db, `friends/${otherUid}`), { [me.uid]: true })
-
-  // 3) Notify sender that it was accepted
-  const notifRef = dbPush(dbRef(db, `users/${otherUid}/notifications`))
-  await dbSet(notifRef, {
-    type: "friend_request_accepted",
-    message: `${me.displayName || "Your friend request"} was accepted`,
-    fromUserId: me.uid,
-    requestId,
-    timestamp: Date.now(),
-  })
-}
-
-async function rejectFriendRequest(requestId: string) {
-  const auth = getAuth()
-  const me = auth.currentUser
-  if (!me) throw new Error("Not authenticated")
-
-  const db = getDatabase()
-  await dbUpdate(dbRef(db, `friendRequests/${requestId}`), { status: "rejected" })
-}
-
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
       <div className="flex h-full items-center justify-between px-4">
@@ -636,36 +602,6 @@ async function rejectFriendRequest(requestId: string) {
 
                           {n.description && (
                             <p className="text-xs text-muted-foreground leading-relaxed">{n.description}</p>
-                          )}
-
-                          {n.type === "friend_request" && (
-                            <div className="flex gap-2 pt-1">
-                              <Button
-                                size="sm"
-                                onClick={async (e) => {
-                                  e.stopPropagation()
-                                  if (!n.requestId || !n.fromUserId) return
-                                  await acceptFriendRequest(n.requestId, n.fromUserId)
-                                  // remove this notif from my list
-                                  dismissNotification(n.id, n.type)
-                                }}
-                              >
-                                Accept
-                              </Button>
-
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={async (e) => {
-                                  e.stopPropagation()
-                                  if (!n.requestId) return
-                                  await rejectFriendRequest(n.requestId)
-                                  dismissNotification(n.id, n.type)
-                                }}
-                              >
-                                Reject
-                              </Button>
-                            </div>
                           )}
                         </div>
                       </div>

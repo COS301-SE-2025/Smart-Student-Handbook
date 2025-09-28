@@ -187,6 +187,7 @@ export function YjsBlockNoteEditor({
 }: YjsBlockNoteEditorProps) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
+
   useEffect(() => {
     const root = document.documentElement;
     const observer = new MutationObserver(() => {
@@ -199,6 +200,9 @@ export function YjsBlockNoteEditor({
     return () => observer.disconnect();
   }, []);
 
+
+  return () => observer.disconnect();
+}, []);
   const doc = useYDoc();
   const provider: any = useYjsProvider();
 
@@ -281,6 +285,7 @@ export function YjsBlockNoteEditor({
         console.error("Failed to save note:", err);
       }
     }, 5000);
+
     return () => clearInterval(interval);
   }, [editor, noteID, ownerID]);
 
@@ -305,6 +310,7 @@ export function YjsBlockNoteEditor({
       </div>
 
       <div className="flex-1 h-[calc(100vh-16px)] overflow-auto">
+
         <BlockNoteView editor={editor} theme={theme} />
       </div>
     </div>
