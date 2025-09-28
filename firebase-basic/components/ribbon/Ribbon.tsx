@@ -43,7 +43,7 @@ export default function Ribbon({ activeSection, onSectionChange, className, onCo
     <div
       className={cn(
         "fixed top-[var(--app-header-height,56px)] bottom-0 right-6 z-50",
-        "w-[50px] min-w-[50px] flex flex-col bg-white/95 backdrop-blur-md rounded-lg shadow-sm border border-gray-100",
+        "w-[50px] min-w-[50px] flex flex-col bg-background/95 backdrop-blur-md rounded-lg shadow-sm border border-border",
         className,
       )}
       aria-hidden={false}
@@ -60,8 +60,8 @@ export default function Ribbon({ activeSection, onSectionChange, className, onCo
               className={cn(
                 "h-12 w-full flex items-center justify-center cursor-pointer",
                 "transition-all duration-200 ease-in-out",
-                "hover:bg-blue-50 hover:scale-105",
-                active && "bg-blue-100 shadow-sm",
+                "hover:bg-accent hover:scale-105",
+                active && "bg-accent/80 shadow-sm",
                 "mx-1 my-0.5 rounded-md",
               )}
               onClick={() => handleIconClick(id)}
@@ -72,17 +72,17 @@ export default function Ribbon({ activeSection, onSectionChange, className, onCo
               <Icon
                 className={cn(
                   "h-5 w-5 transition-colors duration-200",
-                  active ? "text-blue-700" : "text-gray-600",
-                  "group-hover:text-blue-700",
+                  active ? "text-primary" : "text-muted-foreground",
+                  "group-hover:text-primary",
                 )}
               />
             </div>
 
             {hoveredItem === id && (
               <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 z-60">
-                <div className="bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg">
+                <div className="bg-popover text-popover-foreground text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg border border-border">
                   {label}
-                  <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-900"></div>
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-popover"></div>
                 </div>
               </div>
             )}

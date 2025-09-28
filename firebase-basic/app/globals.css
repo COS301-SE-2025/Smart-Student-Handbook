@@ -1,4 +1,3 @@
-
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -31,7 +30,6 @@
   .editor-content li {
     display: list-item;
     margin: 0.25rem 0;
-
   }
 
   .tiptap ul,
@@ -128,37 +126,38 @@
 }
 
 .dark {
-  --background: oklch(0.14 0.034 264.665);
-
+  /* Main background color - set to #040817 */
+  --background: #171717;
+  
   --foreground: oklch(0.985 0.002 247.839);
-  --card: oklch(0.21 0.034 264.665);
+  --card: #0a0e1a;  /* Slightly lighter than background for cards */
   --card-foreground: oklch(0.985 0.002 247.839);
-  --popover: oklch(0.21 0.034 264.665);
+  --popover: #0a0e1a;  /* Same as card */
   --popover-foreground: oklch(0.985 0.002 247.839);
   --primary: oklch(0.928 0.006 264.531);
   --primary-foreground: oklch(0.21 0.034 264.665);
-  --secondary: oklch(0.278 0.033 256.848);
+  --secondary: #0f1421;  /* Darker secondary */
   --secondary-foreground: oklch(0.985 0.002 247.839);
-  --muted: oklch(0.278 0.033 256.848);
+  --muted: #0f1421;  /* Same as secondary */
   --muted-foreground: oklch(0.707 0.022 261.325);
-  --accent: oklch(0.278 0.033 256.848);
+  --accent: #0f1421;  /* Same as secondary */
   --accent-foreground: oklch(0.985 0.002 247.839);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: rgba(255, 255, 255, 0.1);  /* Subtle white border */
+  --input: rgba(255, 255, 255, 0.15);  /* Slightly more visible for inputs */
   --ring: oklch(0.551 0.027 264.364);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.21 0.034 264.665);
+  --sidebar: #171717;  /* Same as background */
   --sidebar-foreground: oklch(0.985 0.002 247.839);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(32.864% 0.08043 267.691);
   --sidebar-primary-foreground: oklch(0.985 0.002 247.839);
-  --sidebar-accent: oklch(0.278 0.033 256.848);
+  --sidebar-accent: #0f1421;  /* Darker accent */
   --sidebar-accent-foreground: oklch(0.985 0.002 247.839);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: rgba(255, 255, 255, 0.1);  /* Same as border */
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
@@ -170,65 +169,12 @@
     @apply bg-background text-foreground;
   }
 }
+
 .ql-editor {
-  overflow: visible !important;   /* or auto if you *do* want it */
+  overflow: visible !important;
 }
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 44%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --chart-1: 221.2 83.2% 53.3%;
-    --chart-2: 212 95% 68%;
-    --chart-3: 216 92% 60%;
-    --chart-4: 210 98% 78%;
-    --chart-5: 212 97% 87%;
-  }
-
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 221.2 83.2% 53.3%;
-    --chart-1: 221.2 83.2% 53.3%;
-    --chart-2: 212 95% 68%;
-    --chart-3: 216 92% 60%;
-    --chart-4: 210 98% 78%;
-    --chart-5: 212 97% 87%;
-  }
-}
+/* Remove the conflicting HSL-based theme definitions */
 
 /* When an overlay is open, let the overlay's backdrop blur handle visuals uniformly.
    We only disable interaction on chrome (header/sidebar). */
