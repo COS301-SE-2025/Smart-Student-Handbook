@@ -8,5 +8,6 @@ export * from "./orgSummaries";   // summaries only
 export * from "./orgnotes"
 export * from "./collaborators"
 export *from "./quiz/quizzes";
+export { searchEverything } from "./searchEverything";
 
 
