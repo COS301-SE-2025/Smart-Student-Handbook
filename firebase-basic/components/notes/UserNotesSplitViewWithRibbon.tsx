@@ -1171,6 +1171,7 @@ export default function UserNotesSplitViewWithRibbon({
                 userId={userID}
                 noteId={selectedNote.id}
                 isPersonal
+                autoGenerateIfMissing
               />
             ) : (
               <div className="p-4 text-sm text-muted-foreground">Select a note to summarize.</div>
@@ -1188,6 +1189,7 @@ export default function UserNotesSplitViewWithRibbon({
                 userId={userID}
                 noteId={selectedNote.id}
                 isPersonal
+                autoGenerateIfMissing
               />
             ) : (
               <div className="p-4 text-sm text-muted-foreground">Select a note to generate flashcards.</div>
@@ -1235,7 +1237,8 @@ export default function UserNotesSplitViewWithRibbon({
         <div
           className={`${
             isRightContentHidden ? "flex-1" : "flex-[3]"
-          } border border-gray-200 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow flex flex-col min-h-0 transition-all duration-300`}
+      } border border-gray-200 dark:border-0 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow flex flex-col min-h-0 transition-all duration-300`}
+
         >
           {/* Editor body */}
           <div className="flex-1 min-h-0 overflow-y-auto scroll-invisible">

@@ -5,11 +5,18 @@ import { getAuth, onAuthStateChanged, type User } from "@firebase/auth"
 import { ref, update } from "@firebase/database"
 import { db } from "@/lib/firebase"
 
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import NoteTree from "@/components/notes/NoteTree"
 
-import { Plus, FolderPlus, Loader2, Notebook, ChevronDown, ChevronRight, Folder, FolderOpen } from "lucide-react"
+import {
+  FileText,
+  FolderPlus,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  FolderOpen,
+} from "lucide-react"
 
 import type { FileNode } from "@/types/note"
 import { addNode, moveNode, sortTree } from "@/lib/note/treeActions"
@@ -37,10 +44,13 @@ export default function RightNotesPanel({
   const [myTree, setMyTree] = useState<FileNode[]>([])
   const [sharedTree, setSharedTree] = useState<FileNode[]>([])
 
-  // UI state (org-style headers & collapsibles)
+  // UI state
   const [loadingMy, setLoadingMy] = useState(false)
   const [loadingShared, setLoadingShared] = useState(false)
-  const [expandedMy, setExpandedMy] = useState(true)
+
+  // Collapsibles per your structure
+  const [expandedAll, setExpandedAll] = useState(true)
+  const [expandedPersonal, setExpandedPersonal] = useState(true)
   const [expandedShared, setExpandedShared] = useState(true)
 
   /* ------------------------------- Auth bootstrap ------------------------------ */
@@ -77,8 +87,6 @@ export default function RightNotesPanel({
   const handleAdd = async (scope: "my" | "shared", type: "note" | "folder") => {
     if (!userId) return
 
-    // Preserve existing create semantics: create under user's path,
-    // let your sharing model expose into sharedTree.
     if (scope === "my") {
       const create =
         type === "folder"
@@ -110,8 +118,6 @@ export default function RightNotesPanel({
   }
 
   const handleMoveShared = (draggedId: string, targetFolderId: string | null) => {
-    // Preserve your existing shared semantics — if your model writes under user path,
-    // this mirrors the personal move. If shared is read-only, you can no-op here.
     if (!userId) return
     setSharedTree((prev) => {
       const updated = moveNode(prev, draggedId, targetFolderId)
@@ -120,7 +126,8 @@ export default function RightNotesPanel({
     })
   }
 
-  const handleRename = async (id: string, newName: string) => {
+  // 👇 Add explicit type annotation to avoid TS7022
+  const handleRename: (id: string, newName: string) => Promise<void> = async (id, newName) => {
     if (!userId) return
     // Update both trees optimistically (node might exist in either)
     setMyTree((prev) => renameInTree(prev, id, newName))
@@ -166,111 +173,150 @@ export default function RightNotesPanel({
   /* ----------------------------------- UI ------------------------------------- */
   return (
     <div className="h-full flex flex-col gap-3 p-2">
-      {/* ------------------------------ MY NOTES ------------------------------ */}
-      <Card className="h-[50%] rounded-xl bg-white dark:bg-neutral-900 border shadow flex flex-col">
-        <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
-          {/* org-style sticky header */}
-          <div className="sticky top-0 z-0 pr-[84px] flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
-            <div className="flex items-center gap-2">
-              <Notebook className="h-5 w-5" />
-              <span className="text-sm font-medium">My Notes</span>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <Button size="sm" variant="secondary" className="gap-2" onClick={() => handleAdd("my", "folder")}>
-                <FolderPlus className="w-4 h-4" /> New folder
-              </Button>
-              <Button size="sm" className="gap-2" onClick={() => handleAdd("my", "note")}>
-                <Plus className="w-4 h-4" /> New note
-              </Button>
-              {loadingMy && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
-            </div>
-          </div>
+      {/* Header (removed icon, slightly larger heading) */}
+      <div className="flex items-center gap-2 px-2 py-1">
+        <span className="text-lg font-semibold">My Notes</span>
+      </div>
 
-          {/* collapsible "All Notes" row (org notes style) */}
-          <div className="px-4 pt-3">
-            <button
-              onClick={() => setExpandedMy((p) => !p)}
-              className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
-            >
-              {expandedMy ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              {expandedMy ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
-              <span className="text-base font-medium">All Notes</span>
-            </button>
-          </div>
+      {/* Top-level: All Notes (no borders) */}
+      <div className="flex-1 min-h-0">
+        <div className="px-2">
+          <button
+            onClick={() => setExpandedAll((p) => !p)}
+            className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
+          >
+            {expandedAll ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            {expandedAll ? <FolderOpen className="h-4 w-4 text-blue-600" /> : <Folder className="h-4 w-4 text-blue-600" />}
+            <span className="text-base font-medium">All Notes</span>
+          </button>
+        </div>
 
-          {/* tree area */}
-          <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
-            {expandedMy && (
-              <div className="ml-6">
-                <NoteTree
-                  treeData={myTree}
-                  onSelect={(id: string) => {
-                    onOpenNote(id)
-                    const node = findNodeById(myTree, id)
-                    setOwnerId(node?.ownerId ?? userId)
-                  }}
-                  onRename={handleRename}
-                  onDelete={handleDelete}
-                  onDropNode={handleMoveMy}
-                />
+        {expandedAll && (
+          <div className="ml-6 pr-2 space-y-1">
+            {/* Personal Notes folder */}
+            <div>
+              <div className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors">
+                <button
+                  onClick={() => setExpandedPersonal((p) => !p)}
+                  className="flex items-center gap-2 flex-1 text-left"
+                >
+                  {expandedPersonal ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  {expandedPersonal ? (
+                    <FolderOpen className="h-4 w-4 text-blue-600" />
+                  ) : (
+                    <Folder className="h-4 w-4 text-blue-600" />
+                  )}
+                  <span className="text-sm font-medium">Personal Notes</span>
+                </button>
+
+                {/* actions: ONLY new folder / new note kept */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="New folder"
+                    aria-label="New folder"
+                    onClick={() => handleAdd("my", "folder")}
+                  >
+                    <FolderPlus className="w-4 h-4 text-blue-600" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="New note"
+                    aria-label="New note"
+                    onClick={() => handleAdd("my", "note")}
+                  >
+                    <FileText className="w-4 h-4 text-blue-600" />
+                  </Button>
+                  {loadingMy && <Loader2 className="h-4 w-4 animate-spin ml-1" aria-label="Loading personal" />}
+                </div>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* ---------------------------- SHARED NOTES ---------------------------- */}
-      <Card className="h-[50%] rounded-xl bg-white dark:bg-neutral-900 border shadow flex flex-col">
-        <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
-          {/* org-style sticky header */}
-          <div className="sticky top-0 z-0 pr-[84px] flex items-center justify-between gap-2 px-4 py-2 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
-            <div className="flex items-center gap-2">
-              <Notebook className="h-5 w-5" />
-              <span className="text-sm font-medium">Shared Notes</span>
+              {expandedPersonal && (
+                <div className="ml-6">
+                  <NoteTree
+                    treeData={myTree}
+                    onSelect={(id: string) => {
+                      onOpenNote(id)
+                      const node = findNodeById(myTree, id)
+                      setOwnerId(node?.ownerId ?? userId)
+                    }}
+                    onRename={handleRename}
+                    onDelete={handleDelete}
+                    onDropNode={handleMoveMy}
+                  />
+                </div>
+              )}
             </div>
-            <div className="ml-auto flex items-center gap-2">
-              <Button size="sm" variant="secondary" className="gap-2" onClick={() => handleAdd("shared", "folder")}>
-                <FolderPlus className="w-4 h-4" /> New folder
-              </Button>
-              <Button size="sm" className="gap-2" onClick={() => handleAdd("shared", "note")}>
-                <Plus className="w-4 h-4" /> New note
-              </Button>
-              {loadingShared && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
-            </div>
-          </div>
 
-          {/* collapsible "All Notes" row (org notes style) */}
-          <div className="px-4 pt-3">
-            <button
-              onClick={() => setExpandedShared((p) => !p)}
-              className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
-            >
-              {expandedShared ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              {expandedShared ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
-              <span className="text-base font-medium">All Notes</span>
-            </button>
-          </div>
+            {/* Shared Notes folder */}
+            <div>
+              <div className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors">
+                <button
+                  onClick={() => setExpandedShared((p) => !p)}
+                  className="flex items-center gap-2 flex-1 text-left"
+                >
+                  {expandedShared ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  {expandedShared ? (
+                    <FolderOpen className="h-4 w-4 text-blue-600" />
+                  ) : (
+                    <Folder className="h-4 w-4 text-blue-600" />
+                  )}
+                  <span className="text-sm font-medium">Shared Notes</span>
+                </button>
 
-          {/* tree area */}
-          <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
-            {expandedShared && (
-              <div className="ml-6">
-                <NoteTree
-                  treeData={sharedTree}
-                  onSelect={(id: string) => {
-                    onOpenNote(id)
-                    const node = findNodeById(sharedTree, id)
-                    setOwnerId(node?.ownerId ?? userId)
-                  }}
-                  onRename={handleRename}
-                  onDelete={handleDelete}
-                  onDropNode={handleMoveShared}
-                />
+                {/* actions: ONLY new folder / new note kept */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="New folder"
+                    aria-label="New folder"
+                    onClick={() => handleAdd("shared", "folder")}
+                  >
+                    <FolderPlus className="w-4 h-4 text-blue-600" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="New note"
+                    aria-label="New note"
+                    onClick={() => handleAdd("shared", "note")}
+                  >
+                    <FileText className="w-4 h-4 text-blue-600" />
+                  </Button>
+                  {loadingShared && <Loader2 className="h-4 w-4 animate-spin ml-1" aria-label="Loading shared" />}
+                </div>
               </div>
-            )}
+
+              {expandedShared && (
+                <div className="ml-6">
+                  <NoteTree
+                    treeData={sharedTree}
+                    onSelect={(id: string) => {
+                      onOpenNote(id)
+                      const node = findNodeById(sharedTree, id)
+                      setOwnerId(node?.ownerId ?? userId)
+                    }}
+                    onRename={handleRename}
+                    onDelete={handleDelete}
+                    onDropNode={handleMoveShared}
+                  />
+                </div>
+              )}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   )
 }

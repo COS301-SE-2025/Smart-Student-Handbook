@@ -1,3 +1,4 @@
+// components/flashcards/FlashCardSection.tsx
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
@@ -32,14 +33,14 @@ type FlashCardSectionProps = {
   /** Current user id (optional, used to infer scope if needed) */
   ownerId?: string
 
-  /** If true, force saving/loading under users/{userId}/... */
+  /** If true, force saving/loading under users/{uid}/... */
   isPersonal?: boolean
-
-  /** legacy (ignored) */
-  setNumber?: number
 
   /** Note id (required to load/save) */
   noteId?: string
+
+  /** NEW: only on personal page – load, and if missing, auto-generate & save once */
+  autoGenerateIfMissing?: boolean
 }
 
 /* ----------------------------- Parse helpers ----------------------------- */
@@ -66,23 +67,17 @@ function tryJson(text: string) {
     if (!arr) return null
     const out: Array<{ front: string; back: string }> = []
     for (const item of arr) {
-      let front = "",
-        back = ""
+      let front = "", back = ""
       if (typeof item === "string") {
         const m = item.match(/^(.*?)\s*::\s*(.+)$/)
-        if (m) {
-          front = m[1]
-          back = m[2]
-        }
+        if (m) { front = m[1]; back = m[2] }
       } else if (Array.isArray(item) && item.length >= 2) {
-        front = String(item[0])
-        back = String(item[1])
+        front = String(item[0]); back = String(item[1])
       } else if (typeof item === "object" && item) {
         front = (item as any).front ?? (item as any).question ?? (item as any).q ?? ""
-        back = (item as any).back ?? (item as any).answer ?? (item as any).a ?? ""
+        back  = (item as any).back  ?? (item as any).answer   ?? (item as any).a ?? ""
       }
-      front = tidy(front)
-      back = tidy(back)
+      front = tidy(front); back = tidy(back)
       if (front && back) out.push({ front, back })
     }
     return out.length ? out : null
@@ -96,24 +91,19 @@ function tryQARegex(text: string) {
   const re = /^Q\s*[:\-–]\s*(.*?)\nA\s*[:\-–]\s*([\s\S]*?)(?=\nQ\s*[:\-–]|$)/gim
   const out: Array<{ front: string; back: string }> = []
   for (const m of t.matchAll(re)) {
-    const front = tidy(m[1]),
-      back = tidy(m[2])
+    const front = tidy(m[1]), back = tidy(m[2])
     if (front && back) out.push({ front, back })
   }
   return out.length ? out : null
 }
 
 function tryLinePairs(text: string) {
-  const lines = stripFences(text)
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
+  const lines = stripFences(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   const out: Array<{ front: string; back: string }> = []
   for (const line of lines) {
     const m = line.match(/^(.*?)\s*(?:::|->|—|-{1,2}>)\s*(.+)$/)
     if (m) {
-      const front = tidy(m[1]),
-        back = tidy(m[2])
+      const front = tidy(m[1]), back = tidy(m[2])
       if (front && back) out.push({ front, back })
     }
   }
@@ -121,15 +111,11 @@ function tryLinePairs(text: string) {
 }
 
 function tryAdjacentPairs(text: string) {
-  const lines = stripFences(text)
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
+  const lines = stripFences(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   if (lines.length < 2) return null
   const out: Array<{ front: string; back: string }> = []
   for (let i = 0; i < lines.length - 1; i += 2) {
-    const front = tidy(lines[i]),
-      back = tidy(lines[i + 1])
+    const front = tidy(lines[i]), back = tidy(lines[i + 1])
     if (front && back) out.push({ front, back })
   }
   return out.length ? out : null
@@ -149,16 +135,24 @@ function parseFlashcards(raw: string) {
   return deduped
 }
 
-/* -------------------------- Callables (org & user) -------------------------- */
+/* -------------------------- Callables -------------------------- */
+/** ORG: keep your existing pack endpoints */
 const callLoadOrgPack = httpsCallable(fns, "loadNoteFlashcardsPack")
 const callSaveOrgPack = httpsCallable(fns, "saveNoteFlashcardsPack")
-const callLoadUserPack = httpsCallable(fns, "loadUserNoteFlashcardsPack")
-const callSaveUserPack = httpsCallable(fns, "saveUserNoteFlashcardsPack")
+
+/** PERSONAL: match your provided usercontents functions:
+ * - loadUserFlashcards:  { noteId } -> { cards: Array<{ q: string; a: string }> }
+ * - saveUserFlashcards:  { noteId, cards: Array<{ q: string; a: string }> } -> { ok: true }
+ */
+type UserLoadCardsRes = { cards: Array<{ q: string; a: string }> }
+type UserSaveCardsReq = { noteId: string; cards: Array<{ q: string; a: string }> }
+
+const callLoadUserCards = httpsCallable<{ noteId: string }, UserLoadCardsRes>(fns, "loadUserFlashcards")
+const callSaveUserCards = httpsCallable<UserSaveCardsReq, { ok: true }>(fns, "saveUserFlashcards")
 
 /* -------------------------------------------------------------------------- */
 /*                                Component UI                                */
 /* -------------------------------------------------------------------------- */
-
 export default function FlashCardSection({
   initialText,
   sourceText,
@@ -168,6 +162,7 @@ export default function FlashCardSection({
   ownerId,
   isPersonal,
   noteId,
+  autoGenerateIfMissing = false,
 }: FlashCardSectionProps) {
   // Text we feed to the AI for generation
   const text = (sourceText ?? initialText ?? "").trim()
@@ -179,6 +174,7 @@ export default function FlashCardSection({
   const [isLoading, setIsLoading] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [autoTried, setAutoTried] = useState(false) // ensure one-time auto-gen
 
   useEffect(() => setIsClient(true), [])
 
@@ -190,7 +186,7 @@ export default function FlashCardSection({
     return false
   }, [isPersonal, orgId, userId, ownerId])
 
-  // Keep overlay tidy on expand/collapse
+  // Overlay scroll lock
   useEffect(() => {
     const cls = "overlay-open"
     const el = document.documentElement
@@ -212,25 +208,27 @@ export default function FlashCardSection({
   /* -------------------- Load existing pack whenever note changes -------------------- */
   useEffect(() => {
     let cancelled = false
+    setAutoTried(false) // reset when note/scope changes
     async function load() {
       if (!noteId) return
       setIsLoading(true)
       try {
         if (useUserScope) {
-          if (!userId) return
-          const res: any = await callLoadUserPack({ userId, noteId })
-          const cards = (res?.data?.cards ?? []) as Array<{ number: number; question: string; answer: string }>
+          // PERSONAL: { noteId } -> { cards: [{q,a}] }
+          const res = await callLoadUserCards({ noteId })
+          const raw = res?.data?.cards ?? []
+          const mapped: FlashCardUI[] = raw.map((c, i) => ({
+            number: i + 1,
+            front: tidy(c.q),
+            back: tidy(c.a),
+          }))
           if (!cancelled) {
-            const mapped: FlashCardUI[] = cards.map((c) => ({
-              number: c.number,
-              front: tidy(c.question),
-              back: tidy(c.answer),
-            }))
             setFlashCards(mapped)
             setCurrentCardIndex(0)
             setIsFlipped(false)
           }
         } else {
+          // ORG: unchanged pack endpoints
           if (!orgId) return
           const res: any = await callLoadOrgPack({ orgId, noteId })
           const cards = (res?.data?.cards ?? []) as Array<{ number: number; question: string; answer: string }>
@@ -263,10 +261,20 @@ export default function FlashCardSection({
     }
   }, [useUserScope, userId, orgId, noteId])
 
+  // If personal + missing + opt-in flag, auto-generate ONCE
+  useEffect(() => {
+    const missing = flashCards.length === 0
+    if (useUserScope && autoGenerateIfMissing && !isLoading && missing && !autoTried && canGenerate) {
+      setAutoTried(true)
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      generateFromAI(true)
+    }
+  }, [useUserScope, autoGenerateIfMissing, isLoading, flashCards.length, autoTried, canGenerate])
+
   /* -------------------- Generate + SAVE pack (replace) -------------------- */
-  const generateFromAI = async () => {
+  const generateFromAI = async (suppressUI = false) => {
     if (!text) return
-    setIsGenerating(true)
+    if (!suppressUI) setIsGenerating(true)
     setIsFlipped(false)
     try {
       const raw = await generateFlashcards(text)
@@ -284,34 +292,22 @@ export default function FlashCardSection({
       setCurrentCardIndex(0)
 
       // Persist pack (replace)
-      const cardsForSave = mapped.map((m) => ({ question: m.front, answer: m.back }))
-
       try {
         if (useUserScope) {
-          if (!userId || !noteId) {
-            console.warn("[Flashcards] User scope chosen but userId/noteId missing; skipping save.")
+          // PERSONAL save: { noteId, cards: [{q,a}] }
+          if (!noteId) {
+            console.warn("[Flashcards] User scope chosen but noteId missing; skipping save.")
           } else {
-            const res: any = await callSaveUserPack({
-              userId,
-              noteId,
-              mode: "replace",
-              cards: cardsForSave,
-            } as any)
-            // Optional debug:
-            // console.log("[Flashcards] Saved user pack:", res?.data)
+            const cardsForSave = mapped.map((m) => ({ q: m.front, a: m.back }))
+            await callSaveUserCards({ noteId, cards: cardsForSave })
           }
         } else {
+          // ORG save unchanged
           if (!orgId || !noteId) {
             console.warn("[Flashcards] Org scope chosen but orgId/noteId missing; skipping save.")
           } else {
-            const res: any = await callSaveOrgPack({
-              orgId,
-              noteId,
-              mode: "replace",
-              cards: cardsForSave,
-            } as any)
-            // Optional debug:
-            // console.log("[Flashcards] Saved org pack:", res?.data)
+            const cardsForSave = mapped.map((m) => ({ question: m.front, answer: m.back }))
+            await callSaveOrgPack({ orgId, noteId, mode: "replace", cards: cardsForSave } as any)
           }
         }
       } catch (err) {
@@ -322,7 +318,7 @@ export default function FlashCardSection({
       setFlashCards([])
       setCurrentCardIndex(0)
     } finally {
-      setIsGenerating(false)
+      if (!suppressUI) setIsGenerating(false)
     }
   }
 
@@ -337,7 +333,7 @@ export default function FlashCardSection({
       setCurrentCardIndex(0)
     }
     setIsFlipped(false)
-    // (Optional) Persist delete by re-saving pack here if you want live deletes saved.
+    // Optional: persist deletes by re-saving pack (not required by your ask)
   }
 
   const toggleFlip = () => setIsFlipped((f) => !f)
@@ -373,7 +369,7 @@ export default function FlashCardSection({
                   <CardTitle className="text-xl">Flash Cards</CardTitle>
                   <div className="flex items-center gap-2">
                     <Button
-                      onClick={generateFromAI}
+                      onClick={() => generateFromAI()}
                       disabled={!canGenerate}
                       variant="default"
                       size="sm"
@@ -514,9 +510,7 @@ export default function FlashCardSection({
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="text-muted-foreground text-lg text-center">
-                      
-                      </p>
+                      <p className="text-muted-foreground text-lg text-center">No flashcards yet.</p>
                     </div>
                   )}
                 </CardContent>
@@ -532,7 +526,7 @@ export default function FlashCardSection({
             <h3 className="text-lg font-semibold">Flash Cards</h3>
             <div className="flex items-center gap-2">
               <Button
-                onClick={generateFromAI}
+                onClick={() => generateFromAI()}
                 disabled={!canGenerate}
                 variant="default"
                 size="sm"
@@ -562,7 +556,7 @@ export default function FlashCardSection({
           <div className="flex-1 min-h-0 p-6 flex items-center justify-center">
             {isLoading ? (
               <div className="flex items-center justify-center text-lg text-muted-foreground">
-                <Loader2 className="h-5 w-5 mr-3 animate-spin" /> 
+                <Loader2 className="h-5 w-5 mr-3 animate-spin" />
               </div>
             ) : flashCards.length > 0 && currentCard ? (
               <div className="w-full max-w-2xl h-full flex flex-col gap-4">
@@ -668,9 +662,7 @@ export default function FlashCardSection({
                 <p className="text-center text-muted-foreground text-sm">Click card to flip • Use arrows to navigate</p>
               </div>
             ) : (
-              <p className="text-lg text-muted-foreground text-center">
-                
-              </p>
+              <p className="text-lg text-muted-foreground text-center">No flashcards yet.</p>
             )}
           </div>
         </div>

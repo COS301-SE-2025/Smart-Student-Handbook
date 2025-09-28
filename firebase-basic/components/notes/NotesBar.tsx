@@ -221,14 +221,14 @@ export default function NotesBar({ orgId, onOpenNote }: NotesBarProps) {
                     className="flex items-center gap-2 w-full p-2 hover:bg-background/40 rounded-md transition-colors text-left"
                   >
                     {expanded ? (
-                      <ChevronDown className="h-4 w-4 text-black" />
+                      <ChevronDown className="h-4 w-4 text-blue-600" />
                     ) : (
-                      <ChevronRight className="h-4 w-4 text-black" />
+                      <ChevronRight className="h-4 w-4 text-blue-600" />
                     )}
                     {expanded ? (
-                      <FolderOpen className="h-4 w-4 text-black" />
+                      <FolderOpen className="h-4 w-4 text-blue-600" />
                     ) : (
-                      <Folder className="h-4 w-4 text-black" />
+                      <Folder className="h-4 w-4 text-blue-600" />
                     )}
                     <span className="text-base font-medium text-foreground">All Notes ({notes.length})</span>
                   </button>
@@ -247,7 +247,7 @@ export default function NotesBar({ orgId, onOpenNote }: NotesBarProps) {
                             if (e.key === "Enter") onOpenNote?.(n.id)
                           }}
                         >
-                          <FileText className="h-4 w-4 text-black" />
+                          <FileText className="h-4 w-4 text-blue-600" />
                           <div className="flex-1 min-w-0">
                             <div className="text-base font-medium text-foreground truncate">{n.title}</div>
                             <div className="text-xs text-muted-foreground">
