@@ -24,6 +24,8 @@ import Link from "next/link"
 import Image from "next/image"
 import { getDatabase, ref as dbRef, onValue, push as dbPush, set as dbSet, update as dbUpdate, remove as dbRemove } from "firebase/database"
 import { getAuth } from "firebase/auth" //adjust real-time db
+import dynamic from "next/dynamic";
+
 
 interface Notification {
   id: string
