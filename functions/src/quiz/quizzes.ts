@@ -1,5 +1,4 @@
 // functions/src/quiz/quizzes.ts
-
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { db } from "../firebaseAdmin";
@@ -69,7 +68,7 @@ function computeAttemptStats(ans: any[]): { avgTimeMs: number; correctCount: num
 }
 
 /**
- * Prefer RTDB profile (UserSettings: name + surname) like the Profile page uses.
+ * Prefer RTDB profile (UserSettings: name + surname).
  * Fallback to Firestore users/{uid}, then Firebase Auth.
  */
 async function resolveProfileDisplayName(uid: string): Promise<string | undefined> {
@@ -114,8 +113,6 @@ async function resolveProfileDisplayName(uid: string): Promise<string | undefine
 
 /**
  * Recompute RTDB leaderboard from Firestore attempts.
- * Stored at: organizations/{orgId}/notes/{noteId}/quizzes/{quizId}/leaderboard
- * Each item includes an explicit `position`.
  */
 async function recomputeAndStoreOrgLeaderboard(
   orgId: string,
@@ -125,12 +122,10 @@ async function recomputeAndStoreOrgLeaderboard(
 ) {
   const firestore = admin.firestore();
 
-  // Read canonical attempt docs (one per uid)
   const attemptsSnap = await firestore
     .collection(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}/attempts`)
     .get();
 
-  // Fallback denominator from RTDB quiz questions
   let totalFromRTDB: number | undefined;
   try {
     const qSnap = await db
@@ -163,10 +158,7 @@ async function recomputeAndStoreOrgLeaderboard(
     });
   }
 
-  // Sort: score desc, then avg time asc
   rows.sort((a, b) => b.score - a.score || (a.avgTimeMs ?? 0) - (b.avgTimeMs ?? 0));
-
-  // Annotate explicit positions (1-based)
   const itemsWithPosition = rows.map((r, i) => ({ position: i + 1, ...r }));
 
   await db
@@ -183,7 +175,7 @@ async function recomputeAndStoreOrgLeaderboard(
 
 /**
  * Create an ORG anytime quiz from an org note.
- * Writes under note scope:
+ * Writes:
  * - organizations/{orgId}/notes/{noteId}/quizzes/{quizId}
  * - organizations/{orgId}/notes/{noteId}/quizzesIndex/{quizId}
  */
@@ -240,7 +232,7 @@ export const createOrgAsyncQuiz = onCall(async (req) => {
 
 /**
  * Create a SELF (personal-async) quiz from an org or personal note.
- * Writes under user:
+ * Writes:
  * - users/{uid}/quizzes/{quizId}
  * - userAsyncQuizzes/{uid}/{noteId}/{quizId}
  */
@@ -298,6 +290,15 @@ export const createSelfAsyncQuiz = onCall(async (req) => {
 
   await db.ref().update(updates);
   return { quizId, type: "personal-async" as QuizType };
+});
+
+/**
+ * Optional alias so clients may call `createPersonalAsyncQuiz`
+ * (same logic as createSelfAsyncQuiz).
+ */
+export const createPersonalAsyncQuiz = onCall(async (req) => {
+  // Simply reuse the same logic as createSelfAsyncQuiz:
+  return await (createSelfAsyncQuiz as any).run(req);
 });
 
 /* -------------------------------------------------------------------------- */
@@ -387,6 +388,10 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
   const quizPath = `organizations/${orgId}/notes/${noteId}/quizzes/${quizId}`;
   let finishedNow = false;
 
+  let lastScore: number | null = null;
+  let lastCorrectCount: number | null = null;
+  let lastTotalQuestions: number | null = null;
+
   try {
     await db.ref(quizPath).transaction((q: any) => {
       if (!q || q.type !== "org-async" || q.state !== "active") return q;
@@ -417,6 +422,12 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
         q.participants[uid!].finishedAt = nowTs;
         delete q.participants[uid!].questionStartAt;
         finishedNow = true;
+
+        // snapshot for return
+        lastScore = q.participants[uid!].score || 0;
+        lastTotalQuestions = qArr.length;
+        const answersArr = Object.values(q.participants[uid!].answers || {});
+        lastCorrectCount = (answersArr as any[]).filter((a: any) => a?.correct).length;
       } else {
         q.participants[uid!].currentIndex = idx + 1;
         q.participants[uid!].questionStartAt = nowTs;
@@ -448,9 +459,14 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
       // Derive total questions
       const quizSnap = await db.ref(quizPath).get();
       const qVal = quizSnap.exists() ? (quizSnap.val() as any) : null;
-      const totalQuestions = qVal?.questions ? Object.keys(qVal.questions).length : undefined;
+      const totalQuestions = qVal?.questions ? Object.keys(qVal.questions).length : null;
 
-      // Write/update attempt doc (one per uid) under new Firestore path
+      // normalize return values with authoritative data
+      lastScore = typeof p?.score === "number" ? p.score : (lastScore ?? 0);
+      lastCorrectCount = typeof correctCount === "number" ? correctCount : (lastCorrectCount ?? 0);
+      lastTotalQuestions = typeof totalQuestions === "number" ? totalQuestions : (lastTotalQuestions ?? null);
+
+      // Write/update attempt doc (one per uid) under Firestore
       await admin
         .firestore()
         .collection(`organizations/${orgId}/notes/${noteId}/quizzes/${quizId}/attempts`)
@@ -458,11 +474,11 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
         .set({
           uid,
           name: bestName,
-          score: p?.score ?? 0,
-          correctCount,
+          score: lastScore ?? 0,
+          correctCount: lastCorrectCount ?? 0,
           avgTimeMs,
           finishedAt: now(),
-          totalQuestions: totalQuestions ?? null,
+          totalQuestions: lastTotalQuestions,
         });
     } catch (err) {
       console.error("Failed to persist attempt doc:", err);
@@ -475,7 +491,14 @@ export const submitOrgAsyncAnswer = onCall(async (req) => {
     console.error("recomputeAndStoreOrgLeaderboard failed", err);
   }
 
-  return { ok: true, finishedNow };
+  // IMPORTANT: return stats on finish so client can show accurate mark/percentage immediately
+  return {
+    ok: true,
+    finishedNow,
+    score: finishedNow ? (lastScore ?? 0) : undefined,
+    correctCount: finishedNow ? (lastCorrectCount ?? 0) : undefined,
+    totalQuestions: finishedNow ? (lastTotalQuestions ?? null) : undefined,
+  };
 });
 
 export const getOrgAsyncLeaderboard = onCall(async (req) => {
@@ -590,54 +613,85 @@ export const submitPersonalAsyncAnswer = onCall(async (req) => {
   if (!uid) throw new HttpsError("unauthenticated", "Login required");
 
   const { quizId, optionIdx } = req.data as { quizId: string; optionIdx: number };
+  if (!quizId || typeof optionIdx !== "number") {
+    throw new HttpsError("invalid-argument", "quizId and optionIdx required");
+  }
+
   const quizPath = `users/${uid}/quizzes/${quizId}`;
   let finishedNow = false;
 
-  await db.ref(quizPath).transaction((q: any) => {
-    if (!q || q.type !== "personal-async" || q.state !== "active") return q;
+  try {
+    await db.ref(quizPath).transaction((q: any) => {
+      if (!q || q.type !== "personal-async" || q.state !== "active") return q;
 
-    const user = q.participants?.[uid!];
-    if (!user || user.finished) return q;
+      const user = q.participants?.[uid!];
+      if (!user || user.finished) return q;
 
-    const idx = typeof user.currentIndex === "number" ? user.currentIndex : 0;
-    const qArr = Object.values(q.questions || {}) as QuizQuestion[];
-    qArr.sort((a: any, b: any) => Number(a.id) - Number(b.id));
-    const total = qArr.length;
+      const idx = typeof user.currentIndex === "number" ? user.currentIndex : 0;
+      const qArr = Object.values(q.questions || {}) as QuizQuestion[];
+      qArr.sort((a: any, b: any) => Number(a.id) - Number(b.id));
+      const total = qArr.length;
 
-    const question = qArr[idx];
-    if (!question) return q;
+      const question = qArr[idx];
+      if (!question) return q;
 
-    const nowTs = now();
-    const elapsed = typeof user.questionStartAt === "number" ? nowTs - user.questionStartAt : 0;
+      const nowTs = now();
+      const elapsed = typeof user.questionStartAt === "number" ? nowTs - user.questionStartAt : 0;
 
-    const correct = optionIdx === question.correctIndex;
+      const correct = optionIdx === question.correctIndex;
 
-    if (!q.participants[uid!].answers) q.participants[uid!].answers = {};
-    q.participants[uid!].answers[idx] = { optionIdx, timeMs: elapsed, correct };
+      if (!q.participants[uid!].answers) q.participants[uid!].answers = {};
+      q.participants[uid!].answers[idx] = { optionIdx, timeMs: elapsed, correct };
 
-    if (correct) q.participants[uid!].score = (q.participants[uid!].score || 0) + 1;
+      if (correct) q.participants[uid!].score = (q.participants[uid!].score || 0) + 1;
 
-    if (idx + 1 >= total) {
-      q.participants[uid!].finished = true;
-      q.participants[uid!].finishedAt = nowTs;
-      delete q.participants[uid!].questionStartAt;
-      finishedNow = true;
-    } else {
-      q.participants[uid!].currentIndex = idx + 1;
-      q.participants[uid!].questionStartAt = nowTs;
-    }
+      if (idx + 1 >= total) {
+        q.participants[uid!].finished = true;
+        q.participants[uid!].finishedAt = nowTs;
+        delete q.participants[uid!].questionStartAt;
+        finishedNow = true;
+      } else {
+        q.participants[uid!].currentIndex = idx + 1;
+        q.participants[uid!].questionStartAt = nowTs;
+      }
 
-    return q;
-  });
+      return q;
+    });
+  } catch (err) {
+    console.error("submitPersonalAsyncAnswer transaction failed:", err);
+    throw new HttpsError("internal", "Could not submit answer. See logs.");
+  }
 
-  return { ok: true, finishedNow };
+  // Mirror org behavior: on finish, return accurate stats so UI can show mark immediately
+  if (finishedNow) {
+    const partSnap = await db.ref(`${quizPath}/participants/${uid}`).get();
+    const p = partSnap.exists() ? (partSnap.val() as any) : null;
+    const answersArr = p?.answers ? (Object.values(p.answers) as any[]) : [];
+    const { avgTimeMs, correctCount } = computeAttemptStats(answersArr);
+
+    const quizSnap = await db.ref(quizPath).get();
+    const qVal = quizSnap.exists() ? (quizSnap.val() as any) : null;
+    const totalQuestions = qVal?.questions ? Object.keys(qVal.questions).length : null;
+    const score = typeof p?.score === "number" ? p.score : 0;
+
+    return {
+      ok: true,
+      finishedNow: true,
+      score,
+      correctCount,
+      totalQuestions,
+      avgTimeMs,
+    };
+  }
+
+  return { ok: true, finishedNow: false };
 });
 
 /* -------------------------------------------------------------------------- */
 /*  QUIZ DETAIL                                                                */
 /* -------------------------------------------------------------------------- */
 
-/** Minimal quiz detail (with questions) for client attempt/review UIs */
+/** Minimal quiz detail (with questions) for client attempt/review UIs - ORG */
 export const getOrgQuizDetail = onCall(async (req) => {
   const uid = req.auth?.uid as string | undefined;
   const { orgId, noteId, quizId } = req.data as { orgId: string; noteId: string; quizId: string };
@@ -660,4 +714,89 @@ export const getOrgQuizDetail = onCall(async (req) => {
   };
 
   return { quiz: payload };
+});
+
+/** Minimal quiz detail (with questions) for client attempt/review UIs - PERSONAL */
+export const getPersonalQuizDetail = onCall(async (req) => {
+  const uid = req.auth?.uid as string | undefined;
+  if (!uid) throw new HttpsError("unauthenticated", "Login required");
+  const { quizId } = req.data as { quizId: string };
+  if (!quizId) throw new HttpsError("invalid-argument", "Missing quizId");
+
+  const snap = await db.ref(`users/${uid}/quizzes/${quizId}`).get();
+  if (!snap.exists()) throw new HttpsError("not-found", "Quiz not found");
+  const q = snap.val() as Quiz;
+  if (q.type !== "personal-async") throw new HttpsError("failed-precondition", "Not a personal quiz");
+
+  const questions = q.questions || {};
+  const numQuestions = Object.keys(questions).length;
+
+  return {
+    quiz: {
+      id: q.id,
+      title: (q as any).title ?? "Self Quiz",
+      numQuestions,
+      questionDurationSec: q.questionDurationSec ?? 45,
+      questions,
+    },
+  };
+});
+
+/* -------------------------------------------------------------------------- */
+/*  PERSONAL ATTEMPT FETCHES (for review and list)                             */
+/* -------------------------------------------------------------------------- */
+
+export const getMyPersonalAsyncAttempt = onCall(async (req) => {
+  const uid = req.auth?.uid as string | undefined;
+  if (!uid) throw new HttpsError("unauthenticated", "Login required");
+  const { quizId } = req.data as { quizId: string };
+  if (!quizId) throw new HttpsError("invalid-argument", "Missing quizId");
+
+  const pSnap = await db.ref(`users/${uid}/quizzes/${quizId}/participants/${uid}`).get();
+  if (!pSnap.exists()) return { attempt: null };
+
+  const p = pSnap.val();
+  const answers = p?.answers ? (Object.values(p.answers) as any[]) : [];
+  const { avgTimeMs, correctCount } = computeAttemptStats(answers);
+
+  return {
+    attempt: {
+      uid,
+      displayName: p?.displayName ?? "You",
+      score: p?.score ?? 0,
+      finished: !!p?.finished,
+      finishedAt: p?.finishedAt ?? null,
+      answers,
+      stats: { avgTimeMs, correctCount },
+    },
+  };
+});
+
+export const listMyPersonalAsyncAttempts = onCall(async (req) => {
+  const uid = req.auth?.uid as string | undefined;
+  if (!uid) throw new HttpsError("unauthenticated", "Login required");
+  const { noteId } = req.data as { noteId: string };
+  if (!noteId) throw new HttpsError("invalid-argument", "Missing noteId");
+
+  // find quiz ids from the note-scoped index
+  const idxSnap = await db.ref(`userAsyncQuizzes/${uid}/${noteId}`).get();
+  const idxVal = idxSnap.val() || {};
+  const quizIds: string[] = Object.keys(idxVal);
+
+  const attempts: any[] = [];
+  for (const qid of quizIds) {
+    const pSnap = await db.ref(`users/${uid}/quizzes/${qid}/participants/${uid}`).get();
+    if (pSnap.exists()) {
+      const p = pSnap.val() || {};
+      attempts.push({
+        quizId: qid,
+        finished: !!p.finished,
+        finishedAt: p.finishedAt ?? null,
+        score: p.score ?? 0,
+      });
+    }
+  }
+
+  attempts.sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0));
+  return { attempts };
 });

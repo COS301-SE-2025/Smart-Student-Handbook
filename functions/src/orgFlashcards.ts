@@ -5,7 +5,6 @@ import { getDatabase } from "firebase-admin/database";
 if (!getApps().length) initializeApp();
 const db = getDatabase();
 
-/* ----------------------------- Helpers ----------------------------- */
 function rethrow(e: unknown): never {
   console.error(e);
   if (e instanceof HttpsError) throw e;
@@ -42,7 +41,7 @@ function toNumberedObject(
   return out;
 }
 
-/* ------------------------- Core single-pack ops ------------------------- */
+
 async function doLoadPack(orgId: string, noteId: string) {
   const snap = await db.ref(cardsPath(orgId, noteId)).get();
   if (!snap.exists()) {
@@ -111,7 +110,7 @@ async function doDeletePack(
   const arr = toOrderedArray(snap.val());
   const toDelete = new Set(numbers.map((n) => Number(n)));
 
-  const doCompact = compact !== false; // default true
+  const doCompact = compact !== false; 
   if (doCompact) {
     const remaining = arr.filter((c) => !toDelete.has(c.number));
     const renumbered = toNumberedObject(
@@ -128,8 +127,6 @@ async function doDeletePack(
   return { success: true, orgId, noteId, deleted: toDelete.size, compacted: compact !== false };
 }
 
-/* ------------------------- Public single-pack API ------------------------- */
-// Use these names in new frontend code:
 export const loadNoteFlashcardsPack = onCall(async (req) => {
   try {
     const { orgId, noteId } = req.data as { orgId: string; noteId: string };
@@ -159,11 +156,10 @@ export const deleteNoteFlashcardsPack = onCall(async (req) => {
   } catch (e) { rethrow(e); }
 });
 
-/* ----------------------- Back-compat shims (no sets) ---------------------- */
-/** Old callers may still send setNumber; we ignore it and use single-pack. */
+
 export const loadNoteFlashcards = onCall(async (req) => {
   try {
-    const { orgId, noteId } = req.data as any; // setNumber ignored
+    const { orgId, noteId } = req.data as any; 
     if (!orgId || !noteId) throw new HttpsError("invalid-argument", "Missing orgId or noteId");
     return await doLoadPack(orgId, noteId);
   } catch (e) { rethrow(e); }
@@ -171,7 +167,7 @@ export const loadNoteFlashcards = onCall(async (req) => {
 
 export const saveNoteFlashcards = onCall(async (req) => {
   try {
-    const { orgId, noteId, mode, cards } = req.data as any; // setNumber ignored
+    const { orgId, noteId, mode, cards } = req.data as any;
     if (!orgId || !noteId) throw new HttpsError("invalid-argument", "Missing orgId or noteId");
     return await doSavePack(orgId, noteId, mode, cards);
   } catch (e) { rethrow(e); }
@@ -179,7 +175,7 @@ export const saveNoteFlashcards = onCall(async (req) => {
 
 export const deleteNoteFlashcards = onCall(async (req) => {
   try {
-    const { orgId, noteId, numbers, deleteAll, compact } = req.data as any; // setNumber ignored
+    const { orgId, noteId, numbers, deleteAll, compact } = req.data as any; 
     if (!orgId || !noteId) throw new HttpsError("invalid-argument", "Missing orgId or noteId");
     return await doDeletePack(orgId, noteId, numbers, deleteAll, compact);
   } catch (e) { rethrow(e); }

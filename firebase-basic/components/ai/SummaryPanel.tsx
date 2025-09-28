@@ -5,7 +5,7 @@ import { useRef, useState, useCallback, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Maximize2, Minimize2 } from "lucide-react"
+import { Loader2, Maximize2, X } from "lucide-react"
 import { summarizeNote } from "@/lib/gemini"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
@@ -18,21 +18,24 @@ type SummaryPanelProps = {
   className?: string
   buttonText?: string
 
-  /** Shared-note (org) context */
+  /** Org context (shared notes) */
   orgId?: string
 
   /** Ownership & identity */
   ownerId: string
   noteId: string
 
-  /** NEW: user context so we can save under the user */
+  /** Personal context hint (optional); if provided we’ll infer scope automatically */
   userId?: string
 
-  /** Optional explicit override. If true, forces user-scope. */
+  /** Force personal user-scope if true */
   isPersonal?: boolean
+
+  /** NEW: only on personal page – load, and if missing, auto-generate & save once */
+  autoGenerateIfMissing?: boolean
 }
 
-/* ---------------- Types for callable fns ---------------- */
+/* ---------------- Org callables (unchanged) ---------------- */
 type OrgLoadReq = { orgId: string; noteId: string }
 type OrgLoadRes = {
   success: boolean
@@ -50,37 +53,23 @@ type OrgLoadRes = {
 }
 type OrgSaveReq = { orgId: string; noteId: string; ownerId: string; text: string; title?: string }
 type OrgSaveRes = { success: boolean; id: string; path: string }
-type OrgDeleteReq = { orgId: string; noteId: string }
-type OrgDeleteRes = { success: boolean }
 
-type UserLoadReq = { userId: string; noteId: string }
-type UserLoadRes = {
-  success: boolean
-  exists: boolean
-  summary?: {
-    id: string
-    userId: string
-    noteId: string
-    ownerId: string | null
-    text: string
-    title: string
-    createdAt: number | null
-    updatedAt: number | null
-  }
-}
-type UserSaveReq = { userId: string; noteId: string; ownerId: string; text: string; title?: string }
-type UserSaveRes = { success: boolean; id: string; path: string }
-type UserDeleteReq = { userId: string; noteId: string }
-type UserDeleteRes = { success: boolean }
-
-/* ---------------- Callables ---------------- */
 const callLoadOrg = httpsCallable<OrgLoadReq, OrgLoadRes>(fns, "loadSummary")
 const callSaveOrg = httpsCallable<OrgSaveReq, OrgSaveRes>(fns, "saveSummary")
-const callDeleteOrg = httpsCallable<OrgDeleteReq, OrgDeleteRes>(fns, "deleteSummary")
 
-const callLoadUser = httpsCallable<UserLoadReq, UserLoadRes>(fns, "loadUserSummary")
-const callSaveUser = httpsCallable<UserSaveReq, UserSaveRes>(fns, "saveUserSummary")
-const callDeleteUser = httpsCallable<UserDeleteReq, UserDeleteRes>(fns, "deleteUserSummary")
+/* ---------------- Personal callables (match your usercontents) ----------------
+   NOTE: These functions rely on Firebase Auth; the callable picks up auth automatically.
+   Payloads:
+   - loadUserSummary:  { noteId }
+   - saveUserSummary:  { noteId, summary }
+   Returns:
+   - loadUserSummary:  { summary: string | null }
+------------------------------------------------------------------------------- */
+type UserLoadSummaryRes = { summary: string | null }
+type UserSaveSummaryReq = { noteId: string; summary: string }
+
+const callLoadUserSimple = httpsCallable<{ noteId: string }, UserLoadSummaryRes>(fns, "loadUserSummary")
+const callSaveUserSimple = httpsCallable<UserSaveSummaryReq, { ok: true }>(fns, "saveUserSummary")
 
 /* ---------------- Local helpers ------------------- */
 const MAX_CHARS = 40_000
@@ -128,6 +117,7 @@ export default function SummaryPanel({
   noteId,
   userId,
   isPersonal,
+  autoGenerateIfMissing = false,
 }: SummaryPanelProps) {
   const [summary, setSummary] = useState<string | null>(initialSummary ?? null)
   const [loading, setLoading] = useState(false)
@@ -135,14 +125,13 @@ export default function SummaryPanel({
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [autoTried, setAutoTried] = useState(false) // ensure we auto-generate only once
 
   const runIdRef = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
   const lastTextRef = useRef<{ text: string; hash: string } | null>(null)
 
   // Decide storage scope:
-  // 1) explicit override via isPersonal
-  // 2) else, infer personal if ownerId === userId or orgId is falsy
   const useUserScope = ((): boolean => {
     if (typeof isPersonal === "boolean") return isPersonal
     if (!orgId) return true
@@ -181,22 +170,23 @@ export default function SummaryPanel({
   // Load existing summary from the correct scope
   useEffect(() => {
     let cancelled = false
+    setAutoTried(false) // reset when note/scope changes
     async function load() {
       if (!noteId) return
       setLoadingExisting(true)
       try {
         if (useUserScope) {
-          if (!userId) return
-          const res = await callLoadUser({ userId, noteId })
-          const data = res.data
-          if (!cancelled && data?.exists && data.summary?.text) setSummary(data.summary.text)
-          else if (!cancelled) setSummary(null)
+          // PERSONAL: uses your simple endpoints
+          const res = await callLoadUserSimple({ noteId })
+          const text = res?.data?.summary ?? null
+          if (!cancelled) setSummary(text)
         } else {
+          // ORG: unchanged
           if (!orgId) return
           const res = await callLoadOrg({ orgId, noteId })
           const data = res.data
-          if (!cancelled && data?.exists && data.summary?.text) setSummary(data.summary.text)
-          else if (!cancelled) setSummary(null)
+          const text = data?.exists && data.summary?.text ? data.summary.text : null
+          if (!cancelled) setSummary(text)
         }
       } catch (e) {
         console.error("Failed to load summary:", e)
@@ -212,6 +202,22 @@ export default function SummaryPanel({
     }
   }, [useUserScope, orgId, userId, noteId])
 
+  // If personal + missing + opt-in flag, auto-generate ONCE
+  useEffect(() => {
+    if (
+      useUserScope &&
+      autoGenerateIfMissing &&
+      !loadingExisting &&
+      !summary &&
+      !autoTried &&
+      canSummarize
+    ) {
+      setAutoTried(true)
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      handleSummarize()
+    }
+  }, [useUserScope, autoGenerateIfMissing, loadingExisting, summary, autoTried, canSummarize])
+
   const handleSummarize = useCallback(async () => {
     if (!sourceText) return
 
@@ -226,11 +232,12 @@ export default function SummaryPanel({
     }
 
     const cached = readCache(hash)
+
     const persist = async (textToSave: string) => {
       try {
         if (useUserScope) {
-          if (!userId) return
-          await callSaveUser({ userId, noteId, ownerId, text: textToSave })
+          // PERSONAL: { noteId, summary }
+          await callSaveUserSimple({ noteId, summary: textToSave })
         } else {
           if (!orgId) return
           await callSaveOrg({ orgId, noteId, ownerId, text: textToSave })
@@ -272,23 +279,14 @@ export default function SummaryPanel({
         abortRef.current = null
       }
     }
-  }, [sourceText, orgId, userId, ownerId, noteId, useUserScope])
+  }, [sourceText, orgId, ownerId, noteId, useUserScope])
 
   return (
     <>
-      <Card className={className}>
-        <CardHeader className="flex flex-row items-center justify-between p-4">
-          <CardTitle className="text-lg">{title}</CardTitle>
+      <div className={`${className} h-full flex flex-col`}>
+        <div className="flex flex-row items-center justify-between p-4 border-b border-border/30 bg-background/70 backdrop-blur">
+          <h3 className="text-lg font-semibold">{title}</h3>
           <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setIsExpanded(true)}
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
-              aria-label="Expand"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </Button>
             <Button onClick={handleSummarize} disabled={!canSummarize || loadingExisting} variant="default" size="sm">
               {loading ? (
                 <>
@@ -299,28 +297,39 @@ export default function SummaryPanel({
                 buttonText
               )}
             </Button>
+            <Button
+              onClick={() => setIsExpanded(true)}
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
+              aria-label="Expand"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent>
+        <div className="flex-1 min-h-0 p-6 flex items-center justify-center">
           {loadingExisting ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading summary…
+            <div className="flex items-center justify-center text-lg text-muted-foreground">
+              <Loader2 className="h-5 w-5 mr-3 animate-spin" />
             </div>
           ) : summary ? (
-            <div className="p-3 rounded-lg bg-card text-foreground whitespace-pre-wrap break-words text-xs md:text-sm leading-snug">
-              {summary}
+            <div className="w-full max-w-4xl h-full overflow-y-auto p-6 rounded-lg bg-white border border-gray-200 shadow-sm">
+              <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-gray-900">{summary}</div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              {disabled ? "No summary yet. Generate one to see it here." : ""}
-            </p>
+            <div className="flex items-center justify-center">
+              <p className="text-lg text-muted-foreground text-center">
+                {disabled ? "No summary yet. Generate one to see it here." : "No summary yet."}
+              </p>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
+      {/* Modal */}
       {isExpanded &&
-        isClient &&
         createPortal(
           <div
             className="fixed inset-0 z-[10000] bg-black/35 backdrop-blur-[6px] flex items-center justify-center p-4"
@@ -354,7 +363,7 @@ export default function SummaryPanel({
                       className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
                       aria-label="Close modal"
                     >
-                      <Minimize2 className="h-4 w-4" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
@@ -362,7 +371,7 @@ export default function SummaryPanel({
                 <CardContent className="flex flex-col flex-1 min-h-0 px-6 pb-6">
                   {loadingExisting ? (
                     <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading summary…
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     </div>
                   ) : summary ? (
                     <div className="flex-1 min-h-0">
@@ -372,9 +381,7 @@ export default function SummaryPanel({
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="text-muted-foreground text-lg text-center">
-                        No summary yet. Generate one to see it here.
-                      </p>
+                      <p className="text-muted-foreground text-lg text-center">No summary yet.</p>
                     </div>
                   )}
                 </CardContent>

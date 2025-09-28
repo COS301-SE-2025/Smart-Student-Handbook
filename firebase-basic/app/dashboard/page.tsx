@@ -88,13 +88,12 @@ export default function DashboardPage() {
   const [favorites, setFavorites] = useState<Record<string, boolean>>({})
   const [loadingOrgs, setLoadingOrgs] = useState(false)
 
-  // Callable functions
-  // CHANGED: use same Cloud Run endpoint as Organisations page
+
   const getMyOrgs = useMemo(
     () => httpsCallableFromURL<{}, Org[]>(fns, "https://getuserorganizations-omrwo3ykaa-uc.a.run.app"),
     []
   )
-  // NEW: fetch public orgs so we can include public orgs the user has already joined
+
   const getPublicOrgs = useMemo(
     () => httpsCallableFromURL<{}, Org[]>(fns, "https://getpublicorganizations-omrwo3ykaa-uc.a.run.app"),
     []
@@ -105,7 +104,7 @@ export default function DashboardPage() {
 
   const db = getDatabase()
 
-  // Set user name from auth
+ 
   useEffect(() => {
     const auth = getAuth()
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -116,7 +115,7 @@ export default function DashboardPage() {
     return unsubscribe
   }, [])
 
-  // Fetch user's friends
+
   const fetchFriends = useCallback(async () => {
     if (!userId) return
     setLoadingFriends(true)
@@ -131,7 +130,7 @@ export default function DashboardPage() {
     }
   }, [userId, getFriendsFunc])
 
-  // Fetch recent notes from Firebase
+  
   const fetchRecentNotes = useCallback(async () => {
     if (!userId) return
     setLoadingNotes(true)
@@ -170,7 +169,7 @@ export default function DashboardPage() {
     }
   }, [userId, db])
 
-  // Fetch upcoming events
+  
   const fetchUpcomingEvents = useCallback(async () => {
     if (!userId) return
     setLoadingEvents(true)

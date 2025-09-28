@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { httpsCallable } from "firebase/functions"   // ⬅️ use SDK callable
+import { httpsCallable } from "firebase/functions"   
 import { fns } from "@/lib/firebase"
 import {
   getDatabase,
@@ -11,6 +11,8 @@ import {
   set,
   remove,
   push,
+  onValue,
+  off,
 } from "firebase/database"
 import {
   ArrowLeft,
@@ -227,9 +229,8 @@ export default function OrganizationDetailsPage() {
   }
 
   /* ---------------------------------------------------------------------- */
-  /*                       Notes loader (from RTDB)                          */
+  /*                       Notes helpers (from RTDB)                         */
   /* ---------------------------------------------------------------------- */
-
   const stripHtml = (html: string) =>
     (html || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
 
@@ -308,6 +309,49 @@ export default function OrganizationDetailsPage() {
   }, [fetchOrg, authLoading])
 
   /* ---------------------------------------------------------------------- */
+  /*                  LIVE notes subscription (no refresh)                  */
+  /* ---------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!orgId) return
+    const notesRef = ref(db, `organizations/${orgId}/notes`)
+
+    const handle = async (snap: any) => {
+      const members = organization?.memberDetails ?? []
+      if (!snap.exists()) {
+        setOrganization((prev) => (prev ? { ...prev, notes: [] } : prev))
+        return
+      }
+      const raw = snap.val() as Record<string, any>
+
+      const uniqueOwners = Array.from(new Set(Object.values(raw).map((n: any) => n.ownerId).filter(Boolean)))
+      const nameCache = new Map<string, string>()
+      await Promise.all(
+        uniqueOwners.map(async (uid: string) => {
+          nameCache.set(uid, await resolveName(uid, members))
+        }),
+      )
+
+      const nextNotes: Note[] = Object.values(raw).map((n: any) => ({
+        id: n.id,
+        title: n.name || "Untitled",
+        content: stripHtml(n.content || ""),
+        author: n.ownerId ? (nameCache.get(n.ownerId) ?? "Unknown") : "Unknown",
+        ownerId: n.ownerId,
+        createdAt: Number(n.createdAt ?? Date.now()),
+        updatedAt: Number(n.updatedAt ?? n.createdAt ?? Date.now()),
+      }))
+      nextNotes.sort((a, b) => b.updatedAt - a.updatedAt)
+
+      setOrganization((prev) => (prev ? { ...prev, notes: nextNotes } : prev))
+    }
+
+    onValue(notesRef, handle)
+    return () => {
+      off(notesRef, "value", handle as any)
+    }
+  }, [db, orgId, organization?.memberDetails])
+
+  /* ---------------------------------------------------------------------- */
   /*                Friend-picker logic (same as before)                     */
   /* ---------------------------------------------------------------------- */
   const loadFriends = async () => {
@@ -368,19 +412,43 @@ export default function OrganizationDetailsPage() {
       const newNoteRef = push(notesRef)
       const noteId = newNoteRef.key!
 
-      const newNote: Note = {
+      const now = Date.now()
+      const newNotePayload = {
         id: noteId,
-        title: "Untitled Note",
+        name: "Untitled",
         content: "",
-        author: "Anonymous",
-        ownerId: orgId,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        ownerId: userId ?? null,
+        createdAt: now,
+        updatedAt: now,
+        type: "note" as const,
       }
 
-      await set(newNoteRef, newNote)
+      await set(newNoteRef, newNotePayload)
+
+      // optimistic insert (listener will reconcile)
+      setOrganization((prev) =>
+        prev
+          ? {
+              ...prev,
+              notes: [
+                {
+                  id: noteId,
+                  title: "Untitled",
+                  content: "",
+                  author: "",
+                  ownerId: userId ?? undefined,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                ...prev.notes,
+              ],
+            }
+          : prev,
+      )
+      toast.success("Note created")
     } catch (err) {
       console.error("Error adding note:", err)
+      toast.error("Failed to create note.")
     } finally {
       setCreatingNote(false)
     }
@@ -949,44 +1017,52 @@ export default function OrganizationDetailsPage() {
                     {organization.notes.map((note) => {
                       const isDeleting = deletingNoteIds.has(note.id)
                       return (
-                        <Card
+                      <Card
                           key={note.id}
-                          className="hover:shadow-md transition-shadow cursor-pointer group"
+                          className="hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col relative"
                           onClick={() => router.push(`/organisations/${orgId}/notes?noteId=${note.id}`)}
                         >
-                          <CardHeader className="flex flex-row items-start justify-between gap-3">
-                            <CardTitle className="text-lg line-clamp-2">{note.title}</CardTitle>
+                          {/* Top-right bin (delete) */}
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-2 right-2 opacity-80 hover:opacity-100"
+                              disabled={deletingNoteIds.has(note.id)}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleDeleteNote(note.id) // uses sonner toasts inside your handler
+                              }}
+                              title="Delete note"
+                            >
+                              {deletingNoteIds.has(note.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              )}
+                            </Button>
+                          )}
 
-                            {isAdmin && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="opacity-70 group-hover:opacity-100"
-                                disabled={isDeleting}
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  handleDeleteNote(note.id)
-                                }}
-                                title="Delete note"
-                              >
-                                {isDeleting ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                )}
-                              </Button>
-                            )}
+                          <CardHeader className="flex flex-row items-start justify-between gap-3 pr-10">
+                            <CardTitle className="text-lg line-clamp-2">{note.title}</CardTitle>
                           </CardHeader>
 
-                          <CardContent>
-                            <p className="text-muted-foreground text-sm line-clamp-3 mb-4">{extractNoteTextFromString(note.content)}</p>
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span> {note.author}</span>
+                          {/* Make content a flex column and fill remaining height */}
+                          <CardContent className="flex flex-col flex-1">
+                            {/* Preview text grows to fill space above the footer */}
+                            <p className="text-muted-foreground text-sm line-clamp-3 mb-4 grow">
+                              {extractNoteTextFromString(note.content)}
+                            </p>
+
+                            {/* Footer pinned to bottom: name left, date right */}
+                            <div className="mt-auto pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="truncate">{note.author || ""}</span>
                               <span>{new Date(note.updatedAt || note.createdAt).toLocaleDateString()}</span>
                             </div>
                           </CardContent>
                         </Card>
+
                       )
                     })}
                   </div>

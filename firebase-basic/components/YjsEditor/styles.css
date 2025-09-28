@@ -1,37 +1,41 @@
-/* Adds border and shadow to editor */
+/* light */
 .bn-container[data-theming-css-variables-demo][data-color-scheme] {
-  --bn-colors-editor-text: black;
-  --bn-colors-editor-background: #ffffff;
-  --bn-colors-menu-text: #ffffff;
-  --bn-colors-menu-background: #02081a;
-  --bn-colors-tooltip-text: #02081a;
-  --bn-colors-tooltip-background: #ffffff;
-  --bn-colors-hovered-text: #ffffff;
-  --bn-colors-hovered-background: #02081a;
-  --bn-colors-selected-text: #02081a;
-  --bn-colors-side-menu: #bababa;
-  --bn-color-highlight-colors: #ffffff;
-  --bn-border-radius: 4px;
-  --bn-font-family: Helvetica Neue, sans-serif;
+  --bn-colors-editor-text: var(--card-foreground);
+  --bn-colors-editor-background: var(--card);
+  --bn-colors-menu-text: var(--popover-foreground);
+  --bn-colors-menu-background: var(--popover);
+  --bn-colors-tooltip-text: var(--muted-foreground);
+  --bn-colors-tooltip-background: var(--muted);
+  --bn-colors-hovered-text: var(--accent-foreground);
+  --bn-colors-hovered-background: color-mix(in oklab, var(--accent) 15%, transparent);
+  --bn-colors-selected-text: var(--secondary-foreground);
+  --bn-colors-selected-background: var(--secondary);
+  --bn-colors-disabled-text: var(--muted-foreground);
+  --bn-colors-disabled-background: var(--muted);
+  --bn-colors-shadow: var(--ring);
+  --bn-colors-border: var(--border);
+  --bn-colors-side-menu: var(--card);
+  --bn-border-radius: 12px;
+  --bn-font-family: var(--font-sans, Inter, system-ui, sans-serif);
 }
 
+/* dark (your navy palette comes from .dark vars in global.css) */
 .bn-container[data-theming-css-variables-demo][data-color-scheme="dark"] {
-  --bn-colors-editor-text: #ffffff;
-  --bn-colors-editor-background: #00040f;
-  --bn-colors-menu-text: #ffffff;
-  --bn-colors-menu-background: #02081a;
-  --bn-colors-tooltip-text: #ffffff;
-  --bn-colors-tooltip-background: #00040f;
-  --bn-colors-hovered-text: #00040f;
-  --bn-colors-hovered-background: #0d225c;
-  --bn-colors-selected-text: #ffffff;
-  --bn-colors-selected-background: #00040f;
-  --bn-colors-disabled-text: #ffffff;
-  --bn-colors-disabled-background: #00040f;
-  --bn-colors-shadow: #00040f;
-  --bn-colors-border: #00040f;
-  --bn-colors-side-menu: #00040f;
-  --bn-color-highlight-colors: #ffffff;
-  --bn-border-radius: 4px;
-  --bn-font-family: Helvetica Neue, sans-serif;
+  --bn-colors-editor-text: var(--card-foreground);
+  --bn-colors-editor-background: var(--card);
+  --bn-colors-menu-text: var(--popover-foreground);
+  --bn-colors-menu-background: var(--popover);
+  --bn-colors-tooltip-text: var(--muted-foreground);
+  --bn-colors-tooltip-background: var(--muted);
+  --bn-colors-hovered-text: var(--accent-foreground);
+  --bn-colors-hovered-background: color-mix(in oklab, var(--accent) 25%, transparent);
+  --bn-colors-selected-text: var(--secondary-foreground);
+  --bn-colors-selected-background: var(--secondary);
+  --bn-colors-disabled-text: var(--muted-foreground);
+  --bn-colors-disabled-background: var(--muted);
+  --bn-colors-shadow: var(--ring);
+  --bn-colors-border: var(--border);
+  --bn-colors-side-menu: var(--card);
+  --bn-border-radius: 12px;
+  --bn-font-family: var(--font-sans, Inter, system-ui, sans-serif);
 }

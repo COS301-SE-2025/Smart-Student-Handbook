@@ -1,10 +1,11 @@
+// components/flashcards/FlashCardSection.tsx
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trash2, ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2 } from "lucide-react"
+import { Trash2, ChevronLeft, ChevronRight, Loader2, Maximize2, X } from "lucide-react"
 import { generateFlashcards } from "@/lib/gemini"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
@@ -32,14 +33,14 @@ type FlashCardSectionProps = {
   /** Current user id (optional, used to infer scope if needed) */
   ownerId?: string
 
-  /** If true, force saving/loading under users/{userId}/... */
+  /** If true, force saving/loading under users/{uid}/... */
   isPersonal?: boolean
-
-  /** legacy (ignored) */
-  setNumber?: number
 
   /** Note id (required to load/save) */
   noteId?: string
+
+  /** NEW: only on personal page – load, and if missing, auto-generate & save once */
+  autoGenerateIfMissing?: boolean
 }
 
 /* ----------------------------- Parse helpers ----------------------------- */
@@ -66,23 +67,17 @@ function tryJson(text: string) {
     if (!arr) return null
     const out: Array<{ front: string; back: string }> = []
     for (const item of arr) {
-      let front = "",
-        back = ""
+      let front = "", back = ""
       if (typeof item === "string") {
         const m = item.match(/^(.*?)\s*::\s*(.+)$/)
-        if (m) {
-          front = m[1]
-          back = m[2]
-        }
+        if (m) { front = m[1]; back = m[2] }
       } else if (Array.isArray(item) && item.length >= 2) {
-        front = String(item[0])
-        back = String(item[1])
+        front = String(item[0]); back = String(item[1])
       } else if (typeof item === "object" && item) {
         front = (item as any).front ?? (item as any).question ?? (item as any).q ?? ""
-        back = (item as any).back ?? (item as any).answer ?? (item as any).a ?? ""
+        back  = (item as any).back  ?? (item as any).answer   ?? (item as any).a ?? ""
       }
-      front = tidy(front)
-      back = tidy(back)
+      front = tidy(front); back = tidy(back)
       if (front && back) out.push({ front, back })
     }
     return out.length ? out : null
@@ -96,24 +91,19 @@ function tryQARegex(text: string) {
   const re = /^Q\s*[:\-–]\s*(.*?)\nA\s*[:\-–]\s*([\s\S]*?)(?=\nQ\s*[:\-–]|$)/gim
   const out: Array<{ front: string; back: string }> = []
   for (const m of t.matchAll(re)) {
-    const front = tidy(m[1]),
-      back = tidy(m[2])
+    const front = tidy(m[1]), back = tidy(m[2])
     if (front && back) out.push({ front, back })
   }
   return out.length ? out : null
 }
 
 function tryLinePairs(text: string) {
-  const lines = stripFences(text)
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
+  const lines = stripFences(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   const out: Array<{ front: string; back: string }> = []
   for (const line of lines) {
     const m = line.match(/^(.*?)\s*(?:::|->|—|-{1,2}>)\s*(.+)$/)
     if (m) {
-      const front = tidy(m[1]),
-        back = tidy(m[2])
+      const front = tidy(m[1]), back = tidy(m[2])
       if (front && back) out.push({ front, back })
     }
   }
@@ -121,15 +111,11 @@ function tryLinePairs(text: string) {
 }
 
 function tryAdjacentPairs(text: string) {
-  const lines = stripFences(text)
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
+  const lines = stripFences(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   if (lines.length < 2) return null
   const out: Array<{ front: string; back: string }> = []
   for (let i = 0; i < lines.length - 1; i += 2) {
-    const front = tidy(lines[i]),
-      back = tidy(lines[i + 1])
+    const front = tidy(lines[i]), back = tidy(lines[i + 1])
     if (front && back) out.push({ front, back })
   }
   return out.length ? out : null
@@ -149,16 +135,24 @@ function parseFlashcards(raw: string) {
   return deduped
 }
 
-/* -------------------------- Callables (org & user) -------------------------- */
+/* -------------------------- Callables -------------------------- */
+/** ORG: keep your existing pack endpoints */
 const callLoadOrgPack = httpsCallable(fns, "loadNoteFlashcardsPack")
 const callSaveOrgPack = httpsCallable(fns, "saveNoteFlashcardsPack")
-const callLoadUserPack = httpsCallable(fns, "loadUserNoteFlashcardsPack")
-const callSaveUserPack = httpsCallable(fns, "saveUserNoteFlashcardsPack")
+
+/** PERSONAL: match your provided usercontents functions:
+ * - loadUserFlashcards:  { noteId } -> { cards: Array<{ q: string; a: string }> }
+ * - saveUserFlashcards:  { noteId, cards: Array<{ q: string; a: string }> } -> { ok: true }
+ */
+type UserLoadCardsRes = { cards: Array<{ q: string; a: string }> }
+type UserSaveCardsReq = { noteId: string; cards: Array<{ q: string; a: string }> }
+
+const callLoadUserCards = httpsCallable<{ noteId: string }, UserLoadCardsRes>(fns, "loadUserFlashcards")
+const callSaveUserCards = httpsCallable<UserSaveCardsReq, { ok: true }>(fns, "saveUserFlashcards")
 
 /* -------------------------------------------------------------------------- */
 /*                                Component UI                                */
 /* -------------------------------------------------------------------------- */
-
 export default function FlashCardSection({
   initialText,
   sourceText,
@@ -168,6 +162,7 @@ export default function FlashCardSection({
   ownerId,
   isPersonal,
   noteId,
+  autoGenerateIfMissing = false,
 }: FlashCardSectionProps) {
   // Text we feed to the AI for generation
   const text = (sourceText ?? initialText ?? "").trim()
@@ -179,6 +174,7 @@ export default function FlashCardSection({
   const [isLoading, setIsLoading] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [autoTried, setAutoTried] = useState(false) // ensure one-time auto-gen
 
   useEffect(() => setIsClient(true), [])
 
@@ -190,7 +186,7 @@ export default function FlashCardSection({
     return false
   }, [isPersonal, orgId, userId, ownerId])
 
-  // Keep overlay tidy on expand/collapse
+  // Overlay scroll lock
   useEffect(() => {
     const cls = "overlay-open"
     const el = document.documentElement
@@ -212,25 +208,27 @@ export default function FlashCardSection({
   /* -------------------- Load existing pack whenever note changes -------------------- */
   useEffect(() => {
     let cancelled = false
+    setAutoTried(false) // reset when note/scope changes
     async function load() {
       if (!noteId) return
       setIsLoading(true)
       try {
         if (useUserScope) {
-          if (!userId) return
-          const res: any = await callLoadUserPack({ userId, noteId })
-          const cards = (res?.data?.cards ?? []) as Array<{ number: number; question: string; answer: string }>
+          // PERSONAL: { noteId } -> { cards: [{q,a}] }
+          const res = await callLoadUserCards({ noteId })
+          const raw = res?.data?.cards ?? []
+          const mapped: FlashCardUI[] = raw.map((c, i) => ({
+            number: i + 1,
+            front: tidy(c.q),
+            back: tidy(c.a),
+          }))
           if (!cancelled) {
-            const mapped: FlashCardUI[] = cards.map((c) => ({
-              number: c.number,
-              front: tidy(c.question),
-              back: tidy(c.answer),
-            }))
             setFlashCards(mapped)
             setCurrentCardIndex(0)
             setIsFlipped(false)
           }
         } else {
+          // ORG: unchanged pack endpoints
           if (!orgId) return
           const res: any = await callLoadOrgPack({ orgId, noteId })
           const cards = (res?.data?.cards ?? []) as Array<{ number: number; question: string; answer: string }>
@@ -263,10 +261,20 @@ export default function FlashCardSection({
     }
   }, [useUserScope, userId, orgId, noteId])
 
+  // If personal + missing + opt-in flag, auto-generate ONCE
+  useEffect(() => {
+    const missing = flashCards.length === 0
+    if (useUserScope && autoGenerateIfMissing && !isLoading && missing && !autoTried && canGenerate) {
+      setAutoTried(true)
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      generateFromAI(true)
+    }
+  }, [useUserScope, autoGenerateIfMissing, isLoading, flashCards.length, autoTried, canGenerate])
+
   /* -------------------- Generate + SAVE pack (replace) -------------------- */
-  const generateFromAI = async () => {
+  const generateFromAI = async (suppressUI = false) => {
     if (!text) return
-    setIsGenerating(true)
+    if (!suppressUI) setIsGenerating(true)
     setIsFlipped(false)
     try {
       const raw = await generateFlashcards(text)
@@ -284,34 +292,22 @@ export default function FlashCardSection({
       setCurrentCardIndex(0)
 
       // Persist pack (replace)
-      const cardsForSave = mapped.map((m) => ({ question: m.front, answer: m.back }))
-
       try {
         if (useUserScope) {
-          if (!userId || !noteId) {
-            console.warn("[Flashcards] User scope chosen but userId/noteId missing; skipping save.")
+          // PERSONAL save: { noteId, cards: [{q,a}] }
+          if (!noteId) {
+            console.warn("[Flashcards] User scope chosen but noteId missing; skipping save.")
           } else {
-            const res: any = await callSaveUserPack({
-              userId,
-              noteId,
-              mode: "replace",
-              cards: cardsForSave,
-            } as any)
-            // Optional debug:
-            // console.log("[Flashcards] Saved user pack:", res?.data)
+            const cardsForSave = mapped.map((m) => ({ q: m.front, a: m.back }))
+            await callSaveUserCards({ noteId, cards: cardsForSave })
           }
         } else {
+          // ORG save unchanged
           if (!orgId || !noteId) {
             console.warn("[Flashcards] Org scope chosen but orgId/noteId missing; skipping save.")
           } else {
-            const res: any = await callSaveOrgPack({
-              orgId,
-              noteId,
-              mode: "replace",
-              cards: cardsForSave,
-            } as any)
-            // Optional debug:
-            // console.log("[Flashcards] Saved org pack:", res?.data)
+            const cardsForSave = mapped.map((m) => ({ question: m.front, answer: m.back }))
+            await callSaveOrgPack({ orgId, noteId, mode: "replace", cards: cardsForSave } as any)
           }
         }
       } catch (err) {
@@ -322,7 +318,7 @@ export default function FlashCardSection({
       setFlashCards([])
       setCurrentCardIndex(0)
     } finally {
-      setIsGenerating(false)
+      if (!suppressUI) setIsGenerating(false)
     }
   }
 
@@ -337,7 +333,7 @@ export default function FlashCardSection({
       setCurrentCardIndex(0)
     }
     setIsFlipped(false)
-    // (Optional) Persist delete by re-saving pack here if you want live deletes saved.
+    // Optional: persist deletes by re-saving pack (not required by your ask)
   }
 
   const toggleFlip = () => setIsFlipped((f) => !f)
@@ -373,7 +369,7 @@ export default function FlashCardSection({
                   <CardTitle className="text-xl">Flash Cards</CardTitle>
                   <div className="flex items-center gap-2">
                     <Button
-                      onClick={generateFromAI}
+                      onClick={() => generateFromAI()}
                       disabled={!canGenerate}
                       variant="default"
                       size="sm"
@@ -395,7 +391,7 @@ export default function FlashCardSection({
                       className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
                       aria-label="Close modal"
                     >
-                      <Minimize2 className="h-4 w-4" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
@@ -403,7 +399,7 @@ export default function FlashCardSection({
                 <CardContent className="flex flex-col flex-1 min-h-0 px-6 pb-6">
                   {isLoading ? (
                     <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading cards…
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     </div>
                   ) : flashCards.length > 0 && currentCard ? (
                     <div className="flex-1 flex flex-col gap-3 min-h-0">
@@ -514,9 +510,7 @@ export default function FlashCardSection({
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="text-muted-foreground text-lg text-center">
-                        No flash cards yet. Generate flash cards to see them here.
-                      </p>
+                      <p className="text-muted-foreground text-lg text-center">No flashcards yet.</p>
                     </div>
                   )}
                 </CardContent>
@@ -526,23 +520,13 @@ export default function FlashCardSection({
           document.body,
         )}
 
-      {/* Inline card view */}
       {!isExpanded && (
-        <Card className={`${className ?? ""} h-full w-full`}>
-          <CardHeader className="flex flex-row items-center justify-between p-4">
-            <CardTitle className="text-lg">Flash Cards</CardTitle>
+        <div className={`${className ?? ""} h-full w-full flex flex-col`}>
+          <div className="flex flex-row items-center justify-between p-4 border-b border-border/30 bg-background/70 backdrop-blur">
+            <h3 className="text-lg font-semibold">Flash Cards</h3>
             <div className="flex items-center gap-2">
               <Button
-                onClick={() => setIsExpanded(true)}
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
-                aria-label="Expand"
-              >
-                <Maximize2 className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={generateFromAI}
+                onClick={() => generateFromAI()}
                 disabled={!canGenerate}
                 variant="default"
                 size="sm"
@@ -557,56 +541,65 @@ export default function FlashCardSection({
                   "Generate Flash Cards"
                 )}
               </Button>
+              <Button
+                onClick={() => setIsExpanded(true)}
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 shrink-0 hover:bg-accent bg-transparent"
+                aria-label="Expand"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
             </div>
-          </CardHeader>
+          </div>
 
-          <CardContent className="flex flex-col min-h-0 h-[calc(100%-4.25rem)] p-4">
+          <div className="flex-1 min-h-0 p-6 flex items-center justify-center">
             {isLoading ? (
-              <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading cards…
+              <div className="flex items-center justify-center text-lg text-muted-foreground">
+                <Loader2 className="h-5 w-5 mr-3 animate-spin" />
               </div>
             ) : flashCards.length > 0 && currentCard ? (
-              <div className="flex-1 flex flex-col gap-3 min-h-0">
-                <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
+              <div className="w-full max-w-2xl h-full flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-2 text-base text-muted-foreground">
                   <span className="whitespace-nowrap font-medium">
                     {currentCardIndex + 1} of {flashCards.length}
                   </span>
-                  <div className="flex gap-1">
+                  <div className="flex gap-2">
                     <Button
                       onClick={prevCard}
                       variant="outline"
                       size="sm"
                       disabled={currentCardIndex === 0}
-                      className="h-8 w-8 p-0 shrink-0 hover:bg-accent disabled:opacity-50 bg-transparent"
+                      className="h-10 w-10 p-0 shrink-0 hover:bg-accent disabled:opacity-50 bg-transparent"
                       aria-label="Previous card"
                     >
-                      <ChevronLeft className="w-4 h-4" />
+                      <ChevronLeft className="w-5 h-5" />
                     </Button>
                     <Button
                       onClick={nextCard}
                       variant="outline"
                       size="sm"
                       disabled={currentCardIndex === flashCards.length - 1}
-                      className="h-8 w-8 p-0 shrink-0 hover:bg-accent disabled:opacity-50 bg-transparent"
+                      className="h-10 w-10 p-0 shrink-0 hover:bg-accent disabled:opacity-50 bg-transparent"
                       aria-label="Next card"
                     >
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-5 h-5" />
                     </Button>
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-0 flex justify-center items-center overflow-hidden p-2">
+                <div className="flex-1 min-h-0 flex justify-center items-center overflow-hidden">
                   <div
-                    className="cursor-pointer transition-transform duration-500 hover:shadow-lg [transform-style:preserve-3d] relative rounded-2xl border w-full h-full min-h-[200px] max-h-[280px]"
+                    className="cursor-pointer transition-transform duration-500 hover:shadow-lg [transform-style:preserve-3d] relative rounded-2xl border w-full h-full min-h-[300px] max-h-[400px]"
                     onClick={toggleFlip}
                     style={{ transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
                   >
                     {/* Front */}
-                    <Card className="absolute inset-0 [backface-visibility:hidden] border bg-background overflow-hidden rounded-2xl">
-                      <CardContent className="h-full flex flex-col justify-center items-center relative p-4">
-                        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                          <div className="inline-flex items-center justify-center px-3 py-1 rounded-lg bg-white border-2 border-black">
-                            <span className="font-semibold text-sm uppercase tracking-wide text-black">Question</span>
+                    <Card className="absolute inset-0 [backface-visibility:hidden] border bg-white shadow-sm overflow-hidden rounded-2xl">
+                      <CardContent className="h-full flex flex-col justify-center items-center relative p-6">
+                        <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+                          <div className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-gray-800 text-white">
+                            <span className="font-semibold text-sm uppercase tracking-wide">Question</span>
                           </div>
                           <Button
                             onClick={(e) => {
@@ -621,9 +614,9 @@ export default function FlashCardSection({
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                        <div className="text-center w-full px-4 overflow-y-auto max-h-full">
+                        <div className="text-center w-full px-6 overflow-y-auto max-h-full">
                           <div className="px-2">
-                            <p className="font-medium leading-relaxed text-foreground break-words text-sm md:text-base">
+                            <p className="font-medium leading-relaxed text-gray-900 break-words text-lg">
                               {currentCard.front}
                             </p>
                           </div>
@@ -633,13 +626,13 @@ export default function FlashCardSection({
 
                     {/* Back */}
                     <Card
-                      className="absolute inset-0 [backface-visibility:hidden] border bg-background overflow-hidden rounded-2xl"
+                      className="absolute inset-0 [backface-visibility:hidden] border bg-white shadow-sm overflow-hidden rounded-2xl"
                       style={{ transform: "rotateY(180deg)" }}
                     >
-                      <CardContent className="h-full min-h-0 flex flex-col relative p-4 pt-14">
-                        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                          <div className="inline-flex items-center justify-center px-3 py-1 rounded-lg bg-white border-2 border-black">
-                            <span className="font-semibold text-sm uppercase tracking-wide text-black">answer</span>
+                      <CardContent className="h-full min-h-0 flex flex-col relative p-6 pt-16">
+                        <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+                          <div className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-gray-800 text-white">
+                            <span className="font-semibold text-sm uppercase tracking-wide">Answer</span>
                           </div>
                           <Button
                             onClick={(e) => {
@@ -656,8 +649,8 @@ export default function FlashCardSection({
                         </div>
 
                         {/* Scrollable content */}
-                        <div className="flex-1 min-h-0 w-full overflow-y-auto px-4 text-center">
-                          <p className="font-medium leading-relaxed text-foreground break-words text-sm md:text-base">
+                        <div className="flex-1 min-h-0 w-full overflow-y-auto px-6 text-center">
+                          <p className="font-medium leading-relaxed text-gray-900 break-words text-lg">
                             {currentCard.back}
                           </p>
                         </div>
@@ -666,13 +659,13 @@ export default function FlashCardSection({
                   </div>
                 </div>
 
-                <p className="text-center text-muted-foreground text-xs">Click card to flip • Use arrows to navigate</p>
+                <p className="text-center text-muted-foreground text-sm">Click card to flip • Use arrows to navigate</p>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm"> </p>
+              <p className="text-lg text-muted-foreground text-center">No flashcards yet.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </>
   )

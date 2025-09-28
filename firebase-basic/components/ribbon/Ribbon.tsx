@@ -1,22 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { FileText, CreditCard, HelpCircle } from "lucide-react"
+import { FileText, CreditCard, HelpCircle, Notebook } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export type RibbonSection = "summary" | "flashcards" | "quiz" | null
+export type RibbonSection = "summary" | "flashcards" | "quiz" | "notes" | null
 
 interface RibbonProps {
   activeSection: RibbonSection
   onSectionChange: (section: RibbonSection) => void
   className?: string
-  /** when user double-clicks an icon, collapse the content (editor remains + ribbon stays) */
   onCollapse?: () => void
 }
 
 export default function Ribbon({ activeSection, onSectionChange, className, onCollapse }: RibbonProps) {
   const [lastClickTime, setLastClickTime] = useState<Record<string, number>>({})
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   const handleIconClick = (section: RibbonSection) => {
     if (!section) return
@@ -25,44 +24,71 @@ export default function Ribbon({ activeSection, onSectionChange, className, onCo
     const dbl = now - last < 300
 
     if (dbl) {
-      onSectionChange(null) // hide right content
-      onCollapse?.() // expand editor
+      onSectionChange(null)
+      onCollapse?.()
     } else {
-      onSectionChange(section) // show that section
+      onSectionChange(section)
     }
     setLastClickTime({ ...lastClickTime, [section]: now })
   }
 
   const items = [
+    { id: "notes" as const, icon: Notebook, label: "Notes", active: activeSection === "notes" },
     { id: "summary" as const, icon: FileText, label: "Summary", active: activeSection === "summary" },
-    { id: "flashcards" as const, icon: CreditCard, label: "Flash Cards", active: activeSection === "flashcards" },
+    { id: "flashcards" as const, icon: CreditCard, label: "Flashcards", active: activeSection === "flashcards" },
     { id: "quiz" as const, icon: HelpCircle, label: "Quiz", active: activeSection === "quiz" },
   ]
 
   return (
     <div
-      // moved ribbon toward the right: ml-auto (push in flex), sticky to keep it at top, right-0 as fallback
       className={cn(
-        "flex flex-col bg-sidebar border-l border-sidebar-border h-full ml-auto sticky top-0 right-0",
+        "fixed top-[var(--app-header-height,56px)] bottom-0 right-6 z-50",
+        "w-[50px] min-w-[50px] flex flex-col bg-white/95 backdrop-blur-md rounded-lg shadow-sm border border-gray-100",
         className,
       )}
+      aria-hidden={false}
     >
-      {items.map(({ id, icon: Icon, label, active }) => (
-        <Button
-          key={id}
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-12 w-12 p-0 rounded-none border-b border-sidebar-border hover:bg-sidebar-accent",
-            active && "bg-sidebar-accent text-sidebar-accent-foreground",
-          )}
-          onClick={() => handleIconClick(id)}
-          title={`${label} (double-click to collapse)`}
-        >
-          <Icon className="h-5 w-5" />
-        </Button>
-      ))}
-      <div className="flex-1" />
+      <div className="flex flex-col py-2">
+        {items.map(({ id, icon: Icon, label, active }) => (
+          <div
+            key={id}
+            className="relative group"
+            onMouseEnter={() => setHoveredItem(id)}
+            onMouseLeave={() => setHoveredItem(null)}
+          >
+            <div
+              className={cn(
+                "h-12 w-full flex items-center justify-center cursor-pointer",
+                "transition-all duration-200 ease-in-out",
+                "hover:bg-blue-50 hover:scale-105",
+                active && "bg-blue-100 shadow-sm",
+                "mx-1 my-0.5 rounded-md",
+              )}
+              onClick={() => handleIconClick(id)}
+              title={`${label} (double-click to collapse)`}
+              aria-pressed={active}
+              aria-label={label}
+            >
+              <Icon
+                className={cn(
+                  "h-5 w-5 transition-colors duration-200",
+                  active ? "text-blue-700" : "text-gray-600",
+                  "group-hover:text-blue-700",
+                )}
+              />
+            </div>
+
+            {hoveredItem === id && (
+              <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 z-60">
+                <div className="bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg">
+                  {label}
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-900"></div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
