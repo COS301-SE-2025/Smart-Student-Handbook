@@ -28,19 +28,27 @@ export function YjsBlockNoteEditor({
 }: YjsBlockNoteEditorProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  useEffect(() => {
-    const root = document.documentElement;
-    const observer = new MutationObserver(() => {
-      setTheme(root.classList.contains('dark') ? 'dark' : 'light');
-    });
+  const customThemes = ["customLight", "customDark"] as const;
+type Theme = (typeof customThemes)[number];
 
+const [theme, setTheme] = useState<Theme>("customLight");
 
-    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+useEffect(() => {
+  const root = document.documentElement;
 
-    setTheme(root.classList.contains('dark') ? 'dark' : 'light');
-    return () => observer.disconnect();
-  }, []);
+  const observer = new MutationObserver(() => {
+    // Instead of checking for "dark"/"light", 
+    // map to your custom themes
+    setTheme(root.classList.contains("dark") ? "customDark" : "customLight");
+  });
 
+  observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+
+  // initialize
+  setTheme(root.classList.contains("dark") ? "customDark" : "customLight");
+
+  return () => observer.disconnect();
+}, []);
   const doc = useYDoc();
   const provider: any = useYjsProvider();
 
@@ -123,7 +131,7 @@ export function YjsBlockNoteEditor({
       } catch (err) {
         console.error("Failed to save note:", err);
       }
-    }, 5000); // every 5 seconds
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [editor, noteID, ownerID]);
@@ -151,7 +159,7 @@ export function YjsBlockNoteEditor({
       </div>
 
       <div className="flex-1 overflow-auto h-[calc(100vh-16px)]">
-        <BlockNoteView editor={editor} data-theming-css-variables-demo/>
+        <BlockNoteView editor={editor} theme={theme} />
       </div>
     </div>
   );
