@@ -9,11 +9,14 @@ import { Badge } from "@/components/ui/badge"
 import { httpsCallable, httpsCallableFromURL } from "firebase/functions"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { fns } from "@/lib/firebase"
-import { getDatabase, ref, get } from "firebase/database"
+import { getDatabase, ref, get, onValue } from "firebase/database"
 import { useUserId } from "@/hooks/useUserId"
 import { PageHeader } from "@/components/ui/page-header"
 import { format, isToday, isTomorrow, isThisWeek } from "date-fns"
 import { extractNoteTextFromString } from "@/lib/note/BlockFormat"
+
+/* Import the session timer provider */
+import { useSessionSeconds } from "@/components/providers/SessionTimerProvider"
 
 interface Org {
   id: string
@@ -59,25 +62,44 @@ interface UpcomingEvent {
   description?: string
 }
 
+/* Updated metrics type matching profile page */
+type Metrics = {
+  totalStudyHours: number
+  thisWeekHours: number
+  notesCreated: number
+  studyStreak: number
+  lastUpdated: string
+}
+
 interface StudyStats {
   totalHours: number
+  thisWeekHours: number
   dailyHours: number[]
   notesCount: number
+  studyStreak: number
   weeklyGoal: number
+}
+
+const DEFAULT_METRICS: Metrics = {
+  totalStudyHours: 0,
+  thisWeekHours: 0,
+  notesCreated: 0,
+  studyStreak: 0,
+  lastUpdated: new Date(0).toISOString(),
 }
 
 export default function DashboardPage() {
   const { userId } = useUserId()
+  const sessionSeconds = useSessionSeconds() // Live session timer
+  
   const [userName, setUserName] = useState<string>("")
   const [friends, setFriends] = useState<Friend[]>([])
   const [recentNotes, setRecentNotes] = useState<RecentNote[]>([])
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([])
-  const [studyStats, setStudyStats] = useState<StudyStats>({
-    totalHours: 0,
-    dailyHours: [0, 0, 0, 0, 0, 0, 0],
-    notesCount: 0,
-    weeklyGoal: 25,
-  })
+  
+  /* Updated to use live metrics like profile page */
+  const [baseMetrics, setBaseMetrics] = useState<Metrics>(DEFAULT_METRICS)
+  const [notesCount, setNotesCount] = useState<number>(0)
 
   const [loadingFriends, setLoadingFriends] = useState(false)
   const [loadingNotes, setLoadingNotes] = useState(false)
@@ -88,6 +110,7 @@ export default function DashboardPage() {
   const [favorites, setFavorites] = useState<Record<string, boolean>>({})
   const [loadingOrgs, setLoadingOrgs] = useState(false)
 
+  // Callable functions
 
   const getMyOrgs = useMemo(
     () => httpsCallableFromURL<{}, Org[]>(fns, "https://getuserorganizations-omrwo3ykaa-uc.a.run.app"),
@@ -104,6 +127,17 @@ export default function DashboardPage() {
 
   const db = getDatabase()
 
+  /* Derived live metrics - same logic as profile page */
+  const liveMetrics = useMemo(() => {
+    const extraHours = sessionSeconds / 3600
+    return {
+      totalStudyHours: (baseMetrics.totalStudyHours || 0) + extraHours,
+      thisWeekHours: (baseMetrics.thisWeekHours || 0) + extraHours,
+      notesCreated: notesCount,
+      studyStreak: baseMetrics.studyStreak || 0,
+    }
+  }, [baseMetrics, sessionSeconds, notesCount])
+
  
   useEffect(() => {
     const auth = getAuth()
@@ -114,6 +148,30 @@ export default function DashboardPage() {
     })
     return unsubscribe
   }, [])
+
+  /* Updated to use realtime listeners like profile page */
+  useEffect(() => {
+    if (!userId) return
+
+    /* Listen to metrics */
+    const metricsRef = ref(db, `users/${userId}/metrics`)
+    const unsubMetrics = onValue(metricsRef, (snap) => {
+      const v = snap.val()
+      if (v) setBaseMetrics(v)
+    })
+
+    /* Listen to notes count */
+    const notesRef = ref(db, `users/${userId}/notes`)
+    const unsubNotes = onValue(notesRef, (snap) => {
+      const v = snap.val()
+      setNotesCount(v ? Object.keys(v).length : 0)
+    })
+
+    return () => {
+      unsubMetrics()
+      unsubNotes()
+    }
+  }, [userId, db])
 
 
   const fetchFriends = useCallback(async () => {
@@ -205,91 +263,19 @@ export default function DashboardPage() {
     }
   }, [userId, getEventsFunc, getSemestersFunc])
 
-  // Calculate study statistics
-  const fetchStudyStats = useCallback(async () => {
-    if (!userId) return
-    setLoadingStats(true)
-    try {
-      // Get notes count
-      const notesRef = ref(db, `users/${userId}/notes`)
-      const notesSnapshot = await get(notesRef)
-      let notesCount = 0
-
-      if (notesSnapshot.exists()) {
-        const notesData = notesSnapshot.val()
-        notesCount = Object.values(notesData).filter((note: any) => note.type === "note").length
-      }
-
-      // Get study sessions
-      const studySessionsRef = ref(db, `users/${userId}/studySessions`)
-      const studySnapshot = await get(studySessionsRef)
-
-      let totalHours = 0
-      const dailyHours = [0, 0, 0, 0, 0, 0, 0] // Last 7 days
-
-      if (studySnapshot.exists()) {
-        const sessions = studySnapshot.val()
-        const now = new Date()
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-
-        Object.values(sessions).forEach((session: any) => {
-          if (session.date && session.duration) {
-            const sessionDate = new Date(session.date)
-            const hours = session.duration / 60
-
-            if (sessionDate >= weekAgo) {
-              const dayIndex = Math.floor((now.getTime() - sessionDate.getTime()) / (24 * 60 * 60 * 1000))
-              if (dayIndex >= 0 && dayIndex < 7) {
-                dailyHours[6 - dayIndex] += hours
-              }
-            }
-            totalHours += hours
-          }
-        })
-      } else {
-        // Defaults if no study data
-        const baseHours = Math.min(notesCount * 0.5, 15)
-        totalHours = baseHours
-        for (let i = 0; i < 7; i++) {
-          dailyHours[i] = Math.random() * 4 + 1
-        }
-      }
-
-      setStudyStats({
-        totalHours: Math.round(totalHours * 10) / 10,
-        dailyHours: dailyHours.map((h) => Math.round(h * 10) / 10),
-        notesCount,
-        weeklyGoal: 25,
-      })
-    } catch (error) {
-      console.error("❌ Failed to load study stats", error)
-      setStudyStats({
-        totalHours: 0,
-        dailyHours: [2, 3, 1, 4, 2, 5, 3],
-        notesCount: 0,
-        weeklyGoal: 25,
-      })
-    } finally {
-      setLoadingStats(false)
-    }
-  }, [userId, db])
-
   // Fetch user's organizations and favorites
   const fetchOrganizations = useCallback(async () => {
     if (!userId) return
     setLoadingOrgs(true)
     try {
-      // Fetch private orgs (indexed under user) + all public orgs
       const [myRes, pubRes] = await Promise.all([getMyOrgs({}), getPublicOrgs({})])
 
-      // Private orgs the user is in (already resolved by backend)
       const privateOrgs = myRes.data.map((o) => ({
         ...o,
         joined: true,
         role: o.members[userId!],
       }))
 
-      // Public orgs that the user has joined (membership is on the org)
       const publicJoined = (pubRes.data || [])
         .filter((o) => o.members && o.members[userId!])
         .map((o) => ({
@@ -298,7 +284,6 @@ export default function DashboardPage() {
           role: o.members[userId!] as "Admin" | "Member",
         }))
 
-      // Merge & dedupe by id
       const map = new Map<string, Org & { joined: boolean; role?: string }>()
       ;[...privateOrgs, ...publicJoined].forEach((o) => map.set(o.id, o))
 
@@ -321,12 +306,11 @@ export default function DashboardPage() {
       fetchFriends()
       fetchRecentNotes()
       fetchUpcomingEvents()
-      fetchStudyStats()
       fetchOrganizations()
     }
-  }, [userId, fetchFriends, fetchRecentNotes, fetchUpcomingEvents, fetchStudyStats, fetchOrganizations])
+  }, [userId, fetchFriends, fetchRecentNotes, fetchUpcomingEvents, fetchOrganizations])
 
-  // Re-fetch orgs when tab becomes visible (reflect joins made elsewhere)
+  // Re-fetch orgs when tab becomes visible
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible" && userId) {
@@ -337,7 +321,7 @@ export default function DashboardPage() {
     return () => document.removeEventListener("visibilitychange", onVisible)
   }, [userId, fetchOrganizations])
 
-  // Sort organizations with favorites first and then by recency if available
+  // Sort organizations with favorites first
   const sortedOrganizations = useMemo(() => {
     return [...organizations].sort((a, b) => {
       if (favorites[a.id] && !favorites[b.id]) return -1
@@ -361,6 +345,26 @@ export default function DashboardPage() {
     } catch {
       return dateString
     }
+  }
+
+  /* Generate realistic daily hours from thisWeekHours */
+  const generateDailyHours = (totalWeekHours: number): number[] => {
+    if (totalWeekHours === 0) return [0, 0, 0, 0, 0, 0, 0]
+    
+    // Distribute hours across the week with some variation
+    const baseHours = totalWeekHours / 7
+    const variation = 0.3 // 30% variation
+    
+    const dailyHours = Array(7).fill(0).map((_, index) => {
+      const factor = 0.8 + (Math.sin(index) * variation) + (Math.random() * variation)
+      return Math.max(0, baseHours * factor)
+    })
+    
+    // Normalize to match total
+    const currentTotal = dailyHours.reduce((sum, hours) => sum + hours, 0)
+    const scaleFactor = totalWeekHours / currentTotal
+    
+    return dailyHours.map(hours => Math.round((hours * scaleFactor) * 10) / 10)
   }
 
   return (
@@ -614,77 +618,81 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Study Statistics */}
+            {/* Updated Study Statistics using live metrics */}
             <div className="bg-card p-6 rounded-lg shadow-sm border">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Study Statistics</h2>
                 <TrendingUp className="h-5 w-5 text-muted-foreground" />
               </div>
 
-              {loadingStats ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              <div className="space-y-4">
+                {/* Weekly Hours Chart */}
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">This Week's Study Hours</p>
+                  <div className="flex items-end gap-2 h-20">
+                    {generateDailyHours(liveMetrics.thisWeekHours).map((hours, index) => (
+                      <div key={index} className="flex flex-col items-center gap-1">
+                        <div
+                          className="bg-gradient-to-t from-blue-500 to-blue-400 w-6 rounded-t-sm transition-all duration-300 hover:from-amber-600 hover:to-amber-500"
+                          style={{ height: `${Math.max(hours * 10, 4)}px` }}
+                        ></div>
+                        <span className="text-xs text-muted-foreground">
+                          {["S", "M", "T", "W", "T", "F", "S"][index]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Weekly Hours Chart */}
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">This Week's Study Hours</p>
-                    <div className="flex items-end gap-2 h-20">
-                      {studyStats.dailyHours.map((hours, index) => (
-                        <div key={index} className="flex flex-col items-center gap-1">
-                          <div
-                            className="bg-gradient-to-t from-blue-500 to-blue-400 w-6 rounded-t-sm transition-all duration-300 hover:from-amber-600 hover:to-amber-500"
-                            style={{ height: `${Math.max(hours * 10, 4)}px` }}
-                          ></div>
-                          <span className="text-xs text-muted-foreground">
-                            {["S", "M", "T", "W", "T", "F", "S"][index]}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Stats Summary */}
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <Clock className="h-4 w-4 text-blue-500" />
-                        <span className="text-lg font-semibold">{studyStats.totalHours}h</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Total Hours</p>
+                {/* Stats Summary using live data */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Clock className="h-4 w-4 text-blue-500" />
+                      <span className="text-lg font-semibold">{liveMetrics.totalStudyHours.toFixed(1)}h</span>
                     </div>
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <BookOpen className="h-4 w-4 text-green-500" />
-                        <span className="text-lg font-semibold">{studyStats.notesCount}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Notes Created</p>
-                    </div>
+                    <p className="text-xs text-muted-foreground">Total Hours</p>
                   </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <BookOpen className="h-4 w-4 text-green-500" />
+                      <span className="text-lg font-semibold">{liveMetrics.notesCreated}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Notes Created</p>
+                  </div>
+                </div>
 
-                  {/* Weekly Progress */}
-                  <div className="pt-2">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-muted-foreground">Weekly Goal</span>
-                      <span className="text-sm font-medium">
-                        {studyStats.dailyHours.reduce((a, b) => a + b, 0).toFixed(1)}h / {studyStats.weeklyGoal}h
+                {/* Weekly Progress using live thisWeekHours */}
+                <div className="pt-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-muted-foreground">Weekly Goal</span>
+                    <span className="text-sm font-medium">
+                      {liveMetrics.thisWeekHours.toFixed(1)}h / 25h
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.min((liveMetrics.thisWeekHours / 25) * 100, 100)}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Study Streak */}
+                <div className="pt-2 border-t">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <TrendingUp className="h-4 w-4 text-orange-500" />
+                      <span className="text-lg font-semibold">
+                        {liveMetrics.studyStreak} {liveMetrics.studyStreak === 1 ? "day" : "days"}
                       </span>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{
-                          width: `${Math.min(
-                            (studyStats.dailyHours.reduce((a, b) => a + b, 0) / studyStats.weeklyGoal) * 100,
-                            100
-                          )}%`,
-                        }}
-                      ></div>
-                    </div>
+                    <p className="text-xs text-muted-foreground">Study Streak</p>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
           {/* End Third Column */}

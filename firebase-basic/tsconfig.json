@@ -22,6 +22,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "components/ui/__tests__/unit/signupform.test.js", "components/ui/__tests__/integration/org.test.js", "components/ui/__tests__/integration/notes.test.js", "components/ui/__tests__/integration/loginform.test.js"],
   "exclude": ["node_modules"]
 }
