@@ -8,39 +8,35 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jsdom',
   moduleNameMapping: {
-    '^@/components/(.*)$': '<rootDir>/components/$1',
-    '^@/pages/(.*)$': '<rootDir>/pages/$1',
-    '^@/utils/(.*)$': '<rootDir>/utils/$1',
     '^@/(.*)$': '<rootDir>/$1',
   },
   testMatch: [
     '**/__tests__/**/*.(test|spec).(js|jsx|ts|tsx)',
-    '**/*.(test|spec).(js|jsx|ts|tsx)'
+    '**/*.(test|spec).(js|jsx|ts|tsx)',
   ],
   testPathIgnorePatterns: [
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
-    '<rootDir>/*.config.js',
-    '<rootDir>/coverage/'
+    '<rootDir>/coverage/',
   ],
   collectCoverageFrom: [
     'components/**/*.{js,jsx,ts,tsx}',
-    'pages/**/*.{js,jsx,ts,tsx}',
-    'utils/**/*.{js,jsx,ts,tsx}',
+    'app/**/*.{js,jsx,ts,tsx}',
     '!**/*.d.ts',
     '!**/node_modules/**',
   ],
   transform: {
-    '^.+\\.[jt]sx?$': ['babel-jest', {
-      presets: [
-        'next/babel',
-        ['@babel/preset-react', { runtime: 'automatic' }]
-      ]
-    }],
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest'],
   },
   transformIgnorePatterns: [
-    '/node_modules/(?!(firebase|@firebase)/)',
+    'node_modules/(?!(firebase|@firebase)/)',
   ],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  globals: {
+    'ts-jest': {
+      tsconfig: 'tsconfig.jest.json'
+    }
+  }
 }
 
 module.exports = createJestConfig(customJestConfig)

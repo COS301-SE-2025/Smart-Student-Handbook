@@ -25,7 +25,7 @@ jest.mock('next/navigation', () => ({
   useParams: () => ({}),
 }));
 
-// Mock Firebase Auth with proper jest.fn() mocks
+// Mock Firebase Auth
 jest.mock('firebase/auth', () => ({
   signInWithEmailAndPassword: jest.fn(),
   createUserWithEmailAndPassword: jest.fn(),
@@ -34,9 +34,15 @@ jest.mock('firebase/auth', () => ({
   getAuth: jest.fn(() => ({
     currentUser: null,
   })),
+  EmailAuthProvider: {
+    credential: jest.fn(),
+  },
+  reauthenticateWithCredential: jest.fn(),
+  updatePassword: jest.fn(),
+  updateProfile: jest.fn(),
 }));
 
-// Mock Firebase Database with proper jest.fn() mocks
+// Mock Firebase Database
 jest.mock('firebase/database', () => ({
   ref: jest.fn(),
   set: jest.fn(),
@@ -44,6 +50,14 @@ jest.mock('firebase/database', () => ({
   remove: jest.fn(),
   push: jest.fn(),
   getDatabase: jest.fn(),
+  onValue: jest.fn(),
+}));
+
+// Mock Firebase Functions
+jest.mock('firebase/functions', () => ({
+  httpsCallable: jest.fn(),
+  httpsCallableFromURL: jest.fn(),
+  getFunctions: jest.fn(),
 }));
 
 // Mock Firebase App
