@@ -1,75 +1,75 @@
-// jest.setup.js
-require('@testing-library/jest-dom');
+require('@testing-library/jest-dom')
 
-// Mock next/navigation
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-    refresh: jest.fn(),
-    prefetch: jest.fn(),
-  }),
-  useSearchParams: () => ({
-    get: jest.fn(),
-    has: jest.fn(),
-    getAll: jest.fn(),
-    keys: jest.fn(),
-    values: jest.fn(),
-    entries: jest.fn(),
-    forEach: jest.fn(),
-    toString: jest.fn(),
-  }),
-  usePathname: () => '',
-  useParams: () => ({}),
-}));
-
-// Mock Firebase Auth
-jest.mock('firebase/auth', () => ({
-  signInWithEmailAndPassword: jest.fn(),
-  createUserWithEmailAndPassword: jest.fn(),
-  signOut: jest.fn(),
-  onAuthStateChanged: jest.fn(),
-  getAuth: jest.fn(() => ({
-    currentUser: null,
-  })),
-  EmailAuthProvider: {
-    credential: jest.fn(),
+// Mock Next.js router
+jest.mock('next/router', () => ({
+  useRouter() {
+    return {
+      route: '/',
+      pathname: '/',
+      query: {},
+      asPath: '/',
+      push: jest.fn(),
+      pop: jest.fn(),
+      reload: jest.fn(),
+      back: jest.fn(),
+      prefetch: jest.fn().mockResolvedValue(undefined),
+      beforePopState: jest.fn(),
+      events: {
+        on: jest.fn(),
+        off: jest.fn(),
+        emit: jest.fn(),
+      },
+    }
   },
-  reauthenticateWithCredential: jest.fn(),
-  updatePassword: jest.fn(),
-  updateProfile: jest.fn(),
-}));
-
-// Mock Firebase Database
-jest.mock('firebase/database', () => ({
-  ref: jest.fn(),
-  set: jest.fn(),
-  get: jest.fn(),
-  remove: jest.fn(),
-  push: jest.fn(),
-  getDatabase: jest.fn(),
-  onValue: jest.fn(),
-}));
-
-// Mock Firebase Functions
-jest.mock('firebase/functions', () => ({
-  httpsCallable: jest.fn(),
-  httpsCallableFromURL: jest.fn(),
-  getFunctions: jest.fn(),
-}));
-
-// Mock Firebase App
-jest.mock('firebase/app', () => ({
-  initializeApp: jest.fn(),
-  getApps: jest.fn(() => []),
-  getApp: jest.fn(),
-}));
+}))
 
 // Global test utilities
-global.console = {
-  ...console,
-  error: jest.fn(),
-  warn: jest.fn(),
-};
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}))
+
+// Mock window.matchMedia
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: jest.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+})
+
+// Polyfill Web APIs
+const { TextEncoder, TextDecoder } = require('util')
+global.TextEncoder = TextEncoder
+global.TextDecoder = TextDecoder
+
+// Mock Response for API route testing
+global.Response = class Response {
+  constructor(body, init = {}) {
+    this.body = body
+    this.status = init.status || 200
+    this.statusText = init.statusText || 'OK'
+    this.headers = new Map()
+    if (init && init.headers) {
+      Object.entries(init.headers).forEach(([key, value]) => {
+        this.headers.set(key, value)
+      })
+    }
+    this.ok = this.status >= 200 && this.status < 300
+  }
+
+  async json() {
+    return JSON.parse(this.body)
+  }
+
+  async text() {
+    return this.body
+  }
+}
