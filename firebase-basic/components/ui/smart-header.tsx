@@ -25,6 +25,7 @@ import Image from "next/image"
 import { getDatabase, ref as dbRef, onValue, push as dbPush, set as dbSet, update as dbUpdate, remove as dbRemove } from "firebase/database"
 import { getAuth } from "firebase/auth" //adjust real-time db
 import dynamic from "next/dynamic";
+import GlobalSearchInline from "@/components/GlobalSearchInline";
 
 
 interface Notification {
@@ -556,14 +557,7 @@ export function SmartHeader() {
               />
             ) : (
               // Everywhere else, open the command palette
-              <Input
-                placeholder="Search notes, organisations, lectures, events, users, flashcards… (Ctrl/Cmd+K)"
-                value={searchValue}
-                readOnly
-                onFocus={openSearchPalette}
-                onClick={openSearchPalette}
-                className="cursor-text pl-9 h-8 bg-muted/50 border-border focus:bg-background transition-colors"
-              />
+              <GlobalSearchInline />
             )}
           </div>
         </div>
