@@ -28,7 +28,6 @@ export const removeCollaborator = functions.https.onCall(
     }
 
     try {
-      // ✅ Look up the note in all users' collections to find the owner
       const usersRef = db.ref("users");
       const snapshot = await usersRef.once("value");
 
@@ -37,19 +36,16 @@ export const removeCollaborator = functions.https.onCall(
         const note = userSnap.child(`notes/${noteId}`);
         if (note.exists()) {
           ownerId = userSnap.key!;
-          return true; // stop loop
+          return true;
         }
         return false;
       });
 
       if (!ownerId) {
-        throw new functions.https.HttpsError(
-          "not-found",
-          "Note not found."
-        );
+        throw new functions.https.HttpsError("not-found", "Note not found.");
       }
 
-      // ✅ Only allow the note owner to remove collaborators
+      // Only allow the note owner to remove collaborators
       if (requesterId !== ownerId) {
         throw new functions.https.HttpsError(
           "permission-denied",
@@ -57,13 +53,23 @@ export const removeCollaborator = functions.https.onCall(
         );
       }
 
+      // Remove collaborator from note
       const collabRef = db.ref(
         `users/${ownerId}/notes/${noteId}/collaborators/${collaboratorId}`
       );
-
       await collabRef.remove();
 
-      return { success: true, message: `Removed ${collaboratorId}` };
+      // ===== New logic: Remove the note from collaborator's sharedNotes =====
+      const sharedNoteRef = db.ref(
+        `users/${collaboratorId}/sharedNotes/${noteId}`
+      );
+      await sharedNoteRef.remove();
+      // ======================================================================
+
+      return {
+        success: true,
+        message: `Removed ${collaboratorId} and cleaned up sharedNotes`,
+      };
     } catch (error: any) {
       console.error("Error removing collaborator:", error);
       throw new functions.https.HttpsError(
@@ -73,6 +79,7 @@ export const removeCollaborator = functions.https.onCall(
     }
   }
 );
+
 
 interface ShareNoteData {
   noteId: string;
