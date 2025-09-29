@@ -51,7 +51,9 @@ type NotesSplitViewProps = {
   title?: string
   onTitleChange?: (name: string) => void
   onTitleCommit?: () => void
+  username?: string
 }
+
 
 /* ------------------------------ Utilities -------------------------------- */
 function htmlToPlain(html: string): string {
@@ -203,10 +205,10 @@ function PersonalQuizBarInline({
 
   useEffect(() => {
     if (userId && noteId) refreshLists()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+ 
   }, [userId, noteId])
 
-  // ----- Create flow -----
+  
   function handleOpenCreate() {
     setCreateOpen(true)
     setCreatePreview(null)
@@ -1098,7 +1100,9 @@ export default function UserNotesSplitViewWithRibbon({
   onSelect,
   initialSelectedId,
   loading,
+  username,
 }: NotesSplitViewProps) {
+
   const [stateNotes, setStateNotes] = useState<Note[]>(notes)
 
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
@@ -1245,7 +1249,8 @@ export default function UserNotesSplitViewWithRibbon({
                 searchParams={{
                   doc: currentSelectedNoteId as any,
                   ownerId: (currentOwnerId || userID) as any,
-                  username: "You",
+                  username: username || "Collaborator",
+
                 }}
               />
             ) : (

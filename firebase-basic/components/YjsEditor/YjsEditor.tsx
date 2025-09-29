@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { useCreateBlockNote } from "@blocknote/react"
-import { BlockNoteView } from "@blocknote/mantine"
+import { BlockNoteView, darkDefaultTheme, lightDefaultTheme } from "@blocknote/mantine"
 import "@blocknote/mantine/style.css"
 
 import { useYDoc, useYjsProvider } from "@y-sweet/react"
 import { PartialBlock, Block } from "@blocknote/core"
 import { loadFromStorage, saveToStorage } from "@/lib/storageFunctions"
 import { Note } from "@/types/note"
-import { fetchNoteWithOwner } from "@/lib/note/treeActions"
+import { fetchNoteWithOwner } from "@/lib/note/treeActions" 
 import { ref, set } from "@firebase/database"
 import { db } from "@/lib"
 
@@ -28,6 +28,16 @@ export function YjsBlockNoteEditor({ noteID, ownerID, username }: YjsBlockNoteEd
   const [initialContent, setInitialContent] = useState<PartialBlock[] | null>(null)
   const [providerReady, setProviderReady] = useState(false)
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
+
+  const [isDark, setIsDark] = useState<boolean>(false)
+  useEffect(() => {
+    const root = document.documentElement
+    const update = () => setIsDark(root.classList.contains("dark"))
+    update()
+    const obs = new MutationObserver(update)
+    obs.observe(root, { attributes: true, attributeFilter: ["class"] })
+    return () => obs.disconnect()
+  }, [])
 
   const [noteName, setNoteName] = useState(selectedNote?.name ?? "")
   useEffect(() => setNoteName(selectedNote?.name ?? ""), [selectedNote])
@@ -93,7 +103,7 @@ export function YjsBlockNoteEditor({ noteID, ownerID, username }: YjsBlockNoteEd
   useEffect(() => {
     if (!providerReady || !editor || !Array.isArray(initialContent)) return
     if (editor.document.length === 0) {
-      editor.insertBlocks(initialContent, editor.getBlock("initialBlockId") as any);
+      editor.insertBlocks(initialContent, editor.getBlock("initialBlockId") as any)
     }
   }, [providerReady, initialContent, editor])
 
@@ -116,8 +126,11 @@ export function YjsBlockNoteEditor({ noteID, ownerID, username }: YjsBlockNoteEd
   }
 
   return (
-    <div>
-      <div>
+    <div className="flex flex-col h-full">
+      {/* Title input */}
+      <div className={/* Give the title line its own surface so it never looks "black" */
+        "bg-white dark:bg-neutral-900"
+      }>
         <input
           type="text"
           value={noteName}
@@ -127,12 +140,22 @@ export function YjsBlockNoteEditor({ noteID, ownerID, username }: YjsBlockNoteEd
             if (e.key === "Enter") e.currentTarget.blur()
           }}
           className="border-b-4 text-2xl font-bold text-left 
-                   text-gray-900 dark:text-gray-100 pb-4 pl-12 bg-transparent outline-none w-full"
+                     text-gray-900 dark:text-gray-100 pb-4 pl-12 bg-transparent outline-none w-full"
         />
       </div>
 
-      <div className="flex-1 overflow-auto h-[calc(100vh-16px)]">
-        <BlockNoteView editor={editor} data-theming-css-variables-demo />
+  
+      <div
+        className={
+        
+          "flex-1 overflow-auto h-[calc(100vh-16px)] bg-white dark:bg-neutral-900"
+        }
+      >
+        <BlockNoteView
+          editor={editor}
+          theme={isDark ? darkDefaultTheme : lightDefaultTheme}
+          data-theming-css-variables-demo
+        />
       </div>
     </div>
   )
