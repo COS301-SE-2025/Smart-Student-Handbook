@@ -179,11 +179,11 @@ export function SmartHeader() {
 
           filtered.push(notification)
         } else {
-          console.log(`❌ Notification type not matching:`, n.type)
+          //console.log(`❌ Notification type not matching:`, n.type)
         }
       })
-      
-      console.log(`📊 Total filtered notifications:`, filtered.length)
+
+      //console.log(`📊 Total filtered notifications:`, filtered.length)
       setOrgNotifications(filtered)
     })
     
