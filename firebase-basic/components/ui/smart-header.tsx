@@ -44,6 +44,14 @@ export function SmartHeader() {
   const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
   const [searchValue, setSearchValue] = useState("")
+  const SearchCommand = dynamic(() => import("@/components/SearchCommand"), { ssr: false });
+  const openSearchPalette = () => {
+  if (typeof window !== "undefined") {
+    // Reuse the palette’s Ctrl/Cmd+K listener
+    const evt = new KeyboardEvent("keydown", { key: "k", ctrlKey: true });
+    window.dispatchEvent(evt);
+  }
+};
 
   // Calendar & lecture notifications
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -121,6 +129,7 @@ export function SmartHeader() {
     },
     [user, dismissedCalendarNotifications],
   )
+
 
   // Initialize search from URL
   useEffect(() => {
@@ -503,6 +512,7 @@ export function SmartHeader() {
 }
 
   return (
+    <>
     <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
       <div className="flex h-full items-center justify-between px-4">
         {/* Left: Sidebar + Title */}
@@ -530,14 +540,34 @@ export function SmartHeader() {
         <div className="flex-1 max-w-lg mx-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={getSearchPlaceholder()}
-              value={searchValue}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9 h-8 bg-muted/50 border-border focus:bg-background transition-colors"
-            />
+
+            {pathname === "/organisations" ? (
+              // Keep existing URL-driven search on the organisations page
+              <Input
+                placeholder={getSearchPlaceholder()}
+                value={searchValue}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleSearchChange((e.target as HTMLInputElement).value);
+                  }
+                }}
+                className="pl-9 h-8 bg-muted/50 border-border focus:bg-background transition-colors"
+              />
+            ) : (
+              // Everywhere else, open the command palette
+              <Input
+                placeholder="Search notes, organisations, lectures, events, users, flashcards… (Ctrl/Cmd+K)"
+                value={searchValue}
+                readOnly
+                onFocus={openSearchPalette}
+                onClick={openSearchPalette}
+                className="cursor-text pl-9 h-8 bg-muted/50 border-border focus:bg-background transition-colors"
+              />
+            )}
           </div>
         </div>
+
 
         {/* Right: Notifications & User */}
         <div className="flex items-center gap-1">
@@ -663,5 +693,7 @@ export function SmartHeader() {
         </div>
       </div>
     </header>
+    <SearchCommand />
+    </>
   )
 }

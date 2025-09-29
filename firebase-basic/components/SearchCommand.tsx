@@ -1,8 +1,5 @@
-// =============================
-// 4) UI: Command Palette (shadcn/ui)
-// =============================
-// File: components/SearchCommand.tsx
 "use client";
+
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
