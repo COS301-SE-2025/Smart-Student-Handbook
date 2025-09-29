@@ -27,25 +27,15 @@ export function YjsBlockNoteEditor({
   username,
 }: YjsBlockNoteEditorProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  const customThemes = ["customLight", "customDark"] as const;
-type Theme = (typeof customThemes)[number];
-
-const [theme, setTheme] = useState<Theme>("customLight");
-
 useEffect(() => {
   const root = document.documentElement;
 
   const observer = new MutationObserver(() => {
-    // Instead of checking for "dark"/"light", 
-    // map to your custom themes
-    setTheme(root.classList.contains("dark") ? "customDark" : "customLight");
+    setTheme(root.classList.contains("dark") ? "dark" : "light");
   });
 
   observer.observe(root, { attributes: true, attributeFilter: ["class"] });
-
-  // initialize
-  setTheme(root.classList.contains("dark") ? "customDark" : "customLight");
+  setTheme(root.classList.contains("dark") ? "dark" : "light");
 
   return () => observer.disconnect();
 }, []);
