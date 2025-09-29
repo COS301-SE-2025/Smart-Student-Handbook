@@ -17,7 +17,6 @@ export async function saveToStorage(noteId: string, jsonBlocks: Block[], ownerID
   const noteRef = ref(db, path);
   try {
     await set(noteRef, jsonBl);
-    console.log("Note saved successfully");
   } catch (error) {
     console.error("Error saving note:", error);
   }

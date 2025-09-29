@@ -267,7 +267,6 @@ export function YjsBlockNoteEditor({
     if (!providerReady || !editor || !Array.isArray(initialContent)) return;
     if (editor.document.length === 0) {
       editor.insertBlocks(initialContent, editor.getBlock("initialBlockId") as any);
-      console.log("Inserted initial content after provider ready:", initialContent);
     }
   }, [providerReady, initialContent, editor]);
 

@@ -204,7 +204,7 @@ const createOrg = useMemo(
     try {
       const res = await leaveOrg({ orgId })
       if (original?.isPrivate) setOrgsData((prev) => prev.filter((o) => o.id !== orgId))
-      if (res.data.transferred) console.log("Ownership transferred")
+      if (res.data.transferred) 
       toast.success("Successfully left organization.")
     } catch (e: any) {
       toast.error(e.message || "Failed to leave organization.")

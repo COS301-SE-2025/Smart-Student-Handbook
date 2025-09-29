@@ -18,10 +18,10 @@ export async function getClientToken(docID: string) {
 }
 
 export async function saveDocumentToDB(roomName: string, data: string) {
-    console.log(`Saving doc for room: ${roomName}`);
+
 }
 
 export async function loadDocumentFromDB(roomName: string) {
-    console.log(`Loading doc for room: ${roomName}`);
+
     return "Initial content here...";
 }

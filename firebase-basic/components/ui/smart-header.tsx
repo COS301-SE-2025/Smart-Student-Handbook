@@ -141,20 +141,16 @@ export function SmartHeader() {
   // Listen for notifications (including friend requests)
   useEffect(() => {
     if (!user?.uid) {
-      console.log(`❌ No user ID for notifications`);
       return;
     }
     
-    console.log(`👂 Setting up notification listener for user: ${user.uid}`);
     const db = getDatabase()
     const notifRef = dbRef(db, `users/${user.uid}/notifications`)
     
     const off = onValue(notifRef, (snap) => {
-      console.log(`📨 Raw notification snapshot:`, snap.val())
       const raw = snap.val() as Record<string, any> | null
       
       if (!raw) {
-        console.log(`📭 No notifications found`)
         setOrgNotifications([])
         return
       }
@@ -164,7 +160,6 @@ export function SmartHeader() {
         const n = childSnap.val() as any
         const key = childSnap.key!
         
-        console.log(`🔍 Processing notification:`, { key, type: n.type, data: n })
         
         if (n.type === "added_to_group" || 
             n.type === "new_public_org" || 
@@ -181,8 +176,7 @@ export function SmartHeader() {
             orgId: n.orgId,
             requestId: n.requestId, 
           }
-          
-          console.log(`✅ Adding notification to list:`, notification)
+
           filtered.push(notification)
         } else {
           console.log(`❌ Notification type not matching:`, n.type)

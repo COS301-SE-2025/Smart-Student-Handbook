@@ -128,17 +128,6 @@ export default function FriendPage() {
           }
         })
       }
-
-      console.log(`Found ${mutualOrgsData.length} mutual organizations for user ${id}:`, 
-        mutualOrgsData.map(org => ({
-          name: org.name,
-          isPrivate: org.isPrivate,
-          memberCount: Object.keys(org.members).length,
-          currentUserRole: org.members[currentUser.uid],
-          friendRole: org.members[id]
-        }))
-      )
-
       setMutualFriends(mutualFriendsData)
       setMutualOrganizations(mutualOrgsData)
     } catch (error) {
@@ -158,7 +147,6 @@ export default function FriendPage() {
     const unsubProfile = onValue(friendRootRef, async (snapshot) => {
       if (snapshot.exists()) {
         const userData = snapshot.val()
-        console.log('Full user data loaded:', userData) // Debug log
         
         // Try to get email from root level first
         let friendData = userData.UserSettings || {}
@@ -175,7 +163,6 @@ export default function FriendPage() {
           email: friendEmail
         }
         
-        console.log('Combined friend data:', combinedFriendData) // Debug log
         setFriend(combinedFriendData)
       }
       setLoading(false)

@@ -43,8 +43,6 @@ const createNote = async (orgId: string, userId: string): Promise<Note> => {
 
   const path = `organizations/${orgId}/notes/${id}`;
   await callCreateNote({ path, note: newNote });
-
-  console.log("Note Posted");
   return newNote;
 };
 
@@ -52,7 +50,6 @@ const deleteNote = async (orgId: string, noteId: string): Promise<void> => {
   const path = `organizations/${orgId}/notes/${noteId}`;
 
   await callDeleteNote({ path });
-  console.log("Deleting Note");
 };
 
 type Note = {
@@ -94,7 +91,6 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
         content: selectedNote.content,
         name: selectedNote.name,
       });
-      console.log("Note auto-saved (name + content)");
     }, 1000);
 
     return () => clearTimeout(timeout);
@@ -131,7 +127,6 @@ export default function NotesSplitView({ notes, orgID }: NotesSplitViewProps) {
   const handleSummarize = async () => {
     if (!selectedNote?.content) return;
 
-    console.log(selectedNote.content) ; 
 
     setLoadingSummary(true);
     const result = await summarizeNote(selectedNote.content);
