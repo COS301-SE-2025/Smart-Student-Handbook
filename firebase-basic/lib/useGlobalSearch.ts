@@ -14,28 +14,40 @@ export function useDebouncedValue<T>(value: T, delay = 250) {
 }
 
 export function useGlobalSearch() {
-  const [query, setQuery] = useState("");
-  const debounced = useDebouncedValue(query, 300);
-  const [loading, setLoading] = useState(false);
-  const [hits, setHits] = useState<SearchHit[]>([]);
-  const [open, setOpen] = useState(false);
-  const lastQ = useRef("");
-  const sections = ["notes", "organizations", "friends"] as const;
+    const sections = ["notes", "organizations", "friends"] as const;
 
-  useEffect(() => {
+    const [query, setQuery] = useState("");
+    const debounced = useDebouncedValue(query, 300);
+    const [loading, setLoading] = useState(false);
+    const [hits, setHits] = useState<SearchHit[]>([]);
+    const [error, setError] = useState<string | null>(null);
+    const [open, setOpen] = useState(false);
+    const lastQ = useRef("");
+
+   useEffect(() => {
     if (!debounced.trim()) {
       setHits([]);
+      setError(null);
       return;
     }
     let cancelled = false;
     async function go() {
       setLoading(true);
+      setError(null);
       try {
         const fn = httpsCallable(fns, "searchEverything");
-        const res = (await fn({ q: debounced, limit: 6, sections: ["notes", "organizations", "friends"] })) as any;
+        const res = await fn({ q: debounced, limit: 6, sections });
         if (cancelled) return;
-        setHits(res?.data?.hits ?? []);
-      } catch (e) {
+        setHits((res as any)?.data?.hits ?? []);
+      } catch (e: any) {
+        if (!cancelled) {
+          const msg =
+            e?.code?.includes?.("unauth") ? "Please sign in to search."
+            : e?.code?.includes?.("not-found") ? "Search service not found (check deploy/region)."
+            : "Search failed. See console.";
+          setError(msg);
+          setHits([]);
+        }
         console.error("searchEverything error", e);
       } finally {
         if (!cancelled) setLoading(false);
@@ -45,19 +57,16 @@ export function useGlobalSearch() {
       lastQ.current = debounced;
       go();
     }
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [debounced]);
 
   const grouped = useMemo(() => {
-    const g = new Map<SearchSection, typeof hits>();
+    const g = new Map<SearchSection, SearchHit[]>();
     for (const h of hits) {
       g.set(h.section, [...(g.get(h.section) || []), h]);
     }
     return g;
   }, [hits]);
 
-  return { query, setQuery, hits, grouped, loading, open, setOpen };
+  return { query, setQuery, hits, grouped, loading, error, open, setOpen, sections };
 }
-
