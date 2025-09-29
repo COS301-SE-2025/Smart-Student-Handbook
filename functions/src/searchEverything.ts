@@ -30,26 +30,26 @@ export const searchEverything = onCall<{
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
-  const qRaw = (req.data?.q ?? "").toString().toLowerCase();
-  const q = qRaw;
+  const q = (req.data?.q ?? "").toString().trim().toLowerCase();
   const limit = Math.min(Number(req.data?.limit ?? 8) || 8, 25);
   const sections: SearchSection[] =
     Array.isArray(req.data?.sections) && req.data.sections.length
       ? (req.data.sections as SearchSection[])
-      : ["notes", "organizations", "friends", "lectures", "events", "users", "flashcards"];
+      : ["notes", "organizations", "friends", "events"];
 
-   if (!q) return { hits: [] as SearchHit[] };
+  if (!q) return { hits: [] as SearchHit[] };
 
   const db = admin.database();
   const hits: SearchHit[] = [];
 
+  // ------------ helpers ------------
   function stripHtml(s: string) {
-    return s.replace(/<[^>]+>/g, " ");
+    return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   }
   function jsonToPlain(s: any): string {
     try {
       const v = typeof s === "string" ? JSON.parse(s) : s;
-      // Block-style editors
+      // Array of blocks
       if (Array.isArray(v)) {
         return v
           .map((blk: any) =>
@@ -61,7 +61,11 @@ export const searchEverything = onCall<{
       }
       // Quill delta
       if (v && Array.isArray(v.ops)) {
-        return v.ops.map((op: any) => (op.insert ?? "")).join("");
+        return v.ops.map((op: any) => op.insert ?? "").join("");
+      }
+      // Editor.js style
+      if (Array.isArray(v?.blocks)) {
+        return v.blocks.map((b: any) => stripHtml(b?.data?.text || b?.data?.title || "")).join(" ");
       }
       // Generic object
       return JSON.stringify(v).replace(/["{}[\],]/g, " ");
@@ -69,22 +73,25 @@ export const searchEverything = onCall<{
       return typeof s === "string" ? s : "";
     }
   }
-  function toPlainPreview(body: any): string {
-    const s = typeof body === "string" ? body : JSON.stringify(body ?? "");
-    // if it looks like HTML
-    if (/<[a-z][\s\S]*>/i.test(s)) return stripHtml(s);
-    // if it looks like JSON
-    if (/^[\[{].*[\]}]$/.test(s.trim())) return jsonToPlain(s);
-    return s;
+
+  function toPlainPreview(body: any, max = 240): string {
+    if (body == null) return "";
+    if (typeof body === "string") {
+      const trimmed = body.trim();
+      if (/^[\[{].*[\]}]$/.test(trimmed)) return jsonToPlain(trimmed).slice(0, max);
+      if (/<[a-z][\s\S]*>/i.test(trimmed)) return stripHtml(trimmed).slice(0, max);
+      return trimmed.slice(0, max);
+    }
+    return jsonToPlain(body).slice(0, max);
   }
-  const scoreOf = (text?: string, q?: string) => {
+  const scoreOf = (text?: string) => {
     const t = (text || "").toLowerCase();
-    if (!q || !t.includes(q)) return -1;
+    if (!t.includes(q)) return -1;
     return t.startsWith(q) ? 10 : 5;
   };
 
 
-  // ---------- NOTES (users/{uid}/notes then fallback notes/{uid})
+  // ------------ NOTES (users/{uid}/notes -> fallback notes/{uid}) ------------
   if (sections.includes("notes")) {
     const notePaths = [`users/${uid}/notes`, `notes/${uid}`];
     let noteSnap: admin.database.DataSnapshot | null = null;
@@ -96,16 +103,17 @@ export const searchEverything = onCall<{
       noteSnap.forEach((c) => {
         const v = c.val() || {};
         const title = v.title || v.name || "Untitled note";
-        const rawBody = v.searchText || v.plainText || v.body || v.content || v.data;
-        const body = toPlainPreview(rawBody).slice(0, 240);
-        const s = Math.max(scoreOf(title, q), scoreOf(body, q));
+        const rawBody = v.searchText ?? v.plainText ?? v.body ?? v.content ?? v.data ?? v.blocks;
+        const preview = toPlainPreview(rawBody);
+        const s = Math.max(scoreOf(title), scoreOf(preview));
         if (s >= 0) {
           hits.push({
             id: c.key!,
             section: "notes",
             title,
-            subtitle: body,
-            href: `/notes/${c.key}`,
+            subtitle: preview,
+            // open your editor at /notes with a query param
+            href: `/notes?noteId=${c.key}`,
             score: s,
           });
         }
@@ -113,7 +121,7 @@ export const searchEverything = onCall<{
     }
   }
 
-  // ---------- ORGANIZATIONS
+  // ------------ ORGANIZATIONS (DB path uses 'organizations') ------------
   if (sections.includes("organizations")) {
     const orgSnap = await db.ref("organizations").limitToFirst(500).get();
     orgSnap.forEach((c) => {
@@ -121,22 +129,51 @@ export const searchEverything = onCall<{
       const isMember = !!v.members?.[uid];
       const isPublic = v.isPrivate === false || v.public === true;
       if (!isMember && !isPublic) return;
+
       const name = v.name || "Organization";
       const desc = v.description || "";
-      const s = Math.max(scoreOf(name, q), scoreOf(desc, q));
+      const s = Math.max(scoreOf(name), scoreOf(desc));
       if (s >= 0) {
         hits.push({
           id: c.key!,
           section: "organizations",
           title: name,
           subtitle: isMember ? "Member" : desc.slice(0, 120),
-          // UI uses UK spelling in the route:
+          // your UI route uses UK spelling
           href: `/organisations/${c.key}`,
           score: s + (isMember ? 2 : 0),
         });
       }
     });
   }
+
+  // ------------ FRIENDS (ids at users/{uid}/friends + profile at users/{fid}/UserSettings) ------------
+  if (sections.includes("friends")) {
+    const friendsSnap = await db.ref(`users/${uid}/friends`).get();
+    const map = friendsSnap.exists() ? friendsSnap.val() : {};
+    const friendIds: string[] = Object.keys(map);
+
+    await Promise.all(
+      friendIds.map(async (fid) => {
+        const ps = await db.ref(`users/${fid}/UserSettings`).get();
+        const p = ps.val() || {};
+        const fullName = `${p.name || ""} ${p.surname || ""}`.trim();
+        const email = p.email || "";
+        const s = Math.max(scoreOf(fullName), scoreOf(email));
+        if (s >= 0) {
+          hits.push({
+            id: fid,
+            section: "friends",
+            title: fullName || email || `User ${fid.slice(0, 6)}`,
+            subtitle: email,
+            href: `/friends/${fid}`,
+            score: s,
+          });
+        }
+      })
+    );
+  }
+
 
   // LECTURES (by active semester under /lectures/<semesterId> or user scoped)
   if (sections.includes("lectures")) {
@@ -157,46 +194,23 @@ export const searchEverything = onCall<{
     });
   }
 
-  // ---------- ORGANIZATIONS
-  if (sections.includes("organizations")) {
-    const orgSnap = await db.ref("organizations").limitToFirst(500).get();
-    orgSnap.forEach((c) => {
-      const v = c.val() || {};
-      const isMember = !!v.members?.[uid];
-      const isPublic = v.isPrivate === false || v.public === true;
-      if (!isMember && !isPublic) return;
-      const name = v.name || "Organization";
-      const desc = v.description || "";
-      const s = Math.max(scoreOf(name, q), scoreOf(desc, q));
-      if (s >= 0) {
-        hits.push({
-          id: c.key!,
-          section: "organizations",
-          title: name,
-          subtitle: isMember ? "Member" : desc.slice(0, 120),
-          // UI uses UK spelling in the route:
-          href: `/organisations/${c.key}`,
-          score: s + (isMember ? 2 : 0),
-        });
-      }
-    });
-  }
 
-  // EVENTS (by semester or user)
+  // ------------ EVENTS (match your other functions: users/{uid}/events) ------------
   if (sections.includes("events")) {
-    const snap = await db.ref(`events/${uid}`).limitToFirst(500).get();
+    const snap = await db.ref(`users/${uid}/events`).limitToFirst(500).get();
     snap.forEach((c) => {
       const v = c.val() as { title?: string; description?: string; type?: string };
       const s = Math.max(scoreOf(v.title || ""), scoreOf(v.description || ""), scoreOf(v.type || ""));
-      if (s >= 0)
+      if (s >= 0) {
         hits.push({
           id: c.key!,
           section: "events",
           title: v.title || (v.type ? v.type.toUpperCase() : "Event"),
-          subtitle: v.description?.slice(0, 120),
+          subtitle: (v.description || "").slice(0, 120),
           href: `/calendar?focus=event:${c.key}`,
           score: s,
         });
+      }
     });
   }
 
@@ -239,15 +253,9 @@ export const searchEverything = onCall<{
     });
   }
 
-  // Sort by score desc, then title asc, then section
-  hits.sort(
-    (a, b) => 
-      (b.score - a.score) || 
-      a.section.localeCompare(b.section) || 
-      a.title.localeCompare(b.title)
-  );
+  // ------------ sort & cap per-section ------------
+  hits.sort((a, b) => (b.score - a.score) || a.section.localeCompare(b.section) || a.title.localeCompare(b.title));
 
-  // Truncate per section and overall
   const perSection = limit;
   const grouped = new Map<SearchSection, SearchHit[]>();
   for (const h of hits) {
@@ -261,4 +269,3 @@ export const searchEverything = onCall<{
   const finalHits = Array.from(grouped.values()).flat().slice(0, limit * sections.length);
   return { hits: finalHits };
 });
-
