@@ -24,6 +24,9 @@ import Link from "next/link"
 import Image from "next/image"
 import { getDatabase, ref as dbRef, onValue, push as dbPush, set as dbSet, update as dbUpdate, remove as dbRemove } from "firebase/database"
 import { getAuth } from "firebase/auth" //adjust real-time db
+import dynamic from "next/dynamic";
+import GlobalSearchInline from "@/components/GlobalSearchInline";
+
 
 interface Notification {
   id: string
@@ -42,6 +45,13 @@ export function SmartHeader() {
   const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
   const [searchValue, setSearchValue] = useState("")
+  const openSearchPalette = () => {
+  if (typeof window !== "undefined") {
+    // Reuse the palette’s Ctrl/Cmd+K listener
+    const evt = new KeyboardEvent("keydown", { key: "k", ctrlKey: true });
+    window.dispatchEvent(evt);
+  }
+};
 
   // Calendar & lecture notifications
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -120,6 +130,7 @@ export function SmartHeader() {
     [user, dismissedCalendarNotifications],
   )
 
+
   // Initialize search from URL
   useEffect(() => {
     setSearchValue(searchParams.get("search") || "")
@@ -141,16 +152,20 @@ export function SmartHeader() {
   // Listen for notifications (including friend requests)
   useEffect(() => {
     if (!user?.uid) {
+      console.log(`❌ No user ID for notifications`);
       return;
     }
     
+    console.log(`👂 Setting up notification listener for user: ${user.uid}`);
     const db = getDatabase()
     const notifRef = dbRef(db, `users/${user.uid}/notifications`)
     
     const off = onValue(notifRef, (snap) => {
+      console.log(`📨 Raw notification snapshot:`, snap.val())
       const raw = snap.val() as Record<string, any> | null
       
       if (!raw) {
+        console.log(`📭 No notifications found`)
         setOrgNotifications([])
         return
       }
@@ -160,6 +175,7 @@ export function SmartHeader() {
         const n = childSnap.val() as any
         const key = childSnap.key!
         
+        console.log(`🔍 Processing notification:`, { key, type: n.type, data: n })
         
         if (n.type === "added_to_group" || 
             n.type === "new_public_org" || 
@@ -176,14 +192,15 @@ export function SmartHeader() {
             orgId: n.orgId,
             requestId: n.requestId, 
           }
-
+          
+          console.log(`✅ Adding notification to list:`, notification)
           filtered.push(notification)
         } else {
-          //console.log(`❌ Notification type not matching:`, n.type)
+          console.log(`❌ Notification type not matching:`, n.type)
         }
       })
-
-      //console.log(`📊 Total filtered notifications:`, filtered.length)
+      
+      console.log(`📊 Total filtered notifications:`, filtered.length)
       setOrgNotifications(filtered)
     })
     
@@ -495,6 +512,7 @@ export function SmartHeader() {
 }
 
   return (
+    <>
     <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
       <div className="flex h-full items-center justify-between px-4">
         {/* Left: Sidebar + Title */}
@@ -522,14 +540,27 @@ export function SmartHeader() {
         <div className="flex-1 max-w-lg mx-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={getSearchPlaceholder()}
-              value={searchValue}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9 h-8 bg-muted/50 border-border focus:bg-background transition-colors"
-            />
+
+            {pathname === "/organisations" ? (
+              // Keep existing URL-driven search on the organisations page
+              <Input
+                placeholder={getSearchPlaceholder()}
+                value={searchValue}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleSearchChange((e.target as HTMLInputElement).value);
+                  }
+                }}
+                className="pl-9 h-8 bg-muted/50 border-border focus:bg-background transition-colors"
+              />
+            ) : (
+              // Everywhere else, open the command palette
+              <GlobalSearchInline />
+            )}
           </div>
         </div>
+
 
         {/* Right: Notifications & User */}
         <div className="flex items-center gap-1">
@@ -655,5 +686,6 @@ export function SmartHeader() {
         </div>
       </div>
     </header>
+    </>
   )
 }
