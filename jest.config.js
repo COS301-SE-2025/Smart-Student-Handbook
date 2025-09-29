@@ -10,28 +10,17 @@ const customJestConfig = {
   moduleNameMapping: {
     '^@/(.*)$': '<rootDir>/$1',
   },
-  testMatch: [
-    '**/__tests__/**/*.(test|spec).(js|jsx|ts|tsx)',
-    '**/*.(test|spec).(js|jsx|ts|tsx)',
-  ],
-  testPathIgnorePatterns: [
-    '<rootDir>/.next/',
-    '<rootDir>/node_modules/',
-    '<rootDir>/coverage/',
-  ],
-  collectCoverageFrom: [
-    'components/**/*.{js,jsx,ts,tsx}',
-    'app/**/*.{js,jsx,ts,tsx}',
-    '!**/*.d.ts',
-    '!**/node_modules/**',
-  ],
   transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest'],
+    '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.(js|jsx)$': 'babel-jest',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(firebase|@firebase)/)',
   ],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  testMatch: [
+    '**/__tests__/**/*.(test|spec).(js|jsx|ts|tsx)',
+    '**/*.(test|spec).(js|jsx|ts|tsx)',
+  ],
   globals: {
     'ts-jest': {
       tsconfig: 'tsconfig.jest.json'
