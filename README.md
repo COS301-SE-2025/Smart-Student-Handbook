@@ -50,14 +50,15 @@ Built to boost academic productivity and make studying simpler and smarter.
 
 ## 📑 Project Documentation
 
-- 📝 [Functional Requirements (SRS v1)](https://docs.google.com/document/d/1dGbn3MYVxm0fnlPx0bUazCMhaD00wgkF/edit)
-- 📄 [Functional Requirements (SRS v2)](https://docs.google.com/document/d/1GNNrZV6f3-w9E6491yCxKhAI8Hea4iuT/edit?usp=sharing)
-- 📄 [Functional Requirements (SRS v3)](https://docs.google.com/document/d/1hx7fG0_NB3ZX6MbRYp7rPdcK3UcVKukj/edit?usp=sharing&ouid=110216960497066760698&rtpof=true&sd=true)
-- `</>` [Coding Standards & Style Guide](https://docs.google.com/document/d/1jon85aK5e1c0lPFog6cDFowFoMS-bff--frhNm1pH8U/edit?usp=sharing)
-- 📝 [Architectural Requirements Design](https://drive.google.com/file/d/1H1dOGesQxQaboIQTfN0642f6wKESVrzi/view?usp=sharing)
-- 📝 [Technical Installation Manual](https://drive.google.com/file/d/1qz2uF8kpABSmg4iEk7dPEaQhs5RrJ3Yp/view?usp=sharing)
+- 📝 [Functional Requirements (SRS v1)](docs/F5_Demo_1)
+- 📄 [Functional Requirements (SRS v2)](docs/F5_Demo_2)
+- 📄 [Functional Requirements (SRS v3)](docs/F5_Demo_3)
+-  [Functional Requirements (SRS v4)](docs/F5_Demo_4)
+- `</>` [Coding Standards & Style Guide](docs/F5_Coding_Standards)
+- 📝 [Architectural Requirements Design](docs/F5_Architectural_Design)
+- 📝 [Technical Installation Manual](docs/F5_Technical_Installation_Manual)
 - 📖 [User Manual](https://drive.google.com/file/d/1qDhr2VoTKRUb15Flq_DGgGrum7w6Je19/view?usp=sharing)
-- 📖 [Deployment Diagram](https://drive.google.com/file/d/1XvGKjqRUz9UwgsGNMfPuPc65xKprGZGK/view?usp=drive_link)
+- 📖 [Deployment Diagram](docs/F5_Deployment_Model)
 - 🔗[Demo Video](https://drive.google.com/file/d/1Tkw3Wsu43KCyIVX9yeC8zNIBY9Rl5UNT/view?usp=sharing)
 
 ## 🔗 Project Management & Links
@@ -198,6 +199,7 @@ We follow a customized GitFlow:
 
 
 ---
+
 
 
 
