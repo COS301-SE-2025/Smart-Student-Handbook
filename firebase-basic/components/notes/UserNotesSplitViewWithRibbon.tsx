@@ -112,7 +112,6 @@ type PersonalQuizDetail = {
       explanation?: string
     }
   }
-  // UI-only fields for completion screen:
   showCompletion?: boolean
   finalScore?: number
   totalQuestions?: number
@@ -166,7 +165,7 @@ function PersonalQuizBarInline({
   // buffer the finished result until modal is closed
   const pendingResultRef = useRef<{ quizId: string; score: number; total: number } | null>(null)
 
-  // review modal state (NEW)
+  // review modal state
   const [reviewOpen, setReviewOpen] = useState(false)
   const [reviewAttempt, setReviewAttempt] = useState<{
     score: number
@@ -402,7 +401,7 @@ function PersonalQuizBarInline({
     }
   }
 
-  // ----- Review flow (NEW) -----
+  // ----- Review flow -----
   async function openReview(quizId: string) {
     try {
       setReviewOpen(true)
@@ -841,7 +840,7 @@ function PersonalQuizBarInline({
                             key={q.id}
                             className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors w-full cursor-pointer"
                             onClick={() => setSelectedQuizId(q.id)}
-                            onDoubleClick={() => openReview(q.id)} // 👈 NEW: open review modal
+                            onDoubleClick={() => openReview(q.id)} // open review modal
                           >
                             <FileText className="h-4 w-4 text-black" />
                             <div className="flex-1 min-w-0">
@@ -899,19 +898,19 @@ function PersonalQuizBarInline({
                           pattern="\d*"
                           value={String(createNumQuestions ?? "")}
                           onChange={(e) => {
-                            const digitsOnly = e.target.value.replace(/[^\d]/g, "");
+                            const digitsOnly = e.target.value.replace(/[^\d]/g, "")
                             if (digitsOnly === "") {
-                              setCreateNumQuestions(0 as any); // allow clearing while typing
-                              return;
+                              setCreateNumQuestions(0 as any) // allow clearing while typing
+                              return
                             }
-                            const n = parseInt(digitsOnly, 10);
-                            setCreateNumQuestions(clamp(n, 1, 20));
+                            const n = parseInt(digitsOnly, 10)
+                            setCreateNumQuestions(clamp(n, 1, 20))
                           }}
                           onBlur={() => {
                             if (!createNumQuestions || Number.isNaN(createNumQuestions)) {
-                              setCreateNumQuestions(5); // default
+                              setCreateNumQuestions(5) // default
                             } else {
-                              setCreateNumQuestions(clamp(Number(createNumQuestions), 1, 20));
+                              setCreateNumQuestions(clamp(Number(createNumQuestions), 1, 20))
                             }
                           }}
                           className="w-full rounded-md border border-border/40 bg-background/40 px-4 py-3 text-base"
@@ -1037,7 +1036,7 @@ function PersonalQuizBarInline({
           document.body,
         )}
 
-      {/* Review Modal (NEW) */}
+      {/* Review Modal */}
       {isClient &&
         reviewOpen &&
         createPortal(
@@ -1099,9 +1098,6 @@ export default function UserNotesSplitViewWithRibbon({
   onSelect,
   initialSelectedId,
   loading,
-  title,
-  onTitleChange,
-  onTitleCommit,
 }: NotesSplitViewProps) {
   const [stateNotes, setStateNotes] = useState<Note[]>(notes)
 
@@ -1144,7 +1140,8 @@ export default function UserNotesSplitViewWithRibbon({
     else setPlain("")
   }, [selectedNote?.id, selectedNote?.content])
 
-  // Debounced autosave of content snapshots to users/{userID}/notes
+  // Debounced autosave of content snapshots to users/{owner}/notes
+  // (only meaningful for personal notes in this list)
   useEffect(() => {
     if (!selectedNote?.id) return
     const t = setTimeout(() => {
@@ -1156,20 +1153,20 @@ export default function UserNotesSplitViewWithRibbon({
 
   const showLoader = loading && stateNotes.length === 0
 
-  // Right pane content
+  // Right pane content — use currentSelectedNoteId so shared notes also render
   const rightPane = (() => {
     switch (activeRibbonSection) {
       case "summary":
         return (
           <div className="min-h-0 h-full">
-            {selectedNote ? (
+            {currentSelectedNoteId ? (
               <SummaryPanel
                 sourceText={plain}
                 title="Summary"
                 className="h-full"
                 ownerId={currentOwnerId || userID}
                 userId={userID}
-                noteId={selectedNote.id}
+                noteId={currentSelectedNoteId}
                 isPersonal
                 autoGenerateIfMissing
               />
@@ -1181,13 +1178,13 @@ export default function UserNotesSplitViewWithRibbon({
       case "flashcards":
         return (
           <div className="min-h-0 h-full">
-            {selectedNote ? (
+            {currentSelectedNoteId ? (
               <FlashCardSection
                 sourceText={plain}
                 className="h-full"
                 ownerId={currentOwnerId || userID}
                 userId={userID}
-                noteId={selectedNote.id}
+                noteId={currentSelectedNoteId}
                 isPersonal
                 autoGenerateIfMissing
               />
@@ -1212,10 +1209,10 @@ export default function UserNotesSplitViewWithRibbon({
       case "quiz":
         return (
           <div className="min-h-0 h-full">
-            {selectedNote ? (
+            {currentSelectedNoteId ? (
               <PersonalQuizBarInline
                 userId={currentOwnerId || userID}
-                noteId={selectedNote.id}
+                noteId={currentSelectedNoteId}
                 displayName="You"
                 defaultDurationSec={45}
                 defaultNumQuestions={5}
@@ -1237,14 +1234,13 @@ export default function UserNotesSplitViewWithRibbon({
         <div
           className={`${
             isRightContentHidden ? "flex-1" : "flex-[3]"
-      } border border-gray-200 dark:border-0 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow flex flex-col min-h-0 transition-all duration-300`}
-
+          } border border-gray-200 dark:border-0 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow flex flex-col min-h-0 transition-all duration-300`}
         >
           {/* Editor body */}
           <div className="flex-1 min-h-0 overflow-y-auto scroll-invisible">
             {showLoader ? (
               <div className="h-full grid place-items-center text-sm text-muted-foreground"></div>
-            ) : selectedNote ? (
+            ) : currentSelectedNoteId ? (
               <EditorMain
                 searchParams={{
                   doc: currentSelectedNoteId as any,
