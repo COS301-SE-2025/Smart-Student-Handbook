@@ -7,7 +7,6 @@ export async function buildTreeFromRealtimeDB(userID: string): Promise<FileNode[
     const userNotesRef = ref(db, `users/${userID}/notes`);
 
     const snapshot = await get(userNotesRef);
-    console.log(snapshot);
 
     if (!snapshot.exists()) return [];
 

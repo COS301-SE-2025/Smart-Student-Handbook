@@ -15,7 +15,7 @@ export const addFriend = async (friendUserID: string) => {
 
   try {
     await set(friendRef, true);
-    console.log("Friend added:", friendUserID);
+    
   } catch (err) {
     console.error("Error adding friend:", err);
   }

@@ -93,7 +93,7 @@ export function YjsBlockNoteEditor({ noteID, ownerID, username }: YjsBlockNoteEd
   useEffect(() => {
     if (!providerReady || !editor || !Array.isArray(initialContent)) return
     if (editor.document.length === 0) {
-      editor.insertBlocks(initialContent, editor.getBlock("initialBlockId") as any)
+      editor.insertBlocks(initialContent, editor.getBlock("initialBlockId") as any);
     }
   }, [providerReady, initialContent, editor])
 

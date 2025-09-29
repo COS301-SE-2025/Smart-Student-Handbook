@@ -33,7 +33,6 @@ async function saveToStorage(noteId: string, jsonBlocks: Block[], ownerID: strin
   const noteRef = ref(db, `users/${ownerID}/notes/${noteId}/content`);
   try {
     await set(noteRef, jsonBl);
-    console.log("Note saved successfully");
   } catch (error) {
     console.error("Error saving note:", error);
   }
@@ -71,13 +70,11 @@ const Editor: React.FC<EditorProps> = ({ editable, noteID, ownerID }) => {
   >("loading");
 
   useEffect(() => {
-    console.log(`Loading Preset , now loading ${noteID}`);
     if (noteID) {
       loadFromStorage(noteID , ownerID).then((content) => {
         setInitialContent(content);
       });
     } else {
-      console.log('Error occured while loading Note , Invalid NoteID');
     }
 
   }, [noteID]);
@@ -96,7 +93,6 @@ const Editor: React.FC<EditorProps> = ({ editable, noteID, ownerID }) => {
   let saveTimeout: string | number | NodeJS.Timeout | undefined;
 
   editor.onChange((editor, { getChanges }) => {
-    console.log("Editor content has been changed");
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
       if (noteID)

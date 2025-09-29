@@ -81,7 +81,6 @@ export default function ShareNoteDialog({
             setCollaboratorId(null);
             setSearchName("");
             setSearchResults([]);
-            console.log(`Shared note ${noteId} with ${collaboratorId}`, result);
         } catch (error: any) {
             console.error("Error sharing note:", error);
             toast.error("Failed to share note.");

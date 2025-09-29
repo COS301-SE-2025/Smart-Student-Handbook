@@ -98,18 +98,46 @@ const createOrg = useMemo(
     if (!userId) return
     setLoading(true)
     try {
-      const [pubRes, privRes] = await Promise.all([getPublicOrgs({}), getPrivateOrgs({})])
+      // Fetch public organizations
+      let publicList: (Org & { joined: boolean })[] = []
+      try {
+        const pubRes = await getPublicOrgs({})
+        publicList = pubRes.data.map((o) => ({
+          ...o,
+          joined: !!o.members?.[userId],
+          role: o.members?.[userId] as "Admin" | "Member" | undefined,
+        }))
+      } catch (pubError) {
+        console.warn("Failed to fetch public organizations:", pubError)
+        // Continue execution, just with empty public list
+      }
 
-      const favSnap = await get(ref(db, `userFavorites/${userId}`))
-      const favObj = (favSnap.val() as Record<string, boolean>) || {}
+      // Fetch private organizations (user's joined orgs)
+      let privateList: (Org & { joined: boolean })[] = []
+      try {
+        const privRes = await getPrivateOrgs({})
+        privateList = privRes.data.map((o) => ({ ...o, joined: true }))
+      } catch (privError: any) {
+        console.warn("Failed to fetch user organizations:", privError)
+        // If the error is "Organization not found", it just means the user has no organizations
+        // This is normal for new users, so we don't show an error toast
+        if (!privError.message?.includes("Organization not found")) {
+          console.error("Unexpected error fetching user organizations:", privError)
+        }
+        // Continue execution with empty private list
+      }
 
-      const publicList = pubRes.data.map((o) => ({
-        ...o,
-        joined: !!o.members?.[userId],
-        role: o.members?.[userId] as "Admin" | "Member" | undefined,
-      }))
-      const privateList = privRes.data.map((o) => ({ ...o, joined: true }))
+      // Fetch favorites
+      let favObj: Record<string, boolean> = {}
+      try {
+        const favSnap = await get(ref(db, `userFavorites/${userId}`))
+        favObj = (favSnap.val() as Record<string, boolean>) || {}
+      } catch (favError) {
+        console.warn("Failed to fetch favorites:", favError)
+        // Continue with empty favorites
+      }
 
+      // Merge and deduplicate organizations
       const map = new Map<string, Org & { joined: boolean }>()
       ;[...publicList, ...privateList].forEach((o) => map.set(o.id, o))
 
@@ -204,7 +232,7 @@ const createOrg = useMemo(
     try {
       const res = await leaveOrg({ orgId })
       if (original?.isPrivate) setOrgsData((prev) => prev.filter((o) => o.id !== orgId))
-      if (res.data.transferred) console.log("Ownership transferred")
+      if (res.data.transferred) 
       toast.success("Successfully left organization.")
     } catch (e: any) {
       toast.error(e.message || "Failed to leave organization.")
@@ -382,7 +410,7 @@ const createOrg = useMemo(
                   {/* badges */}
                   <div className="flex flex-wrap gap-2 mb-6 mt-4">
                     {o.joined && !isLeaving && (
-                      <Badge className="px-3 py-1 bg-green-500 text-white">
+                      <Badge className="px-3 py-1 bg-green-700 text-white">
                         <UserCheck className="h-3 w-3 inline-block mr-1" /> Joined
                       </Badge>
                     )}
@@ -402,7 +430,7 @@ const createOrg = useMemo(
                       </Badge>
                     )}
                     {o.role === "Admin" && !isLeaving && (
-                      <Badge className="px-3 py-1 bg-amber-500 text-white">
+                      <Badge className="px-3 py-1 bg-amber-700 text-white">
                         <Crown className="h-3 w-3 inline-block mr-1" /> Admin
                       </Badge>
                     )}
