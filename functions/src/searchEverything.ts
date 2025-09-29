@@ -6,7 +6,7 @@ if (!admin.apps.length) admin.initializeApp();
 // Types shared with the client
 export type SearchSection =
   | "notes"
-  | "organisations"
+  | "organizations"
   | "friends"
   | "lectures"
   | "events"
@@ -36,21 +36,55 @@ export const searchEverything = onCall<{
   const sections: SearchSection[] =
     Array.isArray(req.data?.sections) && req.data.sections.length
       ? (req.data.sections as SearchSection[])
-      : ["notes", "organisations", "friends", "lectures", "events", "users", "flashcards"];
+      : ["notes", "organizations", "friends", "lectures", "events", "users", "flashcards"];
 
    if (!q) return { hits: [] as SearchHit[] };
 
   const db = admin.database();
   const hits: SearchHit[] = [];
 
-  const scoreOf = (text?: string) => {
+  function stripHtml(s: string) {
+    return s.replace(/<[^>]+>/g, " ");
+  }
+  function jsonToPlain(s: any): string {
+    try {
+      const v = typeof s === "string" ? JSON.parse(s) : s;
+      // Block-style editors
+      if (Array.isArray(v)) {
+        return v
+          .map((blk: any) =>
+            typeof blk?.props?.text === "string"
+              ? blk.props.text
+              : blk?.text || blk?.content || ""
+          )
+          .join(" ");
+      }
+      // Quill delta
+      if (v && Array.isArray(v.ops)) {
+        return v.ops.map((op: any) => (op.insert ?? "")).join("");
+      }
+      // Generic object
+      return JSON.stringify(v).replace(/["{}[\],]/g, " ");
+    } catch {
+      return typeof s === "string" ? s : "";
+    }
+  }
+  function toPlainPreview(body: any): string {
+    const s = typeof body === "string" ? body : JSON.stringify(body ?? "");
+    // if it looks like HTML
+    if (/<[a-z][\s\S]*>/i.test(s)) return stripHtml(s);
+    // if it looks like JSON
+    if (/^[\[{].*[\]}]$/.test(s.trim())) return jsonToPlain(s);
+    return s;
+  }
+  const scoreOf = (text?: string, q?: string) => {
     const t = (text || "").toLowerCase();
-    if (!t.includes(q)) return -1;
+    if (!q || !t.includes(q)) return -1;
     return t.startsWith(q) ? 10 : 5;
   };
 
 
-  // ---------- NOTES (try users/{uid}/notes, fallback notes/{uid})
+  // ---------- NOTES (users/{uid}/notes then fallback notes/{uid})
   if (sections.includes("notes")) {
     const notePaths = [`users/${uid}/notes`, `notes/${uid}`];
     let noteSnap: admin.database.DataSnapshot | null = null;
@@ -62,15 +96,15 @@ export const searchEverything = onCall<{
       noteSnap.forEach((c) => {
         const v = c.val() || {};
         const title = v.title || v.name || "Untitled note";
-        const body =
-          v.searchText || v.plainText || v.body || v.content || "";
-        const s = Math.max(scoreOf(title), scoreOf(body));
+        const rawBody = v.searchText || v.plainText || v.body || v.content || v.data;
+        const body = toPlainPreview(rawBody).slice(0, 240);
+        const s = Math.max(scoreOf(title, q), scoreOf(body, q));
         if (s >= 0) {
           hits.push({
             id: c.key!,
             section: "notes",
             title,
-            subtitle: String(body).replace(/<[^>]+>/g, " ").slice(0, 120),
+            subtitle: body,
             href: `/notes/${c.key}`,
             score: s,
           });
@@ -79,23 +113,24 @@ export const searchEverything = onCall<{
     }
   }
 
-  // ---------- ORGANIZATIONS (US spelling in DB: /organizations)
-  if (sections.includes("organisations")) {
-    const orgSnap = await db.ref("organisations").limitToFirst(500).get();
+  // ---------- ORGANIZATIONS
+  if (sections.includes("organizations")) {
+    const orgSnap = await db.ref("organizations").limitToFirst(500).get();
     orgSnap.forEach((c) => {
       const v = c.val() || {};
       const isMember = !!v.members?.[uid];
       const isPublic = v.isPrivate === false || v.public === true;
-      if (!isMember && !isPublic) return; // visibility
+      if (!isMember && !isPublic) return;
       const name = v.name || "Organization";
       const desc = v.description || "";
-      const s = Math.max(scoreOf(name), scoreOf(desc));
+      const s = Math.max(scoreOf(name, q), scoreOf(desc, q));
       if (s >= 0) {
         hits.push({
           id: c.key!,
-          section: "organisations",
+          section: "organizations",
           title: name,
-          subtitle: isMember ? "Member" : (desc || "").slice(0, 120),
+          subtitle: isMember ? "Member" : desc.slice(0, 120),
+          // UI uses UK spelling in the route:
           href: `/organisations/${c.key}`,
           score: s + (isMember ? 2 : 0),
         });
@@ -122,31 +157,29 @@ export const searchEverything = onCall<{
     });
   }
 
-  // ---------- FRIENDS (ids at users/{uid}/friends; profiles at users/{fid}/UserSettings)
-  if (sections.includes("friends")) {
-    const friendsSnap = await db.ref(`users/${uid}/friends`).get();
-    const friendsMap = friendsSnap.exists() ? friendsSnap.val() : {};
-    const friendIds: string[] = Object.keys(friendsMap);
-
-    await Promise.all(
-      friendIds.map(async (fid) => {
-        const ps = await db.ref(`users/${fid}/UserSettings`).get();
-        const p = ps.val() || {};
-        const fullName = `${p.name || ""} ${p.surname || ""}`.trim();
-        const email = p.email || "";
-        const s = Math.max(scoreOf(fullName), scoreOf(email));
-        if (s >= 0) {
-          hits.push({
-            id: fid,
-            section: "friends",
-            title: fullName || email || `User ${fid.slice(0, 6)}`,
-            subtitle: email,
-            href: `/friends/${fid}`,
-            score: s,
-          });
-        }
-      })
-    );
+  // ---------- ORGANIZATIONS
+  if (sections.includes("organizations")) {
+    const orgSnap = await db.ref("organizations").limitToFirst(500).get();
+    orgSnap.forEach((c) => {
+      const v = c.val() || {};
+      const isMember = !!v.members?.[uid];
+      const isPublic = v.isPrivate === false || v.public === true;
+      if (!isMember && !isPublic) return;
+      const name = v.name || "Organization";
+      const desc = v.description || "";
+      const s = Math.max(scoreOf(name, q), scoreOf(desc, q));
+      if (s >= 0) {
+        hits.push({
+          id: c.key!,
+          section: "organizations",
+          title: name,
+          subtitle: isMember ? "Member" : desc.slice(0, 120),
+          // UI uses UK spelling in the route:
+          href: `/organisations/${c.key}`,
+          score: s + (isMember ? 2 : 0),
+        });
+      }
+    });
   }
 
   // EVENTS (by semester or user)
