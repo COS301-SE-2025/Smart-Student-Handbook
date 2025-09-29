@@ -1,7 +1,3 @@
-// =============================
-// 1) Cloud Function: searchEverything
-// =============================
-// File: functions/src/searchEverything.ts
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 
@@ -11,6 +7,7 @@ if (!admin.apps.length) admin.initializeApp();
 export type SearchSection =
   | "notes"
   | "organisations"
+  | "friends"
   | "lectures"
   | "events"
   | "users"
@@ -21,8 +18,8 @@ export type SearchHit = {
   section: SearchSection;
   title: string;
   subtitle?: string;
-  href: string; // client path to open
-  score: number; // simple rank for now
+  href: string; 
+  score: number; 
 };
 
 export const searchEverything = onCall<{
@@ -33,65 +30,74 @@ export const searchEverything = onCall<{
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
-  const qRaw = (req.data?.q ?? "").toString();
+  const qRaw = (req.data?.q ?? "").toString().toLowerCase();
+  const q = qRaw;
   const limit = Math.min(Number(req.data?.limit ?? 8) || 8, 25);
   const sections: SearchSection[] =
     Array.isArray(req.data?.sections) && req.data.sections.length
       ? (req.data.sections as SearchSection[])
-      : ["notes", "organisations", "lectures", "events", "users", "flashcards"];
+      : ["notes", "organisations", "friends", "lectures", "events", "users", "flashcards"];
+
+   if (!q) return { hits: [] as SearchHit[] };
 
   const db = admin.database();
-
-  // Helper: naive contains filter + score (prefix bonus)
-  const scoreOf = (text: string) => {
-    const t = (text || "").toLowerCase();
-    if (!t.includes(qRaw)) return -1;
-    if (t.startsWith(qRaw)) return 10; // prefix boost
-    return 5; // contains
-  };
-
-  // For large datasets, consider creating a search_index per entity with concatenated `searchText`.
-  // For now we fetch a reasonable subset and filter in memory.
-
   const hits: SearchHit[] = [];
 
-  // NOTES (scoped to user)
+  const scoreOf = (text?: string) => {
+    const t = (text || "").toLowerCase();
+    if (!t.includes(q)) return -1;
+    return t.startsWith(q) ? 10 : 5;
+  };
+
+
+  // ---------- NOTES (try users/{uid}/notes, fallback notes/{uid})
   if (sections.includes("notes")) {
-    const snap = await db.ref(`notes/${uid}`).limitToFirst(500).get();
-    snap.forEach((c) => {
-      const v = c.val() as { title?: string; body?: string };
-      const s1 = scoreOf(v.title || "");
-      const s2 = scoreOf(v.body || "");
-      const best = Math.max(s1, s2);
-      if (best >= 0)
-        hits.push({
-          id: c.key!,
-          section: "notes",
-          title: v.title || "Untitled note",
-          subtitle: v.body?.slice(0, 120) || "",
-          href: `/notes/${c.key}`,
-          score: best,
-        });
-    });
+    const notePaths = [`users/${uid}/notes`, `notes/${uid}`];
+    let noteSnap: admin.database.DataSnapshot | null = null;
+    for (const p of notePaths) {
+      const s = await db.ref(p).limitToFirst(500).get();
+      if (s.exists()) { noteSnap = s; break; }
+    }
+    if (noteSnap) {
+      noteSnap.forEach((c) => {
+        const v = c.val() || {};
+        const title = v.title || v.name || "Untitled note";
+        const body =
+          v.searchText || v.plainText || v.body || v.content || "";
+        const s = Math.max(scoreOf(title), scoreOf(body));
+        if (s >= 0) {
+          hits.push({
+            id: c.key!,
+            section: "notes",
+            title,
+            subtitle: String(body).replace(/<[^>]+>/g, " ").slice(0, 120),
+            href: `/notes/${c.key}`,
+            score: s,
+          });
+        }
+      });
+    }
   }
 
-  // ORGANISATIONS (public + ones the user belongs to)
+  // ---------- ORGANIZATIONS (US spelling in DB: /organizations)
   if (sections.includes("organisations")) {
     const orgSnap = await db.ref("organisations").limitToFirst(500).get();
     orgSnap.forEach((c) => {
-      const v = c.val() as { name?: string; description?: string; members?: Record<string, true> };
+      const v = c.val() || {};
       const isMember = !!v.members?.[uid];
-      const s1 = scoreOf(v.name || "");
-      const s2 = scoreOf(v.description || "");
-      const best = Math.max(s1, s2);
-      if (best >= 0) {
+      const isPublic = v.isPrivate === false || v.public === true;
+      if (!isMember && !isPublic) return; // visibility
+      const name = v.name || "Organization";
+      const desc = v.description || "";
+      const s = Math.max(scoreOf(name), scoreOf(desc));
+      if (s >= 0) {
         hits.push({
           id: c.key!,
           section: "organisations",
-          title: v.name || "Organisation",
-          subtitle: isMember ? "Member" : v.description?.slice(0, 120),
+          title: name,
+          subtitle: isMember ? "Member" : (desc || "").slice(0, 120),
           href: `/organisations/${c.key}`,
-          score: best + (isMember ? 2 : 0),
+          score: s + (isMember ? 2 : 0),
         });
       }
     });
@@ -114,6 +120,33 @@ export const searchEverything = onCall<{
           score: s,
         });
     });
+  }
+
+  // ---------- FRIENDS (ids at users/{uid}/friends; profiles at users/{fid}/UserSettings)
+  if (sections.includes("friends")) {
+    const friendsSnap = await db.ref(`users/${uid}/friends`).get();
+    const friendsMap = friendsSnap.exists() ? friendsSnap.val() : {};
+    const friendIds: string[] = Object.keys(friendsMap);
+
+    await Promise.all(
+      friendIds.map(async (fid) => {
+        const ps = await db.ref(`users/${fid}/UserSettings`).get();
+        const p = ps.val() || {};
+        const fullName = `${p.name || ""} ${p.surname || ""}`.trim();
+        const email = p.email || "";
+        const s = Math.max(scoreOf(fullName), scoreOf(email));
+        if (s >= 0) {
+          hits.push({
+            id: fid,
+            section: "friends",
+            title: fullName || email || `User ${fid.slice(0, 6)}`,
+            subtitle: email,
+            href: `/friends/${fid}`,
+            score: s,
+          });
+        }
+      })
+    );
   }
 
   // EVENTS (by semester or user)
@@ -174,7 +207,12 @@ export const searchEverything = onCall<{
   }
 
   // Sort by score desc, then title asc, then section
-  hits.sort((a, b) => (b.score - a.score) || a.section.localeCompare(b.section) || a.title.localeCompare(b.title));
+  hits.sort(
+    (a, b) => 
+      (b.score - a.score) || 
+      a.section.localeCompare(b.section) || 
+      a.title.localeCompare(b.title)
+  );
 
   // Truncate per section and overall
   const perSection = limit;
