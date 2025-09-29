@@ -20,6 +20,7 @@ export function useGlobalSearch() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [open, setOpen] = useState(false);
   const lastQ = useRef("");
+  const sections = ["notes", "organizations", "friends"] as const;
 
   useEffect(() => {
     if (!debounced.trim()) {
@@ -31,7 +32,7 @@ export function useGlobalSearch() {
       setLoading(true);
       try {
         const fn = httpsCallable(fns, "searchEverything");
-        const res = (await fn({ q: debounced, limit: 6 })) as any;
+        const res = (await fn({ q: debounced, limit: 6, sections: ["notes", "organizations", "friends"] })) as any;
         if (cancelled) return;
         setHits(res?.data?.hits ?? []);
       } catch (e) {

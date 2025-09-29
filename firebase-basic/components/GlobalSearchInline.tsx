@@ -77,6 +77,7 @@ export default function GlobalSearchInline() {
                   <div className="px-3 pb-1 text-[11px] font-medium uppercase text-muted-foreground">{section}</div>
                   {items.map((h: any) => (
                     <button
+                      type="button"
                       key={`${h.section}:${h.id}`}
                       onClick={() => {
                         setOpen(false);
