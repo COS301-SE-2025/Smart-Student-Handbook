@@ -10,11 +10,11 @@ import { fns, db } from "@/lib/firebase"
 import { get, ref, update } from "firebase/database"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Loader2, X } from "lucide-react"
+import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Loader2, X, AlertTriangle } from "lucide-react"
 import { createPortal } from "react-dom"
 import { generateQuizQuestions, type ClientQuizItem } from "@/lib/gemini"
 
-/** Defensive dynamic panels to avoid hard crashes if a file is missing */
+
 const SummaryPanel = dynamic(
   () =>
     import("@/components/ai/SummaryPanel")
@@ -53,7 +53,6 @@ type NotesSplitViewProps = {
   onTitleCommit?: () => void
   username?: string
 }
-
 
 /* ------------------------------ Utilities -------------------------------- */
 function htmlToPlain(html: string): string {
@@ -205,10 +204,8 @@ function PersonalQuizBarInline({
 
   useEffect(() => {
     if (userId && noteId) refreshLists()
- 
   }, [userId, noteId])
 
-  
   function handleOpenCreate() {
     setCreateOpen(true)
     setCreatePreview(null)
@@ -325,8 +322,7 @@ function PersonalQuizBarInline({
 
       if (data?.finishedNow || isLast) {
         // compute/collect score for completion screen and buffer for save-on-close
-        let serverScore: number | undefined =
-          typeof data?.score === "number" ? data.score : undefined
+        let serverScore: number | undefined = typeof data?.score === "number" ? data.score : undefined
         let serverTotal: number = typeof data?.totalQuestions === "number" ? data.totalQuestions : totalLocal
 
         if (serverScore == null) {
@@ -725,7 +721,6 @@ function PersonalQuizBarInline({
             <div className="text-white text-xl font-semibold">{Math.round(percentage)}%</div>
           </div>
         </div>
-
       </div>
     )
   }
@@ -902,15 +897,15 @@ function PersonalQuizBarInline({
                           onChange={(e) => {
                             const digitsOnly = e.target.value.replace(/[^\d]/g, "")
                             if (digitsOnly === "") {
-                              setCreateNumQuestions(0 as any) // allow clearing while typing
+                              setCreateNumQuestions(0 as any)
                               return
                             }
-                            const n = parseInt(digitsOnly, 10)
+                            const n = Number.parseInt(digitsOnly, 10)
                             setCreateNumQuestions(clamp(n, 1, 20))
                           }}
                           onBlur={() => {
                             if (!createNumQuestions || Number.isNaN(createNumQuestions)) {
-                              setCreateNumQuestions(5) // default
+                              setCreateNumQuestions(5)
                             } else {
                               setCreateNumQuestions(clamp(Number(createNumQuestions), 1, 20))
                             }
@@ -931,6 +926,13 @@ function PersonalQuizBarInline({
                           className="w-full rounded-md border border-border/40 bg-background/40 px-4 py-3 text-base"
                         />
                       </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
+                      <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-800">
+                        <strong>Disclaimer</strong>: The content used to generate the quiz is not fact-checked or verified. The quiz questions are generated from the contents in the note editor.
+                      </p>
                     </div>
 
                     {!createPreview ? (
@@ -1102,7 +1104,6 @@ export default function UserNotesSplitViewWithRibbon({
   loading,
   username,
 }: NotesSplitViewProps) {
-
   const [stateNotes, setStateNotes] = useState<Note[]>(notes)
 
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
@@ -1250,7 +1251,6 @@ export default function UserNotesSplitViewWithRibbon({
                   doc: currentSelectedNoteId as any,
                   ownerId: (currentOwnerId || userID) as any,
                   username: username || "Collaborator",
-
                 }}
               />
             ) : (
