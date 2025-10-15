@@ -9,12 +9,12 @@ import { getAuth } from "firebase/auth"
 import Main from "../YjsEditor/OrgMain"
 import NotesBar from "./NotesBar"
 
-/* --------------------------------- Types --------------------------------- */
+
 export type Note = {
   ownerId: string
   id: string
   name: string
-  content: string // HTML from Quill (legacy) or latest snapshot text
+  content: string 
   type: "note"
   createdAt?: number
   updatedAt?: number
@@ -24,38 +24,29 @@ type NotesSplitViewProps = {
   notes: Note[]
   orgID: string
 
-  /** Controlled selection */
+
   selectedId?: string
   onSelect?: (noteId: string) => void
-
-  /** Legacy: ignored if selectedId is provided */
   initialSelectedId?: string | null
 
-  /** Page-level loading passthrough */
   loading?: boolean
 
-  /** Page-level title rendered inside the editor border */
   title?: string
   onTitleChange?: (name: string) => void
-
-  /** Commit title save when user is done typing (blur/Enter) */
   onTitleCommit?: () => void
 }
 
-/* ------------------------------ Utilities -------------------------------- */
 function htmlToPlain(html: string): string {
   if (!html) return ""
   const doc = new DOMParser().parseFromString(html, "text/html")
   return (doc.body?.textContent ?? "").replace(/\s+/g, " ").trim()
 }
 
-/* --------------------------- Firebase callables --------------------------- */
 const callUpdateNoteFn = httpsCallable(fns, "updateNoteAtPath")
 async function callUpdateNote(path: string, note: Partial<Note>) {
   await callUpdateNoteFn({ path, note })
 }
 
-/* ------------------------------ Main component --------------------------- */
 export default function NotesSplitViewWithRibbon({
   notes,
   orgID,
@@ -67,34 +58,24 @@ export default function NotesSplitViewWithRibbon({
   onTitleChange,
   onTitleCommit,
 }: NotesSplitViewProps) {
-  // Local mirror for content snapshots only (NOT title)
-  const [stateNotes, setStateNotes] = useState<Note[]>(notes)
 
-  // If parent doesn't control selection, fall back to internal initial selection.
+  const [stateNotes, setStateNotes] = useState<Note[]>(notes)
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
     selectedId ?? initialSelectedId ?? notes[0]?.id ?? null,
   )
-
-  // Hide only the right content area (not the ribbon). When hidden, the editor expands.
   const [isRightContentHidden, setIsRightContentHidden] = useState(false)
   const [activeRibbonSection, setActiveRibbonSection] = useState<RibbonSection>("summary")
 
   const ownerId = getAuth().currentUser?.uid ?? ""
-
-  // Keep local notes in sync with incoming prop updates
   useEffect(() => {
     setStateNotes(() => notes)
   }, [notes])
-
-  // Compute the authoritative current selected id
   const currentSelectedNoteId = useMemo(() => {
     if (selectedId) return selectedId
     return internalSelectedId
   }, [selectedId, internalSelectedId])
-
-  // Ensure we have a valid selection when uncontrolled
   useEffect(() => {
-    if (selectedId) return // parent controls; do nothing
+    if (selectedId) return 
     if (!internalSelectedId) {
       const first = notes[0]?.id ?? null
       setInternalSelectedId(first)
@@ -102,7 +83,7 @@ export default function NotesSplitViewWithRibbon({
       const exists = notes.some((n) => n.id === internalSelectedId)
       if (!exists) setInternalSelectedId(notes[0]?.id ?? null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  
   }, [notes, selectedId])
 
   const selectedNote = useMemo(
@@ -115,7 +96,7 @@ export default function NotesSplitViewWithRibbon({
     if (selectedNote?.content != null) setPlain(htmlToPlain(selectedNote.content))
   }, [selectedNote?.id, selectedNote?.content])
 
-  // Auto-save (debounced 1s) for content snapshots only
+
   useEffect(() => {
     if (!selectedNote?.id) return
     const t = setTimeout(() => {
@@ -134,7 +115,7 @@ export default function NotesSplitViewWithRibbon({
 
   const note: Note = selectedNote
 
-  // Right pane items
+  
   const getRightPaneItems = () => {
     switch (activeRibbonSection) {
       case "summary":
@@ -190,15 +171,15 @@ export default function NotesSplitViewWithRibbon({
 
   return (
     <div className="relative h-[calc(100vh-2rem)] w-full">
-      {/* Main content area with editor and sections */}
+ 
       <div className="flex h-full min-h-0 gap-4 pr-4">
-        {/* Editor pane â€” expands when right content is hidden */}
+
         <div
           className={`${
             isRightContentHidden ? "flex-1" : "flex-[3]"
           } border border-gray-200 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow flex flex-col min-h-0 transition-all duration-300`}
         >
-          {/* Title header inside the editor border */}
+
           <div className="mb-4 px-2">
             <input
               className="w-full text-3xl font-bold bg-transparent border-none focus:outline-none"
@@ -218,7 +199,7 @@ export default function NotesSplitViewWithRibbon({
             <div className="mt-2 border-b border-muted-foreground/30" />
           </div>
 
-          {/* Scrollable editor area with always-invisible scrollbar */}
+  
           <div className="flex-1 min-h-0 overflow-y-auto scroll-invisible">
             <Main
               searchParams={{
@@ -250,8 +231,6 @@ export default function NotesSplitViewWithRibbon({
           onCollapse={() => setIsRightContentHidden(true)}
         />
       </div>
-
-      {/* Invisible scrollbar styles (still scrollable) */}
       <style jsx>{`
         .scroll-invisible {
           scrollbar-width: none;        /* Firefox */
