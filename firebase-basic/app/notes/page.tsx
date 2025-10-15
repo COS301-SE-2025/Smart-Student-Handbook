@@ -6,6 +6,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { db, fns } from "@/lib/firebase"
 import { httpsCallable } from "firebase/functions"
 import UserNotesSplitViewWithRibbon, { type Note } from "@/components/notes/UserNotesSplitViewWithRibbon"
+import { SmartLoader } from "@/components/ui/smart-loader";
 
 export const dynamic = "force-dynamic"
 
@@ -82,10 +83,8 @@ function PersonalNotesInner() {
   }
 
   // Auth still resolving → show loader instead of blank
-  if (!authReady) {
-    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-  }
-
+  if (!authReady) return <SmartLoader label="Signing you in…" />;
+  
   if (!uid) {
     return <div className="p-6 text-sm text-muted-foreground">Please sign in to view your notes.</div>
   }
@@ -111,7 +110,7 @@ function PersonalNotesInner() {
 
 export default function PersonalNotesPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground"></div>}>
+    <Suspense fallback={<SmartLoader label="Loading notes…" />}>
       <PersonalNotesInner />
     </Suspense>
   )

@@ -15,29 +15,17 @@ export const metadata: Metadata = {
   description: "AI-powered note-taking platform for students",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {/* Server Suspense that covers ALL routes */}
-          <Suspense fallback={<div className="p-8">Loading…</div>}>
-            <SmartLayout>{children}</SmartLayout>
-          </Suspense>
-
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          {/* Removed global Suspense to avoid app-wide flicker */}
+          <SmartLayout>{children}</SmartLayout>
           <Toaster />
         </ThemeProvider>
       </body>
     </html>
   );
 }
+
