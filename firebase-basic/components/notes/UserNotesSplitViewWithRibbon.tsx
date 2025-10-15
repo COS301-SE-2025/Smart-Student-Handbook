@@ -20,17 +20,17 @@ const SummaryPanel = dynamic(
     import("@/components/ai/SummaryPanel")
       .then((m) => m.default)
       .catch(() => () => <div className="p-4 text-sm text-muted-foreground">Summary unavailable.</div>),
-  { ssr: false, loading: () => <div className="p-4 text-sm text-muted-foreground">Loading summary…</div> },
+  { ssr: false, loading: () => <div className="p-4 text-sm text-muted-foreground"></div> },
 )
 const FlashCardSection = dynamic(
   () =>
     import("@/components/flashcards/FlashCardSection")
       .then((m) => m.default)
       .catch(() => () => <div className="p-4 text-sm text-muted-foreground">Flashcards unavailable.</div>),
-  { ssr: false, loading: () => <div className="p-4 text-sm text-muted-foreground">Loading flashcards…</div> },
+  { ssr: false, loading: () => <div className="p-4 text-sm text-muted-foreground"></div> },
 )
 
-/* --------------------------------- Types --------------------------------- */
+
 export type Note = {
   ownerId: string
   id: string
@@ -54,7 +54,7 @@ type NotesSplitViewProps = {
   username?: string
 }
 
-/* ------------------------------ Utilities -------------------------------- */
+
 function htmlToPlain(html: string): string {
   if (!html) return ""
   const doc = new DOMParser().parseFromString(html, "text/html")
@@ -70,13 +70,12 @@ function fmtMs(ms: number | undefined) {
   return `${Math.round(ms / 1000)}s`
 }
 
-/* --------------------------- Firebase callables --------------------------- */
 const callUpdateNoteFn = httpsCallable(fns, "updateNoteAtPath")
 async function callUpdateNote(path: string, note: Partial<Note>) {
   await callUpdateNoteFn({ path, note })
 }
 
-/* ---------------------- Personal Quiz Inline Component -------------------- */
+
 
 type QuizListItem = {
   id: string
@@ -131,42 +130,27 @@ function PersonalQuizBarInline({
   defaultDurationSec?: number
   defaultNumQuestions?: number
 }) {
-  // folders
   const [expandedFolders, setExpandedFolders] = useState({ active: true, completed: true })
-  // data
   const [quizzes, setQuizzes] = useState<QuizListItem[]>([])
   const [myAttempts, setMyAttempts] = useState<AttemptLight[]>([])
-  // selections
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null)
-
-  // loading flags
   const [loadingActive, setLoadingActive] = useState(false)
   const [loadingCompleted, setLoadingCompleted] = useState(false)
   const [creating, setCreating] = useState(false)
   const [attemptLoading, setAttemptLoading] = useState(false)
   const [submittingAnswer, setSubmittingAnswer] = useState(false)
-
-  // create modal state
   const [createOpen, setCreateOpen] = useState(false)
   const [createNumQuestions, setCreateNumQuestions] = useState<number>(defaultNumQuestions)
   const [createDurationSec, setCreateDurationSec] = useState<number>(defaultDurationSec)
   const [createPreview, setCreatePreview] = useState<ClientQuizItem[] | null>(null)
   const createdRef = useRef<{ createdQuizId?: string }>({})
-
-  // attempt modal state
   const [attemptOpen, setAttemptOpen] = useState(false)
   const [attemptQuizDetail, setAttemptQuizDetail] = useState<PersonalQuizDetail | null>(null)
   const [attemptIndex, setAttemptIndex] = useState<number>(0)
   const [selectedAnswerIndex, setSelectedAnswerIndex] = useState<number | null>(null)
   const [answerFeedback, setAnswerFeedback] = useState<{ index: number; correct: boolean } | null>(null)
-
-  // force fresh render key for in-place restart
   const [attemptRunKey, setAttemptRunKey] = useState(0)
-
-  // buffer the finished result until modal is closed
   const pendingResultRef = useRef<{ quizId: string; score: number; total: number } | null>(null)
-
-  // review modal state
   const [reviewOpen, setReviewOpen] = useState(false)
   const [reviewAttempt, setReviewAttempt] = useState<{
     score: number
@@ -181,12 +165,10 @@ function PersonalQuizBarInline({
   const [isClient, setIsClient] = useState(false)
   useEffect(() => setIsClient(true), [])
 
-  // Partition quizzes based on attempt list
   const finishedIds = useMemo(() => new Set(myAttempts.filter((a) => a.finished).map((a) => a.quizId)), [myAttempts])
   const activeQuizzes = useMemo(() => quizzes.filter((q) => !finishedIds.has(q.id)), [quizzes, finishedIds])
   const completedQuizzes = useMemo(() => quizzes.filter((q) => finishedIds.has(q.id)), [quizzes, finishedIds])
 
-  // ----- Load list + attempts -----
   async function refreshLists() {
     setLoadingActive(true)
     setLoadingCompleted(true)
@@ -265,7 +247,7 @@ function PersonalQuizBarInline({
     }
   }
 
-  // ----- Attempt flow -----
+  
   async function loadQuizDetail(quizId: string): Promise<PersonalQuizDetail | null> {
     const snap = await get(ref(db, `users/${userId}/quizzes/${quizId}`))
     if (!snap.exists()) return null
@@ -321,12 +303,12 @@ function PersonalQuizBarInline({
       const isLast = attemptIndex >= totalLocal - 1
 
       if (data?.finishedNow || isLast) {
-        // compute/collect score for completion screen and buffer for save-on-close
+        
         let serverScore: number | undefined = typeof data?.score === "number" ? data.score : undefined
         let serverTotal: number = typeof data?.totalQuestions === "number" ? data.totalQuestions : totalLocal
 
         if (serverScore == null) {
-          // fallback: fetch attempt and compute score client-side
+          
           try {
             const mineFn = httpsCallable(fns, "getMyPersonalAsyncAttempt")
             const { data: md }: any = await mineFn({ quizId: selectedQuizId })
@@ -342,13 +324,12 @@ function PersonalQuizBarInline({
             serverScore = correctCount
             serverTotal = qArr.length
           } catch {
-            // if we cannot fetch, at least set 0/total to move forward
             serverScore = 0
             serverTotal = totalLocal
           }
         }
 
-        // buffer result; do NOT persist yet
+        
         pendingResultRef.current = {
           quizId: selectedQuizId,
           score: serverScore!,
@@ -374,14 +355,14 @@ function PersonalQuizBarInline({
     }
   }
 
-  // finalize (save) buffered result when modal is closed after a completion
+  
   async function finalizeIfPendingAndClose() {
     try {
       const pending = pendingResultRef.current
-      // Only commit when a run is completed and there's a pending score
+      
       if (attemptQuizDetail?.showCompletion && pending && pending.quizId === selectedQuizId) {
         try {
-          // Prefer explicit finalize callable if available
+        
           const finalizeFn = httpsCallable(fns, "finalizePersonalAsyncAttempt") as any
           await finalizeFn({
             quizId: pending.quizId,
@@ -389,7 +370,7 @@ function PersonalQuizBarInline({
             totalQuestions: pending.total,
           })
         } catch {
-          // fallback: even if finalize isn't available, refresh lists so UI stays consistent
+          
         }
         pendingResultRef.current = null
         await refreshLists()
@@ -399,7 +380,7 @@ function PersonalQuizBarInline({
     }
   }
 
-  // ----- Review flow -----
+  
   async function openReview(quizId: string) {
     try {
       setReviewOpen(true)
@@ -728,7 +709,7 @@ function PersonalQuizBarInline({
   return (
     <>
       <div className="w-full h-full flex flex-col">
-        {/* Top half: Quizzes list - now takes full height */}
+ 
         <div className="h-full border-b border-border/30 bg-background/10 flex flex-col min-h-0">
           <div className="sticky top-0 z-0 flex items-center justify-between px-6 py-4 border-b border-border/30 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
             <div className="text-lg font-medium text-foreground">Quizzes</div>
@@ -746,7 +727,6 @@ function PersonalQuizBarInline({
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="p-4">
               <div className="space-y-1">
-                {/* Active */}
                 <div>
                   <button
                     onClick={() => setExpandedFolders((p) => ({ ...p, active: !p.active }))}
@@ -800,8 +780,6 @@ function PersonalQuizBarInline({
                     </div>
                   )}
                 </div>
-
-                {/* Completed */}
                 <div>
                   <button
                     onClick={() => setExpandedFolders((p) => ({ ...p, completed: !p.completed }))}
@@ -837,7 +815,7 @@ function PersonalQuizBarInline({
                             key={q.id}
                             className="flex items-center gap-2 p-2 hover:bg-background/40 rounded-md transition-colors w-full cursor-pointer"
                             onClick={() => setSelectedQuizId(q.id)}
-                            onDoubleClick={() => openReview(q.id)} // open review modal
+                            onDoubleClick={() => openReview(q.id)} 
                           >
                             <FileText className="h-4 w-4 text-black" />
                             <div className="flex-1 min-w-0">
@@ -860,8 +838,6 @@ function PersonalQuizBarInline({
           </div>
         </div>
       </div>
-
-      {/* Create Modal */}
       {isClient &&
         createOpen &&
         createPortal(
@@ -1094,7 +1070,7 @@ function PersonalQuizBarInline({
   )
 }
 
-/* ------------------------------ Main component --------------------------- */
+
 export default function UserNotesSplitViewWithRibbon({
   notes,
   userID,
@@ -1121,7 +1097,6 @@ export default function UserNotesSplitViewWithRibbon({
     [selectedId, internalSelectedId],
   )
 
-  // keep selection valid if uncontrolled
   useEffect(() => {
     if (selectedId) return
     if (!internalSelectedId) {
@@ -1131,7 +1106,7 @@ export default function UserNotesSplitViewWithRibbon({
       const exists = notes.some((n) => n.id === internalSelectedId)
       if (!exists) setInternalSelectedId(notes[0]?.id ?? null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [notes, selectedId])
 
   const selectedNote = useMemo(
@@ -1145,8 +1120,6 @@ export default function UserNotesSplitViewWithRibbon({
     else setPlain("")
   }, [selectedNote?.id, selectedNote?.content])
 
-  // Debounced autosave of content snapshots to users/{owner}/notes
-  // (only meaningful for personal notes in this list)
   useEffect(() => {
     if (!selectedNote?.id) return
     const t = setTimeout(() => {
@@ -1158,7 +1131,6 @@ export default function UserNotesSplitViewWithRibbon({
 
   const showLoader = loading && stateNotes.length === 0
 
-  // Right pane content — use currentSelectedNoteId so shared notes also render
   const rightPane = (() => {
     switch (activeRibbonSection) {
       case "summary":
@@ -1235,13 +1207,11 @@ export default function UserNotesSplitViewWithRibbon({
   return (
     <div className="relative h-[calc(100vh-2rem)] w-full">
       <div className="flex h-full min-h-0 gap-4 pr-4">
-        {/* Editor pane */}
         <div
           className={`${
             isRightContentHidden ? "flex-1" : "flex-[3]"
           } border border-gray-200 dark:border-0 rounded-xl p-3 bg-white dark:bg-neutral-900 shadow flex flex-col min-h-0 transition-all duration-300`}
         >
-          {/* Editor body */}
           <div className="flex-1 min-h-0 overflow-y-auto scroll-invisible">
             {showLoader ? (
               <div className="h-full grid place-items-center text-sm text-muted-foreground"></div>
@@ -1272,8 +1242,6 @@ export default function UserNotesSplitViewWithRibbon({
           </div>
         )}
       </div>
-
-      {/* Fixed ribbon on the far right */}
       <div className="absolute top-0 right-0">
         <Ribbon
           activeSection={activeRibbonSection}
