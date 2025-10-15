@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useCreateBlockNote } from "@blocknote/react";
+import { DefaultReactSuggestionItem, SuggestionMenuController, SuggestionMenuProps, useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
 
@@ -14,6 +14,41 @@ interface YjsBlockNoteEditorProps {
   ownerID: string;
   username: string;
 }
+
+
+function CustomSlashMenu(
+  props: SuggestionMenuProps<DefaultReactSuggestionItem>
+) {
+  const filteredItems = props.items.filter(
+    (item) =>
+      ![
+        "Image",
+        "Video",
+        "File",
+        "Embed",
+        "Audio",
+        "GIF",
+        "Attachment",
+        "Media",
+      ].includes(item.title)
+  );
+
+  return (
+    <div className="bn-suggestion-menu">
+      {filteredItems.map((item, index) => (
+        <div
+          key={item.title}
+          className={`bn-suggestion-menu-item ${props.selectedIndex === index ? "selected" : ""
+            }`}
+          onClick={() => props.onItemClick?.(item)}
+        >
+          {item.title}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 export function YjsBlockNoteEditor({
   noteID,
@@ -42,12 +77,12 @@ export function YjsBlockNoteEditor({
   const editor = useCreateBlockNote(
     provider
       ? {
-          collaboration: {
-            provider,
-            fragment: doc.getXmlFragment("blocknote"),
-            user: { name: username, color: "#005ac2ff" },
-          },
-        }
+        collaboration: {
+          provider,
+          fragment: doc.getXmlFragment("blocknote"),
+          user: { name: username, color: "#005ac2ff" },
+        },
+      }
       : {}
   );
 
@@ -111,11 +146,16 @@ export function YjsBlockNoteEditor({
   // Centered loader (same vibe as dashboard)
   if (!provider || !providerReady || initialContent === null) {
     return (
-       <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  return <BlockNoteView editor={editor} theme={theme} />;
+  return <BlockNoteView editor={editor} theme={theme}>
+    <SuggestionMenuController
+      triggerCharacter={"/"}
+      suggestionMenuComponent={CustomSlashMenu}
+    />
+  </BlockNoteView>;
 }

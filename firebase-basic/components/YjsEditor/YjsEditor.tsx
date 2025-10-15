@@ -1,7 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useCreateBlockNote } from "@blocknote/react"
+import {
+  useCreateBlockNote, DefaultReactSuggestionItem,
+  SuggestionMenuController,
+  SuggestionMenuProps,
+  getDefaultReactSlashMenuItems
+} from "@blocknote/react"
 import { BlockNoteView, darkDefaultTheme, lightDefaultTheme } from "@blocknote/mantine"
 import "@blocknote/mantine/style.css"
 
@@ -9,16 +14,51 @@ import { useYDoc, useYjsProvider } from "@y-sweet/react"
 import { PartialBlock, Block } from "@blocknote/core"
 import { loadFromStorage, saveToStorage } from "@/lib/storageFunctions"
 import { Note } from "@/types/note"
-import { fetchNoteWithOwner } from "@/lib/note/treeActions" 
+import { fetchNoteWithOwner } from "@/lib/note/treeActions"
 import { ref, set } from "@firebase/database"
 import { db } from "@/lib"
 
 import "./styles.css"
+import "@blocknote/react/style.css";
 
 interface YjsBlockNoteEditorProps {
   noteID: string
   ownerID: string
   username: string
+}
+
+function CustomSlashMenu(
+  props: SuggestionMenuProps<DefaultReactSuggestionItem>
+) {
+  const filteredItems = props.items.filter(
+    (item) =>
+      ![
+        "Image",
+        "Video",
+        "File",
+        "Embed",
+        "Audio",
+        "GIF",
+        "Attachment",
+        "Media",
+      ].includes(item.title)
+  );
+
+  return (
+    <div className="bn-suggestion-menu">
+      {filteredItems.map((item, index) => (
+        <div
+          key={item.title}
+          className={`bn-suggestion-menu-item ${
+            props.selectedIndex === index ? "selected" : ""
+          }`}
+          onClick={() => props.onItemClick?.(item)}
+        >
+          {item.title}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function YjsBlockNoteEditor({ noteID, ownerID, username }: YjsBlockNoteEditorProps) {
@@ -51,14 +91,14 @@ export function YjsBlockNoteEditor({ noteID, ownerID, username }: YjsBlockNoteEd
   const editor = useCreateBlockNote(
     provider
       ? {
-          collaboration: {
-            provider,
-            fragment: doc.getXmlFragment("blocknote"),
-            user: { name: username, color: "#005ac2ff" },
-          },
-        }
-      : {},
-  )
+        collaboration: {
+          provider,
+          fragment: doc.getXmlFragment("blocknote"),
+          user: { name: username, color: "#005ac2ff" },
+        },
+      }
+      : {}
+  );
 
   // Load initial content (guard missing ownerID)
   useEffect(() => {
@@ -144,10 +184,10 @@ export function YjsBlockNoteEditor({ noteID, ownerID, username }: YjsBlockNoteEd
         />
       </div>
 
-  
+
       <div
         className={
-        
+
           "flex-1 overflow-auto h-[calc(100vh-16px)] bg-white dark:bg-neutral-900"
         }
       >
@@ -155,8 +195,15 @@ export function YjsBlockNoteEditor({ noteID, ownerID, username }: YjsBlockNoteEd
           editor={editor}
           theme={isDark ? darkDefaultTheme : lightDefaultTheme}
           data-theming-css-variables-demo
-        />
+          slashMenu={false}
+        >
+          <SuggestionMenuController 
+          triggerCharacter={"/"} 
+          suggestionMenuComponent={CustomSlashMenu}
+          />
+        </BlockNoteView>
+
       </div>
-    </div>
+    </div >
   )
 }
