@@ -666,7 +666,7 @@ function StudentCalendar() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {loading && <div className="text-primary text-sm">Loading...</div>}
+        {loading && <div className="text-primary text-sm"></div>}
 
         <header className="bg-card rounded-lg border border-border p-6">
           <div className="text-center mb-6">
