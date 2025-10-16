@@ -94,7 +94,7 @@ export default function AddFriendModal() {
             >
               <div>
                 <p className="font-medium">{user.name} {user.surname}</p>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
+              
               </div>
             </li>
           ))}
@@ -103,3 +103,4 @@ export default function AddFriendModal() {
     </Dialog>
   )
 }
+
