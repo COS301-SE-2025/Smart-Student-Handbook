@@ -1,11 +1,10 @@
-// components/ai/SummaryPanel.tsx
 "use client"
 
 import { useRef, useState, useCallback, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Maximize2, X } from "lucide-react"
+import { Loader2, Maximize2, X, AlertTriangle } from "lucide-react"
 import { summarizeNote } from "@/lib/gemini"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
@@ -17,25 +16,14 @@ type SummaryPanelProps = {
   initialSummary?: string
   className?: string
   buttonText?: string
-
-  /** Org context (shared notes) */
   orgId?: string
-
-  /** Ownership & identity */
   ownerId: string
   noteId: string
-
-  /** Personal context hint (optional); if provided we’ll infer scope automatically */
   userId?: string
-
-  /** Force personal user-scope if true */
   isPersonal?: boolean
-
-  /** NEW: only on personal page – load, and if missing, auto-generate & save once */
   autoGenerateIfMissing?: boolean
 }
 
-/* ---------------- Org callables (unchanged) ---------------- */
 type OrgLoadReq = { orgId: string; noteId: string }
 type OrgLoadRes = {
   success: boolean
@@ -53,25 +41,15 @@ type OrgLoadRes = {
 }
 type OrgSaveReq = { orgId: string; noteId: string; ownerId: string; text: string; title?: string }
 type OrgSaveRes = { success: boolean; id: string; path: string }
-
 const callLoadOrg = httpsCallable<OrgLoadReq, OrgLoadRes>(fns, "loadSummary")
 const callSaveOrg = httpsCallable<OrgSaveReq, OrgSaveRes>(fns, "saveSummary")
-
-/* ---------------- Personal callables (match your usercontents) ----------------
-   NOTE: These functions rely on Firebase Auth; the callable picks up auth automatically.
-   Payloads:
-   - loadUserSummary:  { noteId }
-   - saveUserSummary:  { noteId, summary }
-   Returns:
-   - loadUserSummary:  { summary: string | null }
-------------------------------------------------------------------------------- */
 type UserLoadSummaryRes = { summary: string | null }
 type UserSaveSummaryReq = { noteId: string; summary: string }
 
 const callLoadUserSimple = httpsCallable<{ noteId: string }, UserLoadSummaryRes>(fns, "loadUserSummary")
 const callSaveUserSimple = httpsCallable<UserSaveSummaryReq, { ok: true }>(fns, "saveUserSummary")
 
-/* ---------------- Local helpers ------------------- */
+
 const MAX_CHARS = 40_000
 const CACHE_VERSION = "v3-plain"
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30
@@ -125,13 +103,12 @@ export default function SummaryPanel({
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [isClient, setIsClient] = useState(false)
-  const [autoTried, setAutoTried] = useState(false) // ensure we auto-generate only once
+  const [autoTried, setAutoTried] = useState(false) 
 
   const runIdRef = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
   const lastTextRef = useRef<{ text: string; hash: string } | null>(null)
 
-  // Decide storage scope:
   const useUserScope = ((): boolean => {
     if (typeof isPersonal === "boolean") return isPersonal
     if (!orgId) return true
@@ -167,21 +144,21 @@ export default function SummaryPanel({
     }
   }, [isExpanded])
 
-  // Load existing summary from the correct scope
+
   useEffect(() => {
     let cancelled = false
-    setAutoTried(false) // reset when note/scope changes
+    setAutoTried(false)
     async function load() {
       if (!noteId) return
       setLoadingExisting(true)
       try {
         if (useUserScope) {
-          // PERSONAL: uses your simple endpoints
+      
           const res = await callLoadUserSimple({ noteId })
           const text = res?.data?.summary ?? null
           if (!cancelled) setSummary(text)
         } else {
-          // ORG: unchanged
+  
           if (!orgId) return
           const res = await callLoadOrg({ orgId, noteId })
           const data = res.data
@@ -195,25 +172,18 @@ export default function SummaryPanel({
         if (!cancelled) setLoadingExisting(false)
       }
     }
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+
     load()
     return () => {
       cancelled = true
     }
   }, [useUserScope, orgId, userId, noteId])
 
-  // If personal + missing + opt-in flag, auto-generate ONCE
+
   useEffect(() => {
-    if (
-      useUserScope &&
-      autoGenerateIfMissing &&
-      !loadingExisting &&
-      !summary &&
-      !autoTried &&
-      canSummarize
-    ) {
+    if (useUserScope && autoGenerateIfMissing && !loadingExisting && !summary && !autoTried && canSummarize) {
       setAutoTried(true)
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+ 
       handleSummarize()
     }
   }, [useUserScope, autoGenerateIfMissing, loadingExisting, summary, autoTried, canSummarize])
@@ -315,8 +285,20 @@ export default function SummaryPanel({
               <Loader2 className="h-5 w-5 mr-3 animate-spin" />
             </div>
           ) : summary ? (
-            <div className="w-full max-w-4xl h-full overflow-y-auto p-6 rounded-lg bg-white border border-gray-200 shadow-sm">
-              <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-gray-900">{summary}</div>
+            <div className="w-full max-w-4xl h-full flex flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 rounded-lg bg-white border border-gray-200 shadow-sm">
+                <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-gray-900">{summary}</div>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-sm text-red-800 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>
+                    <strong>Disclaimer</strong>: The content used to generate the summary is not fact-checked or
+                    verified. The summary is generated from the contents in the note editor.
+                  </span>
+                </p>
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-center">
@@ -374,9 +356,19 @@ export default function SummaryPanel({
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     </div>
                   ) : summary ? (
-                    <div className="flex-1 min-h-0">
-                      <div className="h-full w-full overflow-y-auto whitespace-pre-wrap leading-snug p-3 break-words text-xs md:text-sm">
+                    <div className="flex-1 min-h-0 flex flex-col">
+                      <div className="flex-1 min-h-0 overflow-y-auto whitespace-pre-wrap leading-snug p-3 break-words text-xs md:text-sm">
                         {summary}
+                      </div>
+
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-sm text-red-800 flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                          <span>
+                            <strong>Disclaimer</strong>: The content used to generate the summary is not fact-checked or
+                            verified. The summary is generated from the contents in the note editor.
+                          </span>
+                        </p>
                       </div>
                     </div>
                   ) : (

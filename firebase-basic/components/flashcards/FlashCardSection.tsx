@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trash2, ChevronLeft, ChevronRight, Loader2, Maximize2, X } from "lucide-react"
+import { Trash2, ChevronLeft, ChevronRight, Loader2, Maximize2, X ,AlertTriangle} from "lucide-react"
 import { generateFlashcards } from "@/lib/gemini"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
@@ -660,6 +660,16 @@ export default function FlashCardSection({
                 </div>
 
                 <p className="text-center text-muted-foreground text-sm">Click card to flip • Use arrows to navigate</p>
+                  <div>
+                    <p className="text-sm text-red-800 flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>
+                        <strong>Disclaimer</strong>: The content used to generate the flashcards is not fact-checked or
+                        verified. The flashcards are generated from the contents in the note editor.
+                      </span>
+                    </p>
+                  </div>
+
               </div>
             ) : (
               <p className="text-lg text-muted-foreground text-center">No flashcards yet.</p>
