@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
@@ -23,7 +24,7 @@ import { isSameDay, parseISO, format } from "date-fns"
 import Link from "next/link"
 import Image from "next/image"
 import { getDatabase, ref as dbRef, onValue, push as dbPush, set as dbSet, update as dbUpdate, remove as dbRemove } from "firebase/database"
-import { getAuth } from "firebase/auth" //adjust real-time db
+import { getAuth } from "firebase/auth"
 
 interface Notification {
   id: string
@@ -33,10 +34,10 @@ interface Notification {
   description: string
   fromUserId?: string 
   requestId?: string 
-  orgId?: string // Add this for organization notifications
+  orgId?: string
 }
 
-export function SmartHeader() {
+function SmartHeaderContent() {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -178,17 +179,13 @@ export function SmartHeader() {
           }
 
           filtered.push(notification)
-        } else {
-          //console.log(`❌ Notification type not matching:`, n.type)
         }
       })
 
-      //console.log(`📊 Total filtered notifications:`, filtered.length)
       setOrgNotifications(filtered)
     })
     
     return () => {
-      console.log(`🛑 Cleaning up notification listener`)
       off()
     }
   }, [user?.uid])
@@ -243,7 +240,7 @@ export function SmartHeader() {
           }),
           description: e.description,
         }))
-        .filter((e) => !dismissedCalendarNotifications.has(e.id)) // Filter out dismissed events
+        .filter((e) => !dismissedCalendarNotifications.has(e.id))
 
       const day = today.getDay()
       const todaysLectures: Notification[] = lectures
@@ -263,7 +260,7 @@ export function SmartHeader() {
             description: l.room,
           }
         })
-        .filter((l) => !dismissedCalendarNotifications.has(l.id)) // Filter out dismissed lectures
+        .filter((l) => !dismissedCalendarNotifications.has(l.id))
 
       if (mounted) {
         setNotifications([...todaysEvents, ...todaysLectures, ...orgNotifications])
@@ -336,7 +333,7 @@ export function SmartHeader() {
     }
   })()
 
-    // Get notification description
+  // Get notification description
   const getNotificationDescription = (type: string, message: string) => {
     switch (type) {
       case "friend_request":
@@ -380,11 +377,11 @@ export function SmartHeader() {
     }
     return formattedTitle
   }
-  // Add this function near your other utility functions
+
   const formatDate = (timestamp: number) => {
     return format(new Date(timestamp), "MMM d, h:mm a")
   }
-  // Update the notification icon function to include friend icons
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "lecture":
@@ -405,7 +402,7 @@ export function SmartHeader() {
         return <div className="w-2 h-2 rounded-full bg-muted-foreground flex-shrink-0" />
     }
   }
-  // Get notification type display name
+
   const getNotificationTypeDisplay = (type: string) => {
     switch (type) {
       case "lecture":
@@ -427,30 +424,23 @@ export function SmartHeader() {
     }
   }
 
-  // Update the handleNotificationClick function
   const handleNotificationClick = useCallback(
     (notification: Notification) => {
-      // Mark as read - IMPORTANT: Pass the type parameter
       dismissNotification(notification.id, notification.type)
       
-      // Navigate based on notification type
       if (notification.type === "friend_request" && notification.fromUserId) {
-        // Navigate to the friend's profile page to accept/reject
         router.push(`/friends/${notification.fromUserId}`)
       } else if (notification.type === "friend_request_accepted" && notification.fromUserId) {
-        // Navigate to the friend's profile page
         router.push(`/friends/${notification.fromUserId}`)
       } else if (notification.type === "added_to_group") {
-        // Navigate to organisations page (correct spelling)
         router.push("/organisations")
       } else if (notification.type === "new_public_org") {
-        // Navigate to organisations page (correct spelling)
         router.push("/organisations")
       }
     },
     [dismissNotification, router]
   )
-  // Search placeholder
+
   const getSearchPlaceholder = () => {
     switch (pathname) {
       case "/organisations":
@@ -463,36 +453,6 @@ export function SmartHeader() {
         return "Search notes, modules, flashcards..."
     }
   }
-
-  async function sendFriendRequest(toUid: string, fromName?: string) {
-  const auth = getAuth()
-  const user = auth.currentUser
-  if (!user) throw new Error("Not authenticated")
-
-  const db = getDatabase()
-  const reqRef = dbPush(dbRef(db, "friendRequests"))
-  const requestId = reqRef.key!
-
-  // 1) Create request
-  await dbSet(reqRef, {
-    fromUid: user.uid,
-    toUid,
-    status: "pending",
-    createdAt: Date.now(),
-  })
-
-  // 2) Notify receiver
-  const notifRef = dbPush(dbRef(db, `users/${toUid}/notifications`))
-  await dbSet(notifRef, {
-    type: "friend_request",
-    message: `${fromName || "Someone"} sent you a friend request`,
-    fromUserId: user.uid,
-    requestId,
-    timestamp: Date.now(),
-  })
-
-  return requestId
-}
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
@@ -579,7 +539,7 @@ export function SmartHeader() {
                               size="sm"
                               className="h-6 w-6 p-0 hover:bg-destructive/10"
                               onClick={(e) => {
-                                e.stopPropagation() // Prevent triggering the notification click
+                                e.stopPropagation()
                                 dismissNotification(n.id, n.type)
                               }}
                             >
@@ -655,5 +615,22 @@ export function SmartHeader() {
         </div>
       </div>
     </header>
+  )
+}
+
+export function SmartHeader() {
+  return (
+    <Suspense fallback={
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
+        <div className="flex h-full items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 animate-pulse bg-muted rounded" />
+            <div className="h-6 w-32 animate-pulse bg-muted rounded" />
+          </div>
+        </div>
+      </header>
+    }>
+      <SmartHeaderContent />
+    </Suspense>
   )
 }

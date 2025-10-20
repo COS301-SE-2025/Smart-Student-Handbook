@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { Suspense, useState, useEffect, useCallback, useMemo } from "react"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
 import { getDatabase, ref, get, set, remove } from "firebase/database"
@@ -47,7 +47,7 @@ interface CreateOrgInput {
 /* -------------------------------------------------------------------------- */
 /*                               Component                                    */
 /* -------------------------------------------------------------------------- */
-export default function OrganisationsPage() {
+function OrganisationsPageComponent() {
   const { userId, loading: authLoading } = useUserId()
   const searchParams = useSearchParams()
   const [orgsData, setOrgsData] = useState<(Org & { joined: boolean })[]>([])
@@ -61,39 +61,35 @@ export default function OrganisationsPage() {
 
   const searchQuery = searchParams.get("search") || ""
 
+  /* ---- callables -------------------------------------------------------- */
+  const getPublicOrgs = useMemo(
+    () => httpsCallable<{}, Org[]>(fns, "getPublicOrganizations"),
+    [],
+  )
 
-/* ---- callables -------------------------------------------------------- */
-const getPublicOrgs = useMemo(
-  () => httpsCallable<{}, Org[]>(fns, "getPublicOrganizations"),
-  [fns],
-)
+  const getPrivateOrgs = useMemo(
+    () => httpsCallable<{}, Org[]>(fns, "getUserOrganizations"),
+    [],
+  )
 
-const getPrivateOrgs = useMemo(
-  () => httpsCallable<{}, Org[]>(fns, "getUserOrganizations"),
-  [fns],
-)
+  const joinOrg = useMemo(
+    () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "joinOrganization"),
+    [],
+  )
 
-const joinOrg = useMemo(
-  () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "joinOrganization"),
-  [fns],
-)
+  const leaveOrg = useMemo(
+    () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "leaveOrganization"),
+    [],
+  )
 
-const leaveOrg = useMemo(
-  () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "leaveOrganization"),
-  [fns],
-)
-
-const createOrg = useMemo(
-  () => httpsCallable<{ organization: CreateOrgInput }, Org>(fns, "createOrganization"),
-  [fns],
-)
-
+  const createOrg = useMemo(
+    () => httpsCallable<{ organization: CreateOrgInput }, Org>(fns, "createOrganization"),
+    [],
+  )
 
   const db = getDatabase()
 
-  /* ---------------------------------------------------------------------- */
-  /*                         Fetch + merge lists                            */
-  /* ---------------------------------------------------------------------- */
+  // ...existing code...
   const fetchOrgs = useCallback(async () => {
     if (!userId) return
     setLoading(true)
@@ -156,9 +152,7 @@ const createOrg = useMemo(
     fetchOrgs()
   }, [fetchOrgs])
 
-  /* ---------------------------------------------------------------------- */
-  /*                         Helpers (join / leave)                         */
-  /* ---------------------------------------------------------------------- */
+  // ...existing code...
   const handleToggleFav = async (orgId: string) => {
     if (!userId) return
     const next = !favorites[orgId]
@@ -249,9 +243,7 @@ const createOrg = useMemo(
     }
   }
 
-  /* ---------------------------------------------------------------------- */
-  /*                  Filter + sort list for render                         */
-  /* ---------------------------------------------------------------------- */
+  // ...existing code...
   const orgs = useMemo(() => {
     return orgsData
       .filter((o) => {
@@ -270,14 +262,12 @@ const createOrg = useMemo(
       })
   }, [orgsData, searchQuery, filter, favorites])
 
-  /* ---------------------------------------------------------------------- */
-  /*                             JSX                                         */
-  /* ---------------------------------------------------------------------- */
+  // ...existing code...
   if (authLoading) return null
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* ...existing code... */}
       <div className="border-b bg-background">
         <div className="p-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-8">
@@ -350,7 +340,7 @@ const createOrg = useMemo(
                     isJoining || isLeaving ? "opacity-75" : ""
                   }`}
                 >
-                  {/* fav button */}
+                  {/* ...existing code... */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -365,7 +355,6 @@ const createOrg = useMemo(
                     />
                   </Button>
 
-                  {/* header */}
                   <div className="flex items-start gap-4 mb-6">
                     <Avatar className="h-16 w-16 border-4 border-white shadow-lg dark:border-border">
                       <AvatarFallback className="text-xl font-bold bg-white text-primary dark:bg-background">
@@ -402,12 +391,10 @@ const createOrg = useMemo(
                     </div>
                   </div>
 
-                  {/* description */}
                   <p className="text-muted-foreground leading-relaxed line-clamp-3 min-h-[72px]">
                     {o.description || "No description provided for this organization."}
                   </p>
 
-                  {/* badges */}
                   <div className="flex flex-wrap gap-2 mb-6 mt-4">
                     {o.joined && !isLeaving && (
                       <Badge className="px-3 py-1 bg-green-700 text-white">
@@ -436,7 +423,6 @@ const createOrg = useMemo(
                     )}
                   </div>
 
-                  {/* actions */}
                   <div className="flex gap-3 mt-auto pt-4 border-t border-white/30 dark:border-border relative z-10">
                     {o.joined && !isLeaving ? (
                       <Button
@@ -515,7 +501,6 @@ const createOrg = useMemo(
         )}
       </div>
 
-      {/* create-modal */}
       <CreateOrganizationModal
         open={showCreate}
         onOpenChange={setShowCreate}
@@ -538,5 +523,13 @@ const createOrg = useMemo(
         }}
       />
     </div>
+  )
+}
+
+export default function OrganisationsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background p-8">Loading organisations...</div>}>
+      <OrganisationsPageComponent />
+    </Suspense>
   )
 }
