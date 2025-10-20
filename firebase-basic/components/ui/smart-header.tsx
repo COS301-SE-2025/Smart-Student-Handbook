@@ -19,10 +19,11 @@ import { auth } from "@/lib/firebase"
 import { useState, useEffect, useCallback } from "react"
 import { httpsCallable } from "firebase/functions"
 import { fns } from "@/lib/firebase"
-import { getDatabase, ref as dbRef, onValue, remove as dbRemove } from "firebase/database"
 import { isSameDay, parseISO, format } from "date-fns"
 import Link from "next/link"
 import Image from "next/image"
+import { getDatabase, ref as dbRef, onValue, push as dbPush, set as dbSet, update as dbUpdate, remove as dbRemove } from "firebase/database"
+import { getAuth } from "firebase/auth" //adjust real-time db
 
 interface Notification {
   id: string
@@ -30,7 +31,8 @@ interface Notification {
   type: string
   time: string
   description: string
-  fromUserId?: string // Add this for friend notifications
+  fromUserId?: string 
+  requestId?: string 
   orgId?: string // Add this for organization notifications
 }
 
@@ -139,20 +141,16 @@ export function SmartHeader() {
   // Listen for notifications (including friend requests)
   useEffect(() => {
     if (!user?.uid) {
-      console.log(`❌ No user ID for notifications`);
       return;
     }
     
-    console.log(`👂 Setting up notification listener for user: ${user.uid}`);
     const db = getDatabase()
     const notifRef = dbRef(db, `users/${user.uid}/notifications`)
     
     const off = onValue(notifRef, (snap) => {
-      console.log(`📨 Raw notification snapshot:`, snap.val())
       const raw = snap.val() as Record<string, any> | null
       
       if (!raw) {
-        console.log(`📭 No notifications found`)
         setOrgNotifications([])
         return
       }
@@ -162,7 +160,6 @@ export function SmartHeader() {
         const n = childSnap.val() as any
         const key = childSnap.key!
         
-        console.log(`🔍 Processing notification:`, { key, type: n.type, data: n })
         
         if (n.type === "added_to_group" || 
             n.type === "new_public_org" || 
@@ -176,17 +173,17 @@ export function SmartHeader() {
             time: formatDate(n.timestamp),
             description: getNotificationDescription(n.type, n.message),
             fromUserId: n.fromUserId,
-            orgId: n.orgId
+            orgId: n.orgId,
+            requestId: n.requestId, 
           }
-          
-          console.log(`✅ Adding notification to list:`, notification)
+
           filtered.push(notification)
         } else {
-          console.log(`❌ Notification type not matching:`, n.type)
+          //console.log(`❌ Notification type not matching:`, n.type)
         }
       })
-      
-      console.log(`📊 Total filtered notifications:`, filtered.length)
+
+      //console.log(`📊 Total filtered notifications:`, filtered.length)
       setOrgNotifications(filtered)
     })
     
@@ -467,6 +464,36 @@ export function SmartHeader() {
     }
   }
 
+  async function sendFriendRequest(toUid: string, fromName?: string) {
+  const auth = getAuth()
+  const user = auth.currentUser
+  if (!user) throw new Error("Not authenticated")
+
+  const db = getDatabase()
+  const reqRef = dbPush(dbRef(db, "friendRequests"))
+  const requestId = reqRef.key!
+
+  // 1) Create request
+  await dbSet(reqRef, {
+    fromUid: user.uid,
+    toUid,
+    status: "pending",
+    createdAt: Date.now(),
+  })
+
+  // 2) Notify receiver
+  const notifRef = dbPush(dbRef(db, `users/${toUid}/notifications`))
+  await dbSet(notifRef, {
+    type: "friend_request",
+    message: `${fromName || "Someone"} sent you a friend request`,
+    fromUserId: user.uid,
+    requestId,
+    timestamp: Date.now(),
+  })
+
+  return requestId
+}
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
       <div className="flex h-full items-center justify-between px-4">
@@ -512,17 +539,19 @@ export function SmartHeader() {
               <Button variant="ghost" size="sm" className="relative h-8 w-8">
                 <Bell className="h-4 w-4" />
                 {!loadingNotifications && notifications.length > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 text-[10px] bg-destructive">
+                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 text-[10px] bg-blue-500 text-white">
                     {notifications.length}
                   </Badge>
                 )}
               </Button>
             </DropdownMenuTrigger>
+
             <DropdownMenuContent className="w-96 mr-2" align="end">
               <div className="p-3">
                 <h4 className="font-medium mb-3 text-sm">
                   {loadingNotifications ? "Loading…" : "Today's Schedule & Updates"}
                 </h4>
+
                 {loadingNotifications ? (
                   <div className="animate-pulse space-y-2">
                     {[...Array(3)].map((_, i) => (
@@ -538,11 +567,13 @@ export function SmartHeader() {
                         onClick={() => handleNotificationClick(n)}
                       >
                         <div className="mt-1">{getNotificationIcon(n.type)}</div>
+
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-medium leading-tight">
                               {getNotificationTitle(n.type, formatNotificationTitle(n.title, n.type))}
                             </p>
+
                             <Button
                               variant="ghost"
                               size="sm"
@@ -555,12 +586,14 @@ export function SmartHeader() {
                               <X className="h-3 w-3" />
                             </Button>
                           </div>
+
                           <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
                               {getNotificationTypeDisplay(n.type)}
                             </Badge>
                             <span className="text-xs text-muted-foreground">{n.time}</span>
                           </div>
+
                           {n.description && (
                             <p className="text-xs text-muted-foreground leading-relaxed">{n.description}</p>
                           )}

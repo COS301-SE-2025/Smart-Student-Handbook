@@ -7,7 +7,7 @@ export default function OrganisationsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Suspense fallback={<div className="p-8">Loading organisations…</div>}>
+    <Suspense fallback={<div className="p-8"></div>}>
       {children}
     </Suspense>
   );

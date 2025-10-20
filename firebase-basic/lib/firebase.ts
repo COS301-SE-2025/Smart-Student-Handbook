@@ -4,6 +4,13 @@ import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth"
 import { getDatabase } from "firebase/database";
 import { getFunctions } from "firebase/functions";
 
+console.log('Firebase Config Check:', {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'Set' : 'Missing',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ? 'Set' : 'Missing',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? 'Set' : 'Missing',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ? 'Set' : 'Missing',
+});
+
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
   authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,

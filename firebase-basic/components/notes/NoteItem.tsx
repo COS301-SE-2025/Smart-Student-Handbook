@@ -54,7 +54,6 @@ export default function NoteItem({ node, onSelect, onRename, onDelete, isSelecte
   const [isViewOpen, setIsViewOpen] = useState(false);
 
   const handleShare = (collaboratorId: string, permission: "read" | "write") => {
-    console.log("Share with:", collaboratorId, "as", permission);
   };
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({

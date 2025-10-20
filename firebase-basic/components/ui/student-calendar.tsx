@@ -121,12 +121,14 @@ function countSlotsCovered(start: string, end: string, slots: { start: string; e
 
 function CustomCalendarGrid({
   selectedDate,
-  onDateClick,
+  onDaySelect,
+  onDayDoubleClick,
   getEventsForDate,
   getLecturesForDay,
 }: {
   selectedDate: Date
-  onDateClick: (date: Date) => void
+  onDaySelect: (date: Date) => void
+  onDayDoubleClick: (date: Date) => void
   getEventsForDate: (d: Date) => Event[]
   getLecturesForDay: (d: Date) => LectureSlot[]
 }) {
@@ -226,7 +228,8 @@ function CustomCalendarGrid({
           {days.map((day, index) => (
             <button
               key={index}
-              onClick={() => day.isCurrentMonth && onDateClick(day.date)}
+              onClick={() => day.isCurrentMonth && onDaySelect(day.date)}
+              onDoubleClick={() => day.isCurrentMonth && onDayDoubleClick(day.date)}
               className={getDateClasses(day.date, day.isCurrentMonth)}
               disabled={!day.isCurrentMonth}
             >
@@ -534,8 +537,13 @@ function StudentCalendar() {
     return currentTime >= begin && currentTime <= end
   }
 
-  const handleDateClick = (d?: Date) => {
-    if (!d) return
+  const handleSelectDate = (d: Date) => {
+    setSelectedDate(d)
+    setDate(d)
+    setTimetableDate(d)
+  }
+
+  const handleAddEventForDate = (d: Date) => {
     setSelectedDate(d)
     setDate(d)
     setTimetableDate(d)
@@ -652,14 +660,13 @@ function StudentCalendar() {
       return nd
     })
 
-  //if (!userId) return <div className="text-center py-10 text-foreground">Please sign in to use the calendar.</div>
 
   const isPersonalSelectedDate = selectedDate != null && !getSemesterForDate(selectedDate as Date)
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {loading && <div className="text-primary text-sm">Loading...</div>}
+        {loading && <div className="text-primary text-sm"></div>}
 
         <header className="bg-card rounded-lg border border-border p-6">
           <div className="text-center mb-6">
@@ -699,42 +706,38 @@ function StudentCalendar() {
 
         {activeTab === "calendar" && (
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            {/* LEFT: calendar + EVENTS FOR SELECTED DAY */}
             <div className="xl:col-span-3 space-y-6">
               <CustomCalendarGrid
                 selectedDate={date}
-                onDateClick={handleDateClick}
+                onDaySelect={handleSelectDate}
+                onDayDoubleClick={handleAddEventForDate}
                 getEventsForDate={getEventsForDate}
                 getLecturesForDay={getLecturesForDay}
               />
 
-              <Card>
-                <CardContent className="p-4">
-                  <h4 className="font-medium mb-3 text-sm text-foreground">Event Types</h4>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <LegendDot color="bg-red-100 border border-red-300 dark:bg-red-900/30 dark:border-red-700" label="Exams" />
-                    <LegendDot color="bg-blue-100 border border-blue-300 dark:bg-blue-900/30 dark:border-blue-700" label="Assignments" />
-                    <LegendDot color="bg-yellow-100 border border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700" label="Reminders" />
-                    <LegendDot color="bg-green-100 border border-green-300 dark:bg-green-900/30 dark:border-green-700" label="Classes" />
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <LegendDot color="bg-purple-100 border border-purple-300 dark:bg-purple-900/30 dark:border-purple-700" label="Multiple types" />
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Moved here: Events grid (selected day details) */}
+              <DateEventsCard
+                date={date}
+                getEventsForDate={getEventsForDate}
+                getLecturesForDay={getLecturesForDay}
+                lectureTimeSlots={lectureTimeSlots}
+                getEventTypeIcon={getEventTypeIcon}
+                getEventTypeColor={getEventTypeColor}
+                handleDeleteEvent={handleDeleteEvent}
+                handleDeleteLecture={handleDeleteLecture}
+              />
             </div>
 
-            <Sidebar
-              date={date}
-              getEventsForDate={getEventsForDate}
-              getLecturesForDay={getLecturesForDay}
-              lectureTimeSlots={lectureTimeSlots}
-              getEventTypeIcon={getEventTypeIcon}
-              getEventTypeColor={getEventTypeColor}
-              handleDeleteEvent={handleDeleteEvent}
-              handleDeleteLecture={handleDeleteLecture}
-              getActiveSemester={getActiveSemester}
-              setIsSemesterDialogOpen={setIsSemesterDialogOpen}
-            />
+            {/* RIGHT: Event Types legend + Current Semester */}
+            <div className="space-y-6">
+              <EventTypesCard />
+              <CurrentSemesterCard
+                getActiveSemester={getActiveSemester}
+                getLecturesForDay={getLecturesForDay}
+                setIsSemesterDialogOpen={setIsSemesterDialogOpen}
+              />
+            </div>
           </div>
         )}
 
@@ -841,12 +844,139 @@ function StudentCalendar() {
 
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <div className={`w-3 h-3 rounded ${color}`} />
-      <span className="text-foreground">{label}</span>
+    <div className="flex items-center gap-2 text-sm min-w-0">
+      <div className={`w-3 h-3 rounded ${color} flex-shrink-0`} />
+      <span className="text-foreground whitespace-normal break-words leading-tight">{label}</span>
     </div>
   )
 }
+
+function EventTypesCard() {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <h4 className="font-medium mb-3 text-sm text-foreground">Event Types</h4>
+        <div className="flex flex-col gap-2">
+          <LegendDot color="bg-red-100 border border-red-300 dark:bg-red-900/30 dark:border-red-700" label="Exams" />
+          <LegendDot color="bg-blue-100 border border-blue-300 dark:bg-blue-900/30 dark:border-blue-700" label="Assignments" />
+          <LegendDot color="bg-yellow-100 border border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700" label="Reminders" />
+          <LegendDot color="bg-green-100 border border-green-300 dark:bg-green-900/30 dark:border-green-700" label="Classes" />
+        </div>
+        <div className="mt-3 pt-3 border-t border-border">
+          <LegendDot color="bg-purple-100 border border-purple-300 dark:bg-purple-900/30 dark:border-purple-700" label="Multiple types" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function DateEventsCard({
+  date,
+  getEventsForDate,
+  getLecturesForDay,
+  lectureTimeSlots,
+  getEventTypeIcon,
+  getEventTypeColor,
+  handleDeleteEvent,
+  handleDeleteLecture,
+}: {
+  date: Date | undefined
+  getEventsForDate: (d: Date) => Event[]
+  getLecturesForDay: (d: Date) => LectureSlot[]
+  lectureTimeSlots: { start: string; end: string }[]
+  getEventTypeIcon: (t: Event["type"]) => React.ReactNode
+  getEventTypeColor: (t: Event["type"]) => string
+  handleDeleteEvent: (id: string) => void
+  handleDeleteLecture: (id: string) => void
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <CalendarDays className="h-5 w-5" />
+          {date ? format(date, "MMM d, yyyy") : "Select a date"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="min-h-[200px] max-h-[300px] overflow-y-auto">
+          {date && (getEventsForDate(date).length || getLecturesForDay(date).length) ? (
+            <div className="space-y-3">
+              {getLecturesForDay(date).map((lec) => (
+                <LectureChip key={lec.id} lecture={lec} handleDelete={() => handleDeleteLecture(lec.id)} />
+              ))}
+              {getEventsForDate(date).map((evt) => (
+                <EventChip
+                  key={evt.id}
+                  event={evt}
+                  getEventTypeIcon={getEventTypeIcon}
+                  getEventTypeColor={getEventTypeColor}
+                  handleDelete={() => handleDeleteEvent(evt.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState message={date ? "No events or lectures for this date" : "Select a date to view events"} />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function CurrentSemesterCard({
+  getActiveSemester,
+  getLecturesForDay,
+  setIsSemesterDialogOpen,
+}: {
+  getActiveSemester: () => Semester | null
+  getLecturesForDay: (d: Date) => LectureSlot[]
+  setIsSemesterDialogOpen: (open: boolean) => void
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg">Current Semester</CardTitle>
+        <p className="text-sm text-muted-foreground">{getActiveSemester()?.name || "No active semester"}</p>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-4">
+        {getActiveSemester() ? (
+          <>
+            <div className="space-y-2">
+              <InfoRow label="Start:" value={format(getActiveSemester()!.startDate, "MMM d, yyyy")} />
+              <InfoRow label="End:" value={format(getActiveSemester()!.endDate, "MMM d, yyyy")} />
+            </div>
+            <div className="border-t border-border pt-4">
+              <h4 className="font-medium text-sm mb-3 text-foreground">Today's Lectures</h4>
+              <div className="min-h-[100px] max-h-[150px] overflow-y-auto space-y-2">
+                {getLecturesForDay(new Date()).length ? (
+                  getLecturesForDay(new Date()).map((lec) => <LectureToday key={lec.id} lecture={lec} />)
+                ) : (
+                  <EmptyState message="No lectures today" small />
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-sm text-muted-foreground mb-3">No active semester selected</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsSemesterDialogOpen(true)
+                toast.info("Open Manage Semesters to create or activate a semester.")
+              }}
+              className="text-xs"
+            >
+              Manage Semesters
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 
 function Sidebar({
   date,

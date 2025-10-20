@@ -1,0 +1,41 @@
+/* light */
+.bn-container[data-theming-css-variables-demo][data-color-scheme] {
+  --bn-colors-editor-text: var(--card-foreground);
+  --bn-colors-editor-background: var(--card);
+  --bn-colors-menu-text: var(--popover-foreground);
+  --bn-colors-menu-background: var(--popover);
+  --bn-colors-tooltip-text: var(--muted-foreground);
+  --bn-colors-tooltip-background: var(--muted);
+  --bn-colors-hovered-text: var(--accent-foreground);
+  --bn-colors-hovered-background: color-mix(in oklab, var(--accent) 15%, transparent);
+  --bn-colors-selected-text: var(--secondary-foreground);
+  --bn-colors-selected-background: var(--secondary);
+  --bn-colors-disabled-text: var(--muted-foreground);
+  --bn-colors-disabled-background: var(--muted);
+  --bn-colors-shadow: var(--ring);
+  --bn-colors-border: var(--border);
+  --bn-colors-side-menu: var(--card);
+  --bn-border-radius: 12px;
+  --bn-font-family: var(--font-sans, Inter, system-ui, sans-serif);
+}
+
+/* dark (your navy palette comes from .dark vars in global.css) */
+.bn-container[data-theming-css-variables-demo][data-color-scheme="dark"] {
+  --bn-colors-editor-text: var(--card-foreground);
+  --bn-colors-editor-background: var(--card);
+  --bn-colors-menu-text: var(--popover-foreground);
+  --bn-colors-menu-background: var(--popover);
+  --bn-colors-tooltip-text: var(--muted-foreground);
+  --bn-colors-tooltip-background: var(--muted);
+  --bn-colors-hovered-text: var(--accent-foreground);
+  --bn-colors-hovered-background: color-mix(in oklab, var(--accent) 25%, transparent);
+  --bn-colors-selected-text: var(--secondary-foreground);
+  --bn-colors-selected-background: var(--secondary);
+  --bn-colors-disabled-text: var(--muted-foreground);
+  --bn-colors-disabled-background: var(--muted);
+  --bn-colors-shadow: var(--ring);
+  --bn-colors-border: var(--border);
+  --bn-colors-side-menu: var(--card);
+  --bn-border-radius: 12px;
+  --bn-font-family: var(--font-sans, Inter, system-ui, sans-serif);
+}

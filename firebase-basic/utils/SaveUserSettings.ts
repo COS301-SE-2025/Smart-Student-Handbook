@@ -21,7 +21,7 @@ export const saveUserSettings = async (
 
   try {
     await set(ref(db, path), settings);
-    console.log(`User settings saved`);
+
   } catch (error) {
     console.error("Failed :", error);
   }

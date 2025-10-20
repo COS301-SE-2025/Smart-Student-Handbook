@@ -31,16 +31,62 @@
         }
       }
     },
-"userFavorites": {
-    "$user_id": {
-       ".read": "auth != null && auth.uid === $user_id",
-       ".write": "auth != null && auth.uid === $user_id"
-     }
-   },
+
+    "userFavorites": {
+      "$user_id": {
+        ".read": "auth != null && auth.uid === $user_id",
+        ".write": "auth != null && auth.uid === $user_id"
+      }
+    },
+
     "organizations": {
       ".read": "auth != null",
       ".write": "auth != null",
-      ".indexOn": ["isPrivate"]
+      ".indexOn": ["isPrivate"],
+
+      "$org": {
+        "activities": {
+          ".indexOn": ["timestamp"]
+        },
+
+        "quizzes": {
+          "$quiz": {
+            ".read": "auth != null && root.child('organizations/'+$org+'/members/'+auth.uid).exists()",
+            ".write": "auth != null && root.child('organizations/'+$org+'/members/'+auth.uid).exists()",
+
+            "questions": {
+              "$q": {
+                "correctIndex": {
+                  ".read": "root.child('organizations/'+$org+'/quizzes/'+$quiz+'/state').val() == 'ended' || root.child('organizations/'+$org+'/quizzes/'+$quiz+'/creatorId').val() == auth.uid || root.child('organizations/'+$org+'/members/'+auth.uid).val() == 'Admin'"
+                }
+              }
+            },
+
+            "participants": {
+              "$uid": {
+                ".read": "auth != null && root.child('organizations/'+$org+'/members/'+auth.uid).exists()",
+                ".write": "auth != null && auth.uid === $uid"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "organizationActiveQuiz": {
+      "$org": {
+        "$noteId": {
+          ".read": "auth != null && root.child('organizations/'+$org+'/members/'+auth.uid).exists()",
+          ".write": false
+        }
+      }
+    },
+
+    "userQuizSessions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
     }
   }
 }

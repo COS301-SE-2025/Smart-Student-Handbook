@@ -74,14 +74,13 @@ export default function ShareNoteDialog({
             const functions = getFunctions(app);
             const shareNote = httpsCallable(functions, "shareNote");
 
-            const result = await shareNote({ collaboratorId, noteId, permission });
+            const result = await shareNote({ collaboratorId, noteId, permission  : "w"});
 
             toast.success("Note shared successfully!");
             setOpen(false);
             setCollaboratorId(null);
             setSearchName("");
             setSearchResults([]);
-            console.log(`Shared note ${noteId} with ${collaboratorId}`, result);
         } catch (error: any) {
             console.error("Error sharing note:", error);
             toast.error("Failed to share note.");

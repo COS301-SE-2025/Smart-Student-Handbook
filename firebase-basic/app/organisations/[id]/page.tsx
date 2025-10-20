@@ -1,12 +1,12 @@
 /* -------------------------------------------------------------------------- */
-/*          Organisation Details Page – activity tab removed (DYNAMIC)       */
+/*          Organisation Details Page — admin tab for owners (DYNAMIC)       */
 /* -------------------------------------------------------------------------- */
 
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { httpsCallableFromURL } from "firebase/functions"
+import { httpsCallable } from "firebase/functions"   
 import { fns } from "@/lib/firebase"
 import {
   getDatabase,
@@ -14,6 +14,9 @@ import {
   get,
   set,
   remove,
+  push,
+  onValue,
+  off,
 } from "firebase/database"
 import {
   ArrowLeft,
@@ -33,10 +36,10 @@ import {
   X,
   Trash2,
   FileText,
-  Info,
   Plus,
   Search,
   Check,
+  Settings,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -54,6 +57,7 @@ import {
 } from "@/components/ui/dialog"
 import { useUserId } from "@/hooks/useUserId"
 import { toast } from "sonner"
+import { extractNoteTextFromString } from "@/lib/note/BlockFormat"
 
 /* -------------------------------------------------------------------------- */
 /*                                  Types                                     */
@@ -139,67 +143,67 @@ export default function OrganizationDetailsPage() {
   const [loadingFriends, setLoadingFriends] = useState(false)
   const [selectedFriends, setSelectedFriends] = useState<string[]>([])
 
+  const [creatingNote, setCreatingNote] = useState(false)
+
   const orgId = params.id as string
   const db = getDatabase()
 
   /* ---------------------------------------------------------------------- */
-  /*                              Callables                                 */
+  /*                              Callables (SDK)                           */
   /* ---------------------------------------------------------------------- */
   const getOrganizationDetails = useMemo(
     () =>
-      httpsCallableFromURL<{ orgId: string }, OrganizationDetails>(
+      httpsCallable<{ orgId: string }, OrganizationDetails>(
         fns,
-        "https://getorganizationdetails-omrwo3ykaa-uc.a.run.app",
+        "getOrganizationDetails"
       ),
-    [],
+    []
   )
-  const updateOrganization = useMemo(
+
+  const updateOrganizationFn = useMemo(
     () =>
-      httpsCallableFromURL<
+      httpsCallable<
         { orgId: string; organization: Partial<{ name: string; description: string; isPrivate: boolean }> },
         OrganizationDetails
-      >(fns, "https://updateorganization-omrwo3ykaa-uc.a.run.app"),
-    [],
+      >(fns, "updateOrganization"),
+    []
   )
+
   const joinOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(
-        fns,
-        "https://joinorganization-omrwo3ykaa-uc.a.run.app",
-      ),
-    [],
+    () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "joinOrganization"),
+    []
   )
+
   const leaveOrg = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, JoinLeaveResult>(
-        fns,
-        "https://leaveorganization-omrwo3ykaa-uc.a.run.app",
-      ),
-    [],
+    () => httpsCallable<{ orgId: string }, JoinLeaveResult>(fns, "leaveOrganization"),
+    []
   )
+
   const removeMemberFn = useMemo(
     () =>
-      httpsCallableFromURL<
-        { orgId: string; userId: string },
-        { success: boolean }
-      >(fns, "https://removemember-omrwo3ykaa-uc.a.run.app"),
-    [],
+      httpsCallable<{ orgId: string; userId: string }, { success: boolean }>(
+        fns,
+        "removeMember"
+      ),
+    []
   )
+
   const addMemberFn = useMemo(
     () =>
-      httpsCallableFromURL<
-        { orgId: string; userId: string },
-        { success: boolean }
-      >(fns, "https://addmember-omrwo3ykaa-uc.a.run.app"),
-    [],
-  )
-  const deleteOrganization = useMemo(
-    () =>
-      httpsCallableFromURL<{ orgId: string }, { success: boolean }>(
+      httpsCallable<{ orgId: string; userId: string }, { success: boolean }>(
         fns,
-        "https://deleteorganization-omrwo3ykaa-uc.a.run.app",
+        "addMember"
       ),
-    [],
+    []
+  )
+
+  const deleteOrganizationFn = useMemo(
+    () =>
+      httpsCallable<{ orgId: string }, { success: boolean }>(
+        fns,
+        "deleteOrganization"
+      ),
+    []
   )
 
   /* ---------------------------------------------------------------------- */
@@ -222,16 +226,15 @@ export default function OrganizationDetailsPage() {
             continue
           }
         }
-      } catch {/* ignore */}
+      } catch {/* ignore */ }
       out.push(m)
     }
     return out
   }
 
   /* ---------------------------------------------------------------------- */
-  /*                       Notes loader (from RTDB)                          */
+  /*                       Notes helpers (from RTDB)                         */
   /* ---------------------------------------------------------------------- */
-
   const stripHtml = (html: string) =>
     (html || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
 
@@ -245,7 +248,7 @@ export default function OrganizationDetailsPage() {
         const us = snap.val()
         if (us?.name) return us.surname ? `${us.name} ${us.surname}` : us.name
       }
-    } catch {/* ignore */}
+    } catch {/* ignore */ }
     return ""
   }
 
@@ -298,7 +301,7 @@ export default function OrganizationDetailsPage() {
         setIsFavorite(!!favSnap.val())
       }
     } catch (e: any) {
-      console.error("❌ Failed to load organisation", e)
+      console.error("⚠ Failed to load organisation", e)
       setError(e.message ?? "Failed to load organisation")
     } finally {
       setLoading(false)
@@ -308,6 +311,49 @@ export default function OrganizationDetailsPage() {
   useEffect(() => {
     if (!authLoading) fetchOrg()
   }, [fetchOrg, authLoading])
+
+  /* ---------------------------------------------------------------------- */
+  /*                  LIVE notes subscription (no refresh)                  */
+  /* ---------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!orgId) return
+    const notesRef = ref(db, `organizations/${orgId}/notes`)
+
+    const handle = async (snap: any) => {
+      const members = organization?.memberDetails ?? []
+      if (!snap.exists()) {
+        setOrganization((prev) => (prev ? { ...prev, notes: [] } : prev))
+        return
+      }
+      const raw = snap.val() as Record<string, any>
+
+      const uniqueOwners = Array.from(new Set(Object.values(raw).map((n: any) => n.ownerId).filter(Boolean)))
+      const nameCache = new Map<string, string>()
+      await Promise.all(
+        uniqueOwners.map(async (uid: string) => {
+          nameCache.set(uid, await resolveName(uid, members))
+        }),
+      )
+
+      const nextNotes: Note[] = Object.values(raw).map((n: any) => ({
+        id: n.id,
+        title: n.name || "Untitled",
+        content: stripHtml(n.content || ""),
+        author: n.ownerId ? (nameCache.get(n.ownerId) ?? "Unknown") : "Unknown",
+        ownerId: n.ownerId,
+        createdAt: Number(n.createdAt ?? Date.now()),
+        updatedAt: Number(n.updatedAt ?? n.createdAt ?? Date.now()),
+      }))
+      nextNotes.sort((a, b) => b.updatedAt - a.updatedAt)
+
+      setOrganization((prev) => (prev ? { ...prev, notes: nextNotes } : prev))
+    }
+
+    onValue(notesRef, handle)
+    return () => {
+      off(notesRef, "value", handle as any)
+    }
+  }, [db, orgId, organization?.memberDetails])
 
   /* ---------------------------------------------------------------------- */
   /*                Friend-picker logic (same as before)                     */
@@ -362,6 +408,56 @@ export default function OrganizationDetailsPage() {
   /* ---------------------------------------------------------------------- */
   /*                             Other helpers                              */
   /* ---------------------------------------------------------------------- */
+  const handleAddNote = async () => {
+    try {
+      setCreatingNote(true)
+
+      const notesRef = ref(db, `organizations/${orgId}/notes`)
+      const newNoteRef = push(notesRef)
+      const noteId = newNoteRef.key!
+
+      const now = Date.now()
+      const newNotePayload = {
+        id: noteId,
+        name: "Untitled",
+        content: "",
+        ownerId: userId ?? null,
+        createdAt: now,
+        updatedAt: now,
+        type: "note" as const,
+      }
+
+      await set(newNoteRef, newNotePayload)
+
+      // optimistic insert (listener will reconcile)
+      setOrganization((prev) =>
+        prev
+          ? {
+              ...prev,
+              notes: [
+                {
+                  id: noteId,
+                  title: "Untitled",
+                  content: "",
+                  author: "",
+                  ownerId: userId ?? undefined,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                ...prev.notes,
+              ],
+            }
+          : prev,
+      )
+      toast.success("Note created")
+    } catch (err) {
+      console.error("Error adding note:", err)
+      toast.error("Failed to create note.")
+    } finally {
+      setCreatingNote(false)
+    }
+  }
+
   const handleToggleFavorite = async () => {
     if (!userId || !organization) return
     const next = !isFavorite
@@ -376,10 +472,10 @@ export default function OrganizationDetailsPage() {
   }
 
   const handleSaveEdit = async () => {
-    if (!organization || !isAdmin || savingEdit) return
+    if (!organization || !isOwner || savingEdit) return
     setSavingEdit(true)
     try {
-      const { data } = await updateOrganization({
+      const { data } = await updateOrganizationFn({
         orgId,
         organization: {
           name: editName.trim(),
@@ -475,7 +571,7 @@ export default function OrganizationDetailsPage() {
     if (!confirmed) return
     setDeletingOrg(true)
     try {
-      await deleteOrganization({ orgId })
+      await deleteOrganizationFn({ orgId })
       toast.success("Organisation deleted.")
       router.push("/organisations")
     } catch (e: any) {
@@ -555,11 +651,10 @@ export default function OrganizationDetailsPage() {
                 filteredFriends.map((fr) => (
                   <div
                     key={fr.id}
-                    className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
-                      selectedFriends.includes(fr.id)
-                        ? "bg-primary/10 border border-primary/20"
-                        : "hover:bg-muted/50"
-                    }`}
+                    className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${selectedFriends.includes(fr.id)
+                      ? "bg-primary/10 border border-primary/20"
+                      : "hover:bg-muted/50"
+                      }`}
                     onClick={() => toggleFriend(fr.id)}
                   >
                     <Avatar className="h-8 w-8">
@@ -645,7 +740,7 @@ export default function OrganizationDetailsPage() {
                 </div>
               </div>
 
-              {/* Right-side actions: consistent sizes + alignment */}
+              {/* Right-side actions */}
               <div className="flex flex-col gap-2 min-w-[240px]">
                 {!isMember && !organization.isPrivate && (
                   <Button size="lg" onClick={handleJoin} disabled={isJoining} className="w-full">
@@ -679,27 +774,10 @@ export default function OrganizationDetailsPage() {
                   </Button>
                 )}
 
-                {/* Make favorite toggle match sizing + alignment */}
                 <Button size="lg" variant="outline" onClick={handleToggleFavorite} className="w-full">
                   <Heart className={`h-5 w-5 mr-2 ${isFavorite ? "fill-red-500 text-red-500" : ""}`} />
                   {isFavorite ? "Remove Favorite" : "Add Favorite"}
                 </Button>
-
-                {isOwner && (
-                  <Button size="lg" variant="destructive" disabled={deletingOrg} onClick={handleDeleteOrganisation} className="w-full">
-                    {deletingOrg ? (
-                      <>
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        Deleting…
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="h-5 w-5 mr-2" />
-                        Delete Organisation
-                      </>
-                    )}
-                  </Button>
-                )}
               </div>
             </div>
           </div>
@@ -709,140 +787,22 @@ export default function OrganizationDetailsPage() {
         {isMember && (
           <div className="p-8">
             <Tabs defaultValue="notes" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <TabsTrigger value="notes" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Notes
-                </TabsTrigger>
-                <TabsTrigger value="details" className="flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Details
                 </TabsTrigger>
                 <TabsTrigger value="members" className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   Members
                 </TabsTrigger>
+                {isAdmin && (
+                  <TabsTrigger value="admin" className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Admin
+                  </TabsTrigger>
+                )}
               </TabsList>
-
-              {/* Details */}
-              <TabsContent value="details" className="mt-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Organisation Details</CardTitle>
-                    {isAdmin && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (isEditing) {
-                            setEditName(organization.name)
-                            setEditDescription(organization.description)
-                          }
-                          setIsEditing(!isEditing)
-                        }}
-                      >
-                        {isEditing ? (
-                          <>
-                            <X className="h-4 w-4 mr-2" />
-                            Cancel
-                          </>
-                        ) : (
-                          <>
-                            <Edit3 className="h-4 w-4 mr-2" />
-                            Edit
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Organisation Name</label>
-                      {isEditing ? (
-                        <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="mt-2" placeholder="Enter organisation name" />
-                      ) : (
-                        <p className="mt-2 text-lg font-semibold">{organization.name}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Description</label>
-                      {isEditing ? (
-                        <Textarea
-                          value={editDescription}
-                          onChange={(e) => setEditDescription(e.target.value)}
-                          className="mt-2"
-                          placeholder="Enter organisation description"
-                          rows={4}
-                        />
-                      ) : (
-                        <p className="mt-2 text-muted-foreground leading-relaxed">
-                          {organization.description || "No description provided"}
-                        </p>
-                      )}
-                    </div>
-
-                    {isEditing && (
-                      <div className="mt-6">
-                        <label className="text-sm font-medium text-muted-foreground">Privacy</label>
-                        <div className="flex items-center gap-2 mt-2">
-                          <div
-                            className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${
-                              !editIsPrivate ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
-                            }`}
-                            onClick={() => setEditIsPrivate(false)}
-                          >
-                            <Globe className="h-4 w-4" />
-                            <span>Public</span>
-                          </div>
-                          <div
-                            className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${
-                              editIsPrivate ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
-                            }`}
-                            onClick={() => setEditIsPrivate(true)}
-                          >
-                            <Lock className="h-4 w-4" />
-                            <span>Private</span>
-                          </div>
-                          <div className="ml-2 text-sm text-muted-foreground">
-                            {editIsPrivate ? "Only members can see this organisation" : "Anyone can see and join this organisation"}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {isEditing && (
-                      <div className="flex gap-2">
-                        <Button onClick={handleSaveEdit} disabled={savingEdit} className="flex items-center gap-2">
-                          {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                          Save Changes
-                        </Button>
-                      </div>
-                    )}
-
-                    <Separator />
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Created</label>
-                        <p className="mt-1">{new Date(organization.createdAt).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Privacy</label>
-                        <p className="mt-1">{organization.isPrivate ? "Private" : "Public"}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Total Members</label>
-                        <p className="mt-1">{memberCount}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Total Notes</label>
-                        <p className="mt-1">{organization.notes.length}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
 
               {/* Members */}
               <TabsContent value="members" className="mt-6">
@@ -908,12 +868,184 @@ export default function OrganizationDetailsPage() {
                 </Card>
               </TabsContent>
 
+              {/* Admin Tab - Only for Admins */}
+              {isAdmin && (
+                <TabsContent value="admin" className="mt-6">
+                  <div className="space-y-6">
+                    {/* Organization Settings */}
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle>Organisation Settings</CardTitle>
+                        {isOwner && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (isEditing) {
+                                setEditName(organization.name)
+                                setEditDescription(organization.description)
+                                setEditIsPrivate(organization.isPrivate)
+                              }
+                              setIsEditing(!isEditing)
+                            }}
+                          >
+                            {isEditing ? (
+                              <>
+                                <X className="h-4 w-4 mr-2" />
+                                Cancel
+                              </>
+                            ) : (
+                              <>
+                                <Edit3 className="h-4 w-4 mr-2" />
+                                Edit
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Organisation Name</label>
+                          {isEditing && isOwner ? (
+                            <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="mt-2" placeholder="Enter organisation name" />
+                          ) : (
+                            <p className="mt-2 text-lg font-semibold">{organization.name}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Description</label>
+                          {isEditing && isOwner ? (
+                            <Textarea
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              className="mt-2"
+                              placeholder="Enter organisation description"
+                              rows={4}
+                            />
+                          ) : (
+                            <p className="mt-2 text-muted-foreground leading-relaxed">
+                              {organization.description || "No description provided"}
+                            </p>
+                          )}
+                        </div>
+
+                        {isEditing && isOwner && (
+                          <div className="mt-6">
+                            <label className="text-sm font-medium text-muted-foreground">Privacy</label>
+                            <div className="flex items-center gap-2 mt-2">
+                              <div
+                                className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${!editIsPrivate ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+                                  }`}
+                                onClick={() => setEditIsPrivate(false)}
+                              >
+                                <Globe className="h-4 w-4" />
+                                <span>Public</span>
+                              </div>
+                              <div
+                                className={`px-4 py-2 rounded-md cursor-pointer flex items-center gap-2 ${editIsPrivate ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+                                  }`}
+                                onClick={() => setEditIsPrivate(true)}
+                              >
+                                <Lock className="h-4 w-4" />
+                                <span>Private</span>
+                              </div>
+                              <div className="ml-2 text-sm text-muted-foreground">
+                                {editIsPrivate ? "Only members can see this organisation" : "Anyone can see and join this organisation"}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {isEditing && isOwner && (
+                          <div className="flex gap-2">
+                            <Button onClick={handleSaveEdit} disabled={savingEdit} className="flex items-center gap-2">
+                              {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                              Save Changes
+                            </Button>
+                          </div>
+                        )}
+
+                        <Separator />
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-medium text-muted-foreground">Created</label>
+                            <p className="mt-1">{new Date(organization.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-muted-foreground">Privacy</label>
+                            <p className="mt-1">{organization.isPrivate ? "Private" : "Public"}</p>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-muted-foreground">Total Members</label>
+                            <p className="mt-1">{memberCount}</p>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-muted-foreground">Total Notes</label>
+                            <p className="mt-1">{organization.notes.length}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Danger Zone - Only for Owners */}
+                    {isOwner && (
+                      <Card className="border-destructive/50">
+                        <CardHeader>
+                          <CardTitle className="text-destructive flex items-center gap-2">
+                            <Trash2 className="h-5 w-5" />
+                            Danger Zone
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="text-sm font-medium text-muted-foreground mb-2">Delete Organisation</h4>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                Permanently delete this organisation and all its data. This action cannot be undone.
+                              </p>
+                              <Button 
+                                variant="destructive" 
+                                disabled={deletingOrg} 
+                                onClick={handleDeleteOrganisation}
+                                className="w-full sm:w-auto"
+                              >
+                                {deletingOrg ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Deleting…
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Organisation
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </TabsContent>
+              )}
+
               {/* Notes */}
               <TabsContent value="notes" className="mt-6">
+
+                <div className="flex justify-start mb-4">
+                  <Button onClick={handleAddNote} disabled={creatingNote} className="gap-2">
+                    {creatingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    New Note
+                  </Button>
+                </div>
+
                 {organization.notes.length === 0 ? (
                   <Card>
                     <CardContent className="py-10 text-center text-muted-foreground">
-                      No notes yet. 
+                      No notes yet.
                     </CardContent>
                   </Card>
                 ) : (
@@ -921,45 +1053,52 @@ export default function OrganizationDetailsPage() {
                     {organization.notes.map((note) => {
                       const isDeleting = deletingNoteIds.has(note.id)
                       return (
-                        <Card
+                      <Card
                           key={note.id}
-                          className="hover:shadow-md transition-shadow cursor-pointer group"
+                          className="hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col relative"
                           onClick={() => router.push(`/organisations/${orgId}/notes?noteId=${note.id}`)}
                         >
-                          <CardHeader className="flex flex-row items-start justify-between gap-3">
-                            <CardTitle className="text-lg line-clamp-2">{note.title}</CardTitle>
+                          {/* Top-right bin (delete) */}
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-2 right-2 opacity-80 hover:opacity-100"
+                              disabled={deletingNoteIds.has(note.id)}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleDeleteNote(note.id) // uses sonner toasts inside your handler
+                              }}
+                              title="Delete note"
+                            >
+                              {deletingNoteIds.has(note.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              )}
+                            </Button>
+                          )}
 
-                            {isAdmin && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="opacity-70 group-hover:opacity-100"
-                                disabled={isDeleting}
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  handleDeleteNote(note.id)
-                                }}
-                                title="Delete note"
-                              >
-                                {isDeleting ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                )}
-                              </Button>
-                            )}
+                          <CardHeader className="flex flex-row items-start justify-between gap-3 pr-10">
+                            <CardTitle className="text-lg line-clamp-2">{note.title}</CardTitle>
                           </CardHeader>
 
-                          <CardContent>
-                            <p className="text-muted-foreground text-sm line-clamp-3 mb-4">{note.content}</p>
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              {/* author name here */}
-                              <span> {note.author}</span>
+                          {/* Make content a flex column and fill remaining height */}
+                          <CardContent className="flex flex-col flex-1">
+                            {/* Preview text grows to fill space above the footer */}
+                            <p className="text-muted-foreground text-sm line-clamp-3 mb-4 grow">
+                              {extractNoteTextFromString(note.content)}
+                            </p>
+
+                            {/* Footer pinned to bottom: name left, date right */}
+                            <div className="mt-auto pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="truncate">{note.author || ""}</span>
                               <span>{new Date(note.updatedAt || note.createdAt).toLocaleDateString()}</span>
                             </div>
                           </CardContent>
                         </Card>
+
                       )
                     })}
                   </div>

@@ -1,75 +1,111 @@
-"use client";
 
-import { Suspense } from "react";
-import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
-import { onValue, ref } from "firebase/database";
-import { db } from "@/lib/firebase";
-import NotesSplitView, { type Note } from "@/components/notes/NotesSplitView";
+"use client"
 
-// Avoid prerender issues for client-only router hooks
-export const dynamic = "force-dynamic";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { useParams, useSearchParams } from "next/navigation"
+import { onValue, ref } from "firebase/database"
+import { db, fns } from "@/lib/firebase"
+import { httpsCallable } from "firebase/functions"
+
+// Controlled selection + split view
+import NotesSplitViewWithRibbon, { type Note } from "@/components/notes/OrgNotesSplitViewWithRibbon"
+
+export const dynamic = "force-dynamic"
 
 function OrgNotesInner() {
-  const { id: orgId } = useParams<{ id: string }>();
-  const search = useSearchParams();
-  const preselectId = search.get("noteId");
+  const { id: orgId } = useParams<{ id: string }>()
+  const search = useSearchParams()
+  const preselectId = search.get("noteId")
 
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [notes, setNotes] = useState<Note[]>([])
+  const [loading, setLoading] = useState(true)
 
+  // Sort / preselect logic
+  const activeNoteId = useMemo(() => {
+    if (preselectId) return preselectId
+    return notes.length > 0 ? notes[0].id : undefined
+  }, [preselectId, notes])
+
+  // Controlled selection
+  const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   useEffect(() => {
-    if (!orgId) return;
+    setSelectedId(activeNoteId)
+  }, [activeNoteId])
 
-    const notesRef = ref(db, `organizations/${orgId}/notes`);
+  // Live load notes
+  useEffect(() => {
+    if (!orgId) return
+    const notesRef = ref(db, `organizations/${orgId}/notes`)
     const unsub = onValue(notesRef, (snap) => {
-      const raw = (snap.val() as Record<string, Note> | null) ?? null;
-      let arr = raw ? Object.values(raw) : [];
-
-      arr.sort(
-        (a, b) =>
-          (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0)
-      );
-
+      const raw = (snap.val() as Record<string, Note> | null) ?? null
+      let arr = raw ? Object.values(raw) : []
+      arr.sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0))
       if (preselectId) {
-        const idx = arr.findIndex((n) => n.id === preselectId);
+        const idx = arr.findIndex((n) => n.id === preselectId)
         if (idx > 0) {
-          const [picked] = arr.splice(idx, 1);
-          arr = [picked, ...arr];
+          const [picked] = arr.splice(idx, 1)
+          arr = [picked, ...arr]
         }
       }
+      setNotes(arr)
+      setLoading(false)
+    })
+    return () => unsub()
+  }, [orgId, preselectId])
 
-      setNotes(arr);
-      setLoading(false);
-    });
+  // ---------- Page-level title state + commit-on-finish save ----------
+  const updateNoteAtPath = useMemo(() => httpsCallable(fns, "updateNoteAtPath"), [])
+  const currentNote = useMemo(
+    () => (selectedId ? (notes.find((n) => n.id === selectedId) ?? null) : null),
+    [notes, selectedId],
+  )
 
-    return () => unsub();
-  }, [orgId, preselectId]);
+  const [pageTitle, setPageTitle] = useState<string>("")
+  const lastCommittedRef = useRef<string>("")
 
-  if (!orgId)
-    return (
-      <div className="p-6 text-sm text-muted-foreground">Missing org id.</div>
-    );
+  // Sync pageTitle when selection or notes change
+  useEffect(() => {
+    const nextTitle = currentNote?.name ?? ""
+    setPageTitle(nextTitle)
+    lastCommittedRef.current = nextTitle
+  }, [currentNote?.id, currentNote?.name])
 
-  // Optional loading UI:
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center bg-background">
-  //       <div className="text-center space-y-3">
-  //         <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto" />
-  //         <p className="text-muted-foreground">Loading notes…</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  // Save only when the user is done typing (explicit commit)
+  async function commitTitleSave() {
+    if (!orgId || !selectedId) return
+    if (!currentNote) return
+    // Avoid unnecessary writes if nothing changed
+    if (pageTitle === lastCommittedRef.current) return
+    try {
+      await updateNoteAtPath({
+        path: `organizations/${orgId}/notes/${selectedId}`,
+        note: { name: pageTitle, updatedAt: Date.now() },
+      })
+      lastCommittedRef.current = pageTitle
+    } catch {
+     
+    }
+  }
+
+  if (!orgId) return <div className="p-6 text-sm text-muted-foreground">Missing org id.</div>
 
   return (
-    <NotesSplitView
-      notes={notes}
-      orgID={orgId}
-      initialSelectedId={preselectId ?? undefined}
-    />
-  );
+    <div className="px-4 md:px-6">
+      <div className="mt-4">
+        <NotesSplitViewWithRibbon
+          notes={notes}
+          orgID={orgId}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          initialSelectedId={activeNoteId ?? undefined}
+          loading={loading}
+          title={pageTitle}
+          onTitleChange={setPageTitle}
+          onTitleCommit={commitTitleSave}  
+        />
+      </div>
+    </div>
+  )
 }
 
 export default function OrgNotesWorkspacePage() {
@@ -77,5 +113,5 @@ export default function OrgNotesWorkspacePage() {
     <Suspense fallback={null}>
       <OrgNotesInner />
     </Suspense>
-  );
+  )
 }

@@ -28,7 +28,7 @@ export const sendTestNote = async () => {
 
   try {
     await set(ref(db, path), noteData);
-    console.log("✅ Note successfully written (or overwritten) to Realtime Database");
+
   } catch (error) {
     console.error("❌ Failed to write note:", error);
   }

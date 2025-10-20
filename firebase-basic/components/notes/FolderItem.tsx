@@ -1,7 +1,7 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { FileNode } from "@/types/note";
-import { ChevronRight, Folder, Trash2, GripVertical } from "lucide-react";
+import { ChevronRight, Folder, FolderOpen, Trash2, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -38,7 +38,7 @@ export default function FolderItem({
     : undefined;
 
   const handleRename = () => {
-    const newName = inputRef.current?.value.trim();
+    const newName = inputRef.current?.value?.trim();
     if (newName && newName !== node.name) {
       onRename(node.id, newName);
     }
@@ -53,39 +53,57 @@ export default function FolderItem({
       }}
       style={style}
       className={cn(
-        "flex items-center gap-2 px-3 py-1 rounded cursor-pointer group",
+        "flex items-center gap-2 rounded cursor-pointer group px-1 py-0.5",
         isOver && "bg-blue-100"
       )}
     >
+      {/* Drag handle — fixed width for column alignment */}
       <div
         {...listeners}
         {...attributes}
-        className="cursor-grab p-1 rounded hover:bg-gray-200"
+        className="cursor-grab p-1 rounded hover:bg-gray-200 w-6 flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
         aria-label="Drag handle"
         role="button"
       >
-        <GripVertical className="w-4 h-4 text-gray-500" />
+        <GripVertical className="w-4 h-4 text-black" />
       </div>
 
-      <ChevronRight
-        className={cn(
-          "w-3 h-3 transition-transform select-none",
-          isExpanded && "rotate-90"
+      {/* Chevron — fixed width so icons align in a column */}
+      <span className="w-5 flex items-center justify-center select-none">
+        <ChevronRight
+          className={cn(
+            "w-4 h-4 text-black transition-transform",
+            isExpanded && "rotate-90"
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleExpand();
+          }}
+        />
+      </span>
+
+      {/* Folder icon — BLUE; switches on open/close */}
+      <span className="w-5 flex items-center justify-center select-none">
+        {isExpanded ? (
+          <FolderOpen
+            className="w-4 h-4 text-blue-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpand();
+            }}
+          />
+        ) : (
+          <Folder
+            className="w-4 h-4 text-blue-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpand();
+            }}
+          />
         )}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleExpand();
-        }}
-      />
-      <Folder
-        className="w-4 h-4 text-yellow-500 select-none"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleExpand();
-        }}
-      />
+      </span>
 
       {isRenaming ? (
         <input
@@ -100,7 +118,7 @@ export default function FolderItem({
         />
       ) : (
         <span
-          className="text-sm select-none truncate max-w-[100px] inline-block align-middle"
+          className="text-sm select-none truncate max-w-[140px] inline-block align-middle"
           style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
           title={node.name}
           onClick={() => onSelect(node.id)}
@@ -110,15 +128,16 @@ export default function FolderItem({
         </span>
       )}
 
+      {/* Delete — keep red */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onDelete(node.id);
         }}
-        className="ml-auto opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700"
+        className="ml-auto opacity-0 group-hover:opacity-100 hover:opacity-100"
         aria-label={`Delete folder ${node.name}`}
       >
-        <Trash2 className="w-3 h-3" />
+        <Trash2 className="w-4 h-4 text-red-500" />
       </button>
     </div>
   );

@@ -1,0 +1,222 @@
+import React from 'react';
+import { SignupForm } from '@/components/signup-form';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import "@testing-library/jest-dom";
+
+// Mock implementations - declare functions directly in jest.mock calls
+const mockCreateUserWithEmailAndPassword = jest.fn();
+const mockPush = jest.fn();
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
+jest.mock("firebase/auth", () => ({
+  getAuth: jest.fn(() => ({})),
+  createUserWithEmailAndPassword: jest.fn((...args) => 
+    mockCreateUserWithEmailAndPassword(...args)),
+  updateProfile: jest.fn(() => Promise.resolve()),
+}));
+
+// Fix: Create mock functions directly in the mock call
+jest.mock("firebase/database", () => ({
+  ref: jest.fn((db, path) => ({ db, path })),
+  set: jest.fn(),
+}));
+
+jest.mock("@/lib/firebase", () => ({
+  auth: {},
+  db: {},
+}));
+
+// Import the mocked functions after mocking
+import { ref as mockRef, set as mockSet } from 'firebase/database';
+
+describe('SignupForm', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateUserWithEmailAndPassword.mockReset();
+    (mockSet as jest.Mock).mockReset();
+    (mockRef as jest.Mock).mockReset();
+    mockPush.mockReset();
+    (mockRef as jest.Mock).mockImplementation((db, path) => ({ db, path }));
+  });
+
+  describe('Happy paths', () => {
+    test('renders all form fields and static content', () => {
+      render(<SignupForm />);
+      
+      expect(screen.getByText('Create Account')).toBeInTheDocument();
+      expect(screen.getByText('Join the Smart Student community')).toBeInTheDocument();
+      expect(screen.getByTestId('name-input')).toBeInTheDocument();
+      // Fixed: Use placeholder text selector instead of testid for now
+      expect(screen.getByPlaceholderText('Your surname')).toBeInTheDocument();
+      expect(screen.getByTestId('email-input')).toBeInTheDocument();
+      expect(screen.getByTestId('password-input')).toBeInTheDocument();
+      expect(screen.getByTestId('submit-button')).toBeInTheDocument();
+      expect(screen.getByText(/Already have an account/i)).toBeInTheDocument();
+      expect(screen.getByText(/By signing up, you agree to our/i)).toBeInTheDocument();
+    });
+
+    test('successful form submission', async () => {
+      const mockUser = { 
+        uid: 'test-uid',
+        email: 'test@example.com' 
+      };
+      
+      mockCreateUserWithEmailAndPassword.mockResolvedValue({ user: mockUser });
+      (mockSet as jest.Mock).mockResolvedValue(undefined);
+    
+      render(<SignupForm />);
+    
+      // Fill out the form - Fixed: Use specific selectors
+      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
+      
+      // Submit the form
+      fireEvent.click(screen.getByTestId('submit-button'));
+
+      // Wait for the async operations to complete
+      await waitFor(() => {
+        expect(mockCreateUserWithEmailAndPassword).toHaveBeenCalledWith(
+          expect.anything(),
+          'test@example.com',
+          'password123'
+        );
+        
+        expect(mockSet).toHaveBeenCalledWith(
+          expect.anything(),
+          {
+            name: 'Test',
+            surname: 'User',
+            role: 'User',
+            email: 'test@example.com',
+            createdAt: expect.any(Number),
+          }
+        );
+        
+        expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      });
+    });
+
+    test('email validation works correctly', () => {
+      // Test the email regex directly
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      expect(emailRegex.test('invalid-email')).toBe(false);
+      expect(emailRegex.test('test@example.com')).toBe(true);
+    });
+  });
+
+  describe('Error handling', () => {
+    test('shows error when user creation fails', async () => {
+      mockCreateUserWithEmailAndPassword.mockRejectedValue(new Error('Email already in use'));
+
+      render(<SignupForm />);
+
+      // Fill out form with valid data
+      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
+      
+      // Submit form
+      fireEvent.click(screen.getByTestId('submit-button'));
+
+      // Wait for error message
+      await waitFor(() => {
+        expect(screen.getByText('Email already in use')).toBeInTheDocument();
+      });
+    });
+
+    test('shows error when database write fails', async () => {
+      const mockUser = { 
+        uid: 'test-uid',
+        email: 'test@example.com' 
+      };
+      
+      mockCreateUserWithEmailAndPassword.mockResolvedValue({ user: mockUser });
+      (mockSet as jest.Mock).mockRejectedValue(new Error('Database write failed'));
+
+      render(<SignupForm />);
+
+      // Fill out form
+      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
+      
+      // Submit form
+      fireEvent.click(screen.getByTestId('submit-button'));
+
+      // Wait for error message
+      await waitFor(() => {
+        expect(screen.getByText('Database write failed')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Form behavior', () => {
+    test('disables submit button when required fields are empty', () => {
+      render(<SignupForm />);
+      const button = screen.getByTestId('submit-button');
+      expect(button).toBeDisabled();
+    });
+
+    test('enables submit button when all fields are valid', () => {
+      render(<SignupForm />);
+      
+      fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByTestId('email-input'), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'password123' } });
+      
+      const button = screen.getByTestId('submit-button');
+      expect(button).not.toBeDisabled();
+    });
+
+    test('trims whitespace from inputs', async () => {
+      const mockUser = { 
+        uid: 'test-uid',
+        email: 'test@example.com' 
+      };
+      
+      mockCreateUserWithEmailAndPassword.mockResolvedValue({ user: mockUser });
+      (mockSet as jest.Mock).mockResolvedValue(true);
+
+      render(<SignupForm />);
+
+      // Fill form with whitespace
+      fireEvent.change(screen.getByTestId('name-input'), { target: { value: '  Test  ' } });
+      fireEvent.change(screen.getByPlaceholderText('Your surname'), { target: { value: '  User  ' } });
+      fireEvent.change(screen.getByTestId('email-input'), { target: { value: '  test@example.com  ' } });
+      fireEvent.change(screen.getByTestId('password-input'), { target: { value: '  password123  ' } });
+      
+      // Submit form
+      fireEvent.click(screen.getByTestId('submit-button'));
+
+      // Verify trimmed values were used
+      await waitFor(() => {
+        expect(mockCreateUserWithEmailAndPassword).toHaveBeenCalledWith(
+          expect.anything(),
+          'test@example.com',
+          'password123'
+        );
+        
+        expect(mockSet).toHaveBeenCalledWith(
+          expect.anything(),
+          {
+            name: 'Test',
+            surname: 'User',
+            role: 'User',
+            email: 'test@example.com',
+            createdAt: expect.any(Number),
+          }
+        );
+      });
+    });
+  });
+});
