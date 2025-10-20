@@ -152,8 +152,7 @@ export function YjsBlockNoteEditor({
     );
   }
 
-  return <BlockNoteView editor={editor} theme={theme} slashMenu={false}
-  >
+  return <BlockNoteView editor={editor} theme={theme} slashMenu={false}>
     <SuggestionMenuController
       triggerCharacter={"/"}
       suggestionMenuComponent={CustomSlashMenu}
