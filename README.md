@@ -60,7 +60,7 @@ Built to boost academic productivity and make studying simpler and smarter.
 - 📖 [User Manual](docs/F5_User_Manual.pdf)
 - 📖 [Testing Policy](docs/F5_Testing_Policy.pdf)
 - 📖 [Deployment Diagram](docs/F5_Deployement_Model.pdf)
-- 🔗[Demo Video](https://drive.google.com/file/d/1Tkw3Wsu43KCyIVX9yeC8zNIBY9Rl5UNT/view?usp=sharing)
+- 🔗[Project Video](https://drive.google.com/file/d/1QhMwksYrTu1qIWp4NvZ8Tc3OmsdQAqpw/view?usp=drive_link)
 
 ## 🔗 Project Management & Links
 
@@ -200,6 +200,7 @@ We follow a customized GitFlow:
 
 
 ---
+
 
 
 
